@@ -1,0 +1,93 @@
+// Copyright 2015 Google Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Base test yang module.
+module base {
+  namespace "urn:mod";
+  prefix "base";
+
+  include sub;
+  import other {
+    prefix bother;
+  }
+
+  // basic type tests
+  typedef base-type { type int32; }
+  leaf base-leaf1 { type base-type; }
+  leaf base-leaf2 { type base:base-type; }
+  leaf base-leaf3 { type bother:other-type; }
+  leaf base-leaf4 { type sub-type; }
+
+  grouping base-group {
+    description
+      "The base-group is used to test the 'uses' statement below.
+       This description is here to simply include a multi-line string
+       as an example of multi-line strings";
+    leaf base-group-leaf {
+      config false;
+      type string;
+    }
+  }
+
+  // test uses and leaf ref
+  container base-container-1 {
+    uses base-group;
+    uses bother:other-group;
+    uses base:sub-group;
+    choice base-choice {
+      case choice-a {
+          leaf base-choice-a1 { type string; }
+          leaf base-choice-a2 {
+            type leafref { path ../base-container-1-leaf; }
+          }
+      }
+      case choice-b {
+          leaf base-choice-b1 { type string; }
+          leaf base-choice-b2 {
+            type leafref { path ../../base-container-2/base-container-2a/base-container-2a-leaf; }
+          }
+      }
+    }
+    leaf base-container-1-leaf { type string; }
+  }
+
+  // container referenced by a leafref above
+  container base-container-2 {
+    container base-container-2a {
+      leaf base-container-2a-leaf { type string; }
+    }
+  }
+
+  // test basic augmenting
+  augment /base-container-1/base-choice/choice-a {
+     leaf base-choice-a3 { type string; }
+  }
+  augment /base-container-1/base-choice {
+     case choice-c {
+        leaf base-choice-c1 { type string; }
+     }
+  }
+
+  // simple extension test
+  extension base-ext {
+     argument base-arg;
+  }
+  container ext-container {
+     config false;
+     leaf ext-container-leaf { type string; }
+     base:base-ext "EXTENSION" {
+       leaf base-ext-leaf { type string; }
+     }
+  }
+}

@@ -1,0 +1,297 @@
+// Copyright 2015 Google Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package yang
+
+// This file implements the Modules type.  This includes the processing of
+// include and import statements, which must be done prior to turning the
+// module into an Entry tree.
+
+import "fmt"
+
+// Modules contains information about all the top level modules and
+// submodules that are read into it via its Read method.
+type Modules struct {
+	Modules    map[string]*Module // All "module" nodes
+	SubModules map[string]*Module // All "submodule" nodes
+	includes   map[*Module]bool   // Modules we have already done include on
+}
+
+// NewModules returns a newly created and initialized Modules.
+func NewModules() *Modules {
+	return &Modules{
+		Modules:    map[string]*Module{},
+		SubModules: map[string]*Module{},
+		includes:   map[*Module]bool{},
+	}
+}
+
+// Read reads the named yang module into ms.  The name can be the name of an
+// actual .yang file or a module/submodule name (the base name of a .yang file,
+// e.g., foo.yang is named foo).  An error is returned if the file is not
+// found or there was an error parsing the file.
+func (ms *Modules) Read(name string) error {
+	name, data, err := findFile(name)
+	if err != nil {
+		return err
+	}
+	return ms.Parse(string(data), name)
+}
+
+// Parse parses data as YANG source and adds it to ms.  The name should reflect
+// the source of data.
+func (ms *Modules) Parse(data, name string) error {
+	ss, err := Parse(data, name)
+	if err != nil {
+		return err
+	}
+	for _, s := range ss {
+		n, err := BuildAST(s)
+		if err != nil {
+			return err
+		}
+		ms.add(n)
+	}
+	return nil
+}
+
+// GetModule returns the Entry of the module named by name.  GetModule will
+// search for and read the file named name + ".yang" if it cannot satisfy the
+// request from what it has currntly read.
+//
+// GetModule is a convience function for calling Read and Process, and
+// then looking up the module name.  It is safe to call Read and Process prior
+// to calling GetModule.
+func (ms *Modules) GetModule(name string) (*Entry, []error) {
+	if ms.Modules[name] == nil {
+		if err := ms.Read(name); err != nil {
+			return nil, []error{err}
+		}
+		if ms.Modules[name] == nil {
+			return nil, []error{fmt.Errorf("module not found: %s", name)}
+		}
+	}
+	// Make sure that the modules have all been processed and have no
+	// errors.
+	if errs := ms.Process(); len(errs) != 0 {
+		return nil, errs
+	}
+	return ToEntry(ms.Modules[name]), nil
+}
+
+// GetModule optionally reads in a set of YANG source files, named by sources,
+// and then returns the Entry for the module named module.  If sources is
+// missing, or the named module is not yet known, GetModule searchs for name
+// with the suffix ".yang".  GetModule either returns an Entry or returns
+// one or more errors.
+//
+// GetModule is a convience function for calling NewModules, Read, and Process,
+// and then looking up the module name.
+func GetModule(name string, sources ...string) (*Entry, []error) {
+	var errs []error
+	ms := NewModules()
+	for _, source := range sources {
+		if err := ms.Read(source); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		return nil, errs
+	}
+	return ms.GetModule(name)
+}
+
+// add adds Node n to ms.  n must be assignable to *Module (i.e., it is a
+// "module" or "submodule").  An error is returned if n is a duplicate of
+// a name already added, or n is not assignable to *Module.
+func (ms *Modules) add(n Node) error {
+	var m map[string]*Module
+
+	name := n.NName()
+	kind := n.Kind()
+	switch kind {
+	case "module":
+		m = ms.Modules
+	case "submodule":
+		m = ms.SubModules
+	default:
+		return fmt.Errorf("not a module or submodule: %s is of type %s", name, kind)
+	}
+
+	mod := n.(*Module)
+	fullName := mod.FullName()
+	mod.modules = ms
+
+	if o := m[fullName]; o != nil {
+		return fmt.Errorf("duplicate %s %s at %s and %s", kind, fullName, Source(o), Source(n))
+	}
+	m[fullName] = mod
+	if fullName == name {
+		return nil
+	}
+
+	// Add us to the map if:
+	// name has not been added before
+	// fullname is a more recent version of the entry.
+	if o := m[name]; o == nil || o.FullName() < fullName {
+		m[name] = mod
+	}
+	return nil
+}
+
+// FindModule returns the Module/Submodule specified by n, which must be a
+// *Include or *Import.  If n is a *Include then a submodule is returned.  If n
+// is a *Import then a module is returned.
+func (ms *Modules) FindModule(n Node) *Module {
+	name := n.NName()
+	rev := name
+	var m map[string]*Module
+
+	switch i := n.(type) {
+	case *Include:
+		m = ms.SubModules
+		if i.RevisionDate != nil {
+			rev = name + "@" + i.RevisionDate.Name
+		}
+		// TODO(borman): we should check the BelongsTo field below?
+	case *Import:
+		m = ms.Modules
+		if i.RevisionDate != nil {
+			rev = name + "@" + i.RevisionDate.Name
+		}
+	default:
+		return nil
+	}
+	if n := m[rev]; n != nil {
+		return n
+	}
+	if n := m[name]; n != nil {
+		return n
+	}
+
+	// Try to read it in.
+	if err := ms.Read(name); err != nil {
+		return nil
+	}
+	if n := m[rev]; n != nil {
+		return n
+	}
+	return m[name]
+}
+
+// process satisfies all include and import statements and verifies that all
+// link ref paths reference a known node.  If an import or include references
+// a [sub]module that is not already known, Process will search for a .yang
+// file that contains it, returning an error if not found.  An error is also
+// returned if there is an unknown link ref path or other parsing errors.
+//
+// Process must be called once all the source modules have been read in and
+// prior to converting Node tree into an Entry tree.
+func (ms *Modules) process() []error {
+	var mods []*Module
+	var errs []error
+
+	// Collect the list of modules we know about now so when we range
+	// below we don't pick up new modules.  We assume the user tells
+	// us explicitly which modules they are interested in.
+	for _, m := range ms.Modules {
+		mods = append(mods, m)
+	}
+	for _, m := range mods {
+		if err := ms.include(m); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	// Append any errors found trying to resolve typedefs
+	errs = append(errs, resolveTypedefs()...)
+	return errs
+}
+
+// Process processes all the modules and submodules that have been read into
+// ms.  While processing, if an include or import is found for which there
+// is no matching module, Process attempts to locate the source file (using
+// Path) and automatically load them.  If a file cannot be found then an
+// error is returned.  When looking for a source file, Process searches for a
+// file using the module's or submodule's name with ".yang" appended.  After
+// searching the current directory, the directories in Path are searched.
+//
+// Process may return multiple errors if multiple errors were encountered
+// while processing.  Even though multiple errors may be returned, this does
+// not mean these are all the errors.  Process will terminate processing early
+// based on the type and location of the error.
+func (ms *Modules) Process() []error {
+	errs := ms.process()
+	for _, m := range ms.Modules {
+		errs = append(errs, ToEntry(m).GetErrors()...)
+	}
+	for _, m := range ms.SubModules {
+		errs = append(errs, ToEntry(m).GetErrors()...)
+	}
+
+	// Now resort the combined set of errors and then de-dup the
+	// errors.  It is possible the same error was reported in two
+	// different modules/sub-modules due include or import statements.
+	errorSort(errs)
+
+	i := 0
+	for _, err := range errs {
+		if i > 0 && err == errs[i-1] {
+			continue
+		}
+		errs[i] = err
+		i++
+	}
+	return errs[:i]
+}
+
+// include resolves all the include and import statements for m.  It returns
+// an error if m, or recursively, any of the modules it includes or imports,
+// reference a module that cannot be found.
+func (ms *Modules) include(m *Module) error {
+	if ms.includes[m] {
+		return nil
+	}
+	ms.includes[m] = true
+
+	// First process any includes in this module.
+	for _, i := range m.Include {
+		im := ms.FindModule(i)
+		if im == nil {
+			// TODO(borman): should print @rev if available
+			return fmt.Errorf("no such submodule: %s", i.Name)
+		}
+		// Process the include statements in our included module.
+		if err := ms.include(im); err != nil {
+			return err
+		}
+		i.Module = im
+	}
+
+	// Next process any imports in this module.  Imports are used
+	// when searching.
+	for _, i := range m.Import {
+		im := ms.FindModule(i)
+		if im == nil {
+			// TODO(borman): should print @rev if available
+			return fmt.Errorf("no such module: %s", i.Name)
+		}
+		// Process the include statements in our included module.
+		if err := ms.include(im); err != nil {
+			return err
+		}
+		i.Module = im
+	}
+	return nil
+}
