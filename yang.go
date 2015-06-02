@@ -47,8 +47,8 @@ import (
 	"strings"
 
 	"code.google.com/p/getopt"
-	"yang/pkg/indent"
-	"yang/pkg/yang"
+	"github.com/openconfig/goyang/pkg/indent"
+	"github.com/openconfig/goyang/pkg/yang"
 )
 
 // Types keeps track of all the YangTypes defined.
