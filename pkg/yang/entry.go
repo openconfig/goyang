@@ -254,7 +254,7 @@ func (e *Entry) asKind(k EntryKind) *Entry {
 func (e *Entry) add(key string, value *Entry) *Entry {
 	value.Parent = e
 	if e.Dir[key] != nil {
-		e.errorf("%s: duplicate key: %s", Source(value.Node), key)
+		e.errorf("%s: duplicate key from %s: %s", Source(e.Node), Source(value.Node), key)
 		return e
 	}
 	e.Dir[key] = value
@@ -564,7 +564,11 @@ func (e *Entry) merge(prefix *Value, oe *Entry) {
 		if prefix != nil {
 			v.Prefix = prefix.Name
 		}
-		e.add(k, v)
+		if se := e.Dir[k]; se != nil {
+			se.merge(prefix, v)
+		} else {
+			e.Dir[k] = v;
+		}
 	}
 }
 

@@ -84,12 +84,12 @@ module base {
 
 var badYangErrors = []string{
 	`bad.yang:9:3: invalid config value: bad`,
+	`bad.yang:13:3: duplicate key from bad.yang:20:5: bob`,
 	`bad.yang:14:5: invalid config value: incorrect`,
 	`bad.yang:17:7: unknown type: base:unknown`,
-	`bad.yang:20:5: duplicate key: bob`,
 	`bad.yang:22:5: unknown group: the-beatles`,
 	`bad.yang:25:3: augment nothing: nothing: no such element`,
-	`bad.yang:35:5: duplicate key: one`,
+	`bad.yang:32:3: duplicate key from bad.yang:35:5: one`,
 }
 
 func TestBadYang(t *testing.T) {
