@@ -25,9 +25,12 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"io"
 	"sort"
 	"strconv"
 	"strings"
+
+        "github.com/openconfig/goyang/pkg/indent"
 )
 
 // A TriState may be true, false, or unset
@@ -84,6 +87,44 @@ type Entry struct {
 	// Fields associted with choice statements
 	Choice *Entry // The choice statement the entry is part of
 	Case   *Entry // The case statement, if any, the entry is in
+}
+
+// Print prints e to w in human readable form.
+func (e *Entry)Print(w io.Writer) {
+        if e.Description != "" {
+                fmt.Fprintln(w)
+                fmt.Fprintln(indent.NewWriter(w, "// "), e.Description)
+        }
+        if e.ReadOnly() {
+                fmt.Fprintf(w, "RO: ")
+        } else {
+                fmt.Fprintf(w, "rw: ")
+        }
+        if e.Type != nil {
+                fmt.Fprintf(w, "%s ", e.Type.Name)
+        }
+        switch {
+        case e.Dir == nil && e.IsList:
+                fmt.Fprintf(w, "[]%s\n", e.Name)
+                return
+        case e.Dir == nil:
+                fmt.Fprintf(w, "%s\n", e.Name)
+                return
+        case e.IsList:
+                fmt.Fprintf(w, "[%s]%s {\n", e.Key, e.Name) //}
+        default:
+                fmt.Fprintf(w, "%s {\n", e.Name) //}
+        }
+        var names []string
+        for k := range e.Dir {
+                names = append(names, k)
+        }
+        sort.Strings(names)
+        for _, k := range names {
+                e.Dir[k].Print(indent.NewWriter(w, "  "))
+        }
+        // { to match the brace below to keep brace matching working
+        fmt.Fprintln(w, "}")
 }
 
 // An EntryKind is the kind of node an Entry is.  All leaf nodes are of kind
@@ -224,6 +265,7 @@ func (e *Entry) add(key string, value *Entry) *Entry {
 // converted nodes.
 var entryCache = map[Node]*Entry{}
 
+var depth = 0
 // ToEntry expands node n into a directory Entry.  Expansion is based on the
 // YANG tags in the structure behind n.  ToEntry must only be used
 // with nodes that are directories, such as top level modules and sub-modules.
@@ -437,10 +479,10 @@ func ToEntry(n Node) (e *Entry) {
 	// should be done after the entire tree is built.  Is it correct to
 	// assume augment paths are data tree paths and not schema tree paths?
 	for _, a := range augments {
-		an := FindNode(a.Node, a.Name)
+		an, err := FindNode(a.Node, a.Name)
 		switch an {
 		case nil:
-			e.errorf("%s: augment element not found: %s", Source(a.Node), a.Name)
+			e.errorf("%s: augment %s: %s", Source(a.Node), a.Name, err)
 			continue
 		case isRPCNode:
 			// Just ignore augments to RPC nodes since we are

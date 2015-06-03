@@ -17,6 +17,7 @@ package yang
 // This file has functions that search the AST for specified nodes.
 
 import (
+"fmt"
 	"reflect"
 	"strings"
 )
@@ -50,6 +51,10 @@ func FindGrouping(n Node, name string) *Grouping {
 		// Grab the Grouping field of the underlying structure.  n is
 		// always a pointer to a structure,
 		e := reflect.ValueOf(n).Elem()
+		if !e.IsValid() {
+			fmt.Printf("%s: unknown grouping\n", name)
+			return nil
+		}
 		v := e.FieldByName("Grouping")
 		if v.IsValid() {
 			for _, g := range v.Interface().([]*Grouping) {

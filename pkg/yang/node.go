@@ -16,8 +16,12 @@ package yang
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"reflect"
 	"strings"
+
+	"google3/ops/netops/gnetch/frontend/indent"
 )
 
 // A Node contains a yang statement and all attributes and sub-statements.
@@ -134,17 +138,17 @@ func RootNode(n Node) *Module {
 // reference a node then nil is returned (i.e. path not found).  The path looks
 // similar to an XPath but curently has no wildcarding.  For example:
 // "/if:interfaces/if:interface" and "../config".
-func FindNode(n Node, path string) Node {
+func FindNode(n Node, path string) (Node, error) {
 	if path == "" {
-		return n
+		return n, nil
 	}
 	// / is not a valid path, it needs a module name
 	if path == "/" {
-		return nil
+		return nil, fmt.Errorf("invalid path %q", path)
 	}
 	// Paths do not end in /'s
 	if path[len(path)-1] == '/' {
-		return nil
+		return nil, fmt.Errorf("invalid path %q", path)
 	}
 
 	parts := strings.Split(path, "/")
@@ -160,11 +164,10 @@ func FindNode(n Node, path string) Node {
 		// The base is always a module
 		mod := n.(*Module)
 		prefix, _ := getPrefix(parts[0])
-
 		if mod.Kind() == "submodule" {
 			m := mod.modules.Modules[mod.BelongsTo.Name]
 			if m == nil {
-				return nil
+				return nil, fmt.Errorf("%s: unknown module %s", m.Name, mod.BelongsTo.Name)
 			}
 			if prefix == "" || prefix == mod.BelongsTo.Prefix.Name {
 				mod = m
@@ -184,7 +187,7 @@ func FindNode(n Node, path string) Node {
 			}
 		}
 		// We didn't find a matching prefix.
-		return nil
+		return nil, fmt.Errorf("unknown prefix: %q", prefix)
 	processing:
 		// At this point, n should be pointing to the Module node
 		// of module we are rooted in
@@ -196,14 +199,14 @@ func FindNode(n Node, path string) Node {
 		// an error that it is an RPC node.  isRPCNode is a singleton
 		// and can be checked against.
 		if n.Kind() == "rpc" {
-			return isRPCNode
+			return isRPCNode, nil
 		}
 		if part == ".." {
 		Loop:
 			for {
 				n = n.ParentNode()
 				if n == nil {
-					return nil
+					return nil, fmt.Errorf(".. with no parent")
 				}
 				// choice, leaf, and case nodes
 				// are "invisible" when doing ".."
@@ -218,13 +221,13 @@ func FindNode(n Node, path string) Node {
 		}
 		// For now just strip off any prefix
 		// TODO(borman): fix this
-		_, part := getPrefix(part)
-		n = ChildNode(n, part)
+		_, spart := getPrefix(part)
+		n = ChildNode(n, spart)
 		if n == nil {
-			return n
+			return nil, fmt.Errorf("%s: no such element", part)
 		}
 	}
-	return n
+	return n, nil
 }
 
 // ChildNode finds n's child node named name.  It returns nil if the node
@@ -255,21 +258,93 @@ Loop:
 			continue
 		}
 
+		check := func(n Node) Node {
+			if n.NName() == name {
+				return n
+			}
+			return nil
+		}
+		if parts[0] == "uses" {
+			check = func(n Node) Node {
+				uname := n.NName()
+				// unrooted uses are rooted at root
+				if !strings.HasPrefix(uname, "/") {
+					uname = "/" + uname
+				}
+				if n, _ = FindNode(n, uname); n != nil {
+					return ChildNode(n, name)
+				}
+				return nil
+			}
+		}
+
 		switch ft.Type.Kind() {
 		case reflect.Ptr:
-			n = f.Interface().(Node)
-			if n.NName() == name {
+			if n = check(f.Interface().(Node)); n != nil {
 				return n
 			}
 		case reflect.Slice:
 			sl := f.Len()
 			for i := 0; i < sl; i++ {
 				n = f.Index(i).Interface().(Node)
-				if n.NName() == name {
+				if n = check(n); n != nil {
 					return n
 				}
 			}
 		}
 	}
 	return nil
+}
+
+// PrintNode prints node n to w, recursively.
+// TODO(borman): display more information
+func PrintNode(w io.Writer, n Node) {
+	v := reflect.ValueOf(n).Elem()
+	t := v.Type()
+	nf := t.NumField()
+	fmt.Fprintf(w, "%s%s [%s]\n", n.NName(), n.Kind())
+Loop:
+	for i := 0; i < nf; i++ {
+		ft := t.Field(i)
+		yang := ft.Tag.Get("yang")
+		if yang == "" {
+			continue
+		}
+		parts := strings.Split(yang, ",")
+		for _, p := range parts[1:] {
+			if p == "nomerge" {
+				continue Loop
+			}
+		}
+
+		// Skip uppercase elements.
+		if parts[0][0] >= 'A' && parts[0][0] <= 'Z' {
+			continue
+		}
+
+		f := v.Field(i)
+		if !f.IsValid() || f.IsNil() {
+			continue
+		}
+
+		switch ft.Type.Kind() {
+		case reflect.Ptr:
+			n = f.Interface().(Node)
+			if v, ok := n.(*Value); ok {
+				fmt.Fprintf(w, "%s%s = %s\n", ft.Name, v.Name)
+			} else {
+				PrintNode(indent.NewWriter(w, "    "), n)
+			}
+		case reflect.Slice:
+			sl := f.Len()
+			for i := 0; i < sl; i++ {
+				n = f.Index(i).Interface().(Node)
+				if v, ok := n.(*Value); ok {
+					fmt.Fprintf(w, "%s%s[%d] = %s\n", ft.Name, i, v.Name)
+				} else {
+					PrintNode(indent.NewWriter(w, "    "), n)
+				}
+			}
+		}
+	}
 }

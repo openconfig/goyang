@@ -1,0 +1,28 @@
+module aug {
+  namespace "yang-sucks";
+  prefix "yang";
+  grouping bgp-neighbor_config {
+    leaf peer-as { type string; }
+  }
+  grouping bgp-neighbors {
+    list neighbor {
+      uses bgp-neighbor-group;
+    }
+  }
+  grouping bgp-neighbor-group {
+    container config {
+      uses bgp-neighbor_config;
+    }
+  }
+  grouping bgp-neighbor-peer-group_config {
+    leaf peer-group { type string; }
+  }
+  augment /bgp/neighbors/neighbor/config {
+    uses bgp-neighbor-peer-group_config;
+  }
+  container bgp {
+    container neighbors {
+      uses bgp-neighbors;
+    }
+  }
+}
