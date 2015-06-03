@@ -303,7 +303,7 @@ type Type struct {
 	Path            *Value     `yang:"path"`
 	Pattern         []*Pattern `yang:"pattern"`
 	Range           *Range     `yang:"range"`
-	RequireInstance *Value     `yang:"required-instance"`
+	RequireInstance *Value     `yang:"require-instance"`
 	Type            []*Type    `yang:"type"` // len > 1 only when Name is "union"
 
 	YangType *YangType
