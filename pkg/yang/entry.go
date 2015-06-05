@@ -479,17 +479,11 @@ func ToEntry(n Node) (e *Entry) {
 	// should be done after the entire tree is built.  Is it correct to
 	// assume augment paths are data tree paths and not schema tree paths?
 	for _, a := range augments {
-		an, err := FindNode(a.Node, a.Name)
-		switch an {
-		case nil:
-			e.errorf("%s: augment %s: %s", Source(a.Node), a.Name, err)
-			continue
-		case isRPCNode:
-			// Just ignore augments to RPC nodes since we are
-			// ignoring RPC nodes in general.
+		ae := a.Find(a.Name)
+		if ae == nil {
+			e.errorf("%s: augment %s not found", Source(a.Node), a.Name)
 			continue
 		}
-		ae := ToEntry(an)
 		// Augments do not have a prefix we merge in, just a node.
 		ae.merge(nil, a)
 	}
@@ -524,6 +518,7 @@ func (e *Entry) Find(name string) *Entry {
 	}
 	parts := strings.Split(name[1:], "/")
 	for _, part := range parts {
+		_, part = getPrefix(part)
 		ne := e.Dir[part]
 		if ne == nil {
 			return nil
@@ -531,6 +526,14 @@ func (e *Entry) Find(name string) *Entry {
 		e = ne
 	}
 	return e
+}
+
+// Path returns the path to e. A nil Entry returns "".
+func (e *Entry)Path() string {
+	if e == nil {
+		return ""
+	}
+	return e.Parent.Path()+"/"+e.Name
 }
 
 // dup makes a deep duplicate of e.
@@ -556,7 +559,8 @@ func (e *Entry) dup() *Entry {
 }
 
 // merge merges a duplicate of oe.Dir into e.Dir, setting the prefix of each
-// element to prefix, if not nil.
+// element to prefix, if not nil.  It is an error if e and oe contain common
+// elements.
 func (e *Entry) merge(prefix *Value, oe *Entry) {
 	e.importErrors(oe)
 	for k, v := range oe.Dir {
@@ -565,7 +569,10 @@ func (e *Entry) merge(prefix *Value, oe *Entry) {
 			v.Prefix = prefix.Name
 		}
 		if se := e.Dir[k]; se != nil {
-			se.merge(prefix, v)
+			er := newError(oe.Node, `Duplicate node %q in %q from:
+   %s: %s
+   %s: %s`, k, e.Name, Source(v.Node), v.Name, Source(se.Node), se.Name)
+			e.addError(er.Errors[0])
 		} else {
 			e.Dir[k] = v;
 		}
