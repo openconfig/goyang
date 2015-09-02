@@ -14,8 +14,6 @@
 
 package yang
 
-// This file forked from //google3/net/proto2/compiler/go/generator/generator.go
-
 var knownWords = map[string]string{
 	"Ietf": "IETF",
 }

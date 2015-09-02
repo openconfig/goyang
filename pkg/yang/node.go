@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"strings"
 
-	"google3/ops/netops/gnetch/frontend/indent"
+	"github.com/openconfig/goyang/pkg/indent"
 )
 
 // A Node contains a yang statement and all attributes and sub-statements.
