@@ -46,7 +46,7 @@ import (
 	"sort"
 	"strings"
 
-	"code.google.com/p/getopt"
+	"github.com/pborman/getopt"
 	"github.com/openconfig/goyang/pkg/indent"
 	"github.com/openconfig/goyang/pkg/yang"
 )
