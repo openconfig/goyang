@@ -1,0 +1,12 @@
+// A YANG module located in a subdirectory, to test the AddYANGPaths
+// helper function.
+
+module subdir1 {
+  yang-version "1";
+
+namespace "namespace:goes:here";
+  prefix "subdir1";
+
+  description
+    "This module is to be found by test cases.";
+}

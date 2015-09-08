@@ -17,7 +17,9 @@ package yang
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 )
 
@@ -28,15 +30,43 @@ import (
 var Path []string
 var pathMap = map[string]bool{} // prevent adding dups in Path
 
-// AddPath adds the directories specified in p, a colon separated list of
-// directory names, to Path, if they are not already in Path.
-func AddPath(path string) {
-	for _, p := range strings.Split(path, ":") {
-		if !pathMap[p] {
-			pathMap[p] = true
-			Path = append(Path, p)
+// AddPath adds the directories specified in p, a colon separated list
+// of directory names, to Path, if they are not already in Path. Using
+// multiple arguments is also supported.
+func AddPath(paths ...string) {
+	for _, path := range paths {
+		for _, p := range strings.Split(path, ":") {
+			if !pathMap[p] {
+				pathMap[p] = true
+				Path = append(Path, p)
+			}
 		}
 	}
+}
+
+// PathsWithModules returns all paths  under and including the
+// root containing files with a ".yang" extension, as well as
+// any error encountered
+func PathsWithModules(root string) (paths []string, err error) {
+	pm := map[string]bool{}
+	filepath.Walk(root, func(p string, info os.FileInfo, e error) error {
+		err = e
+		if err == nil {
+			if info == nil {
+				return nil
+			}
+			if !info.IsDir() && strings.HasSuffix(p, ".yang") {
+				dir := path.Dir(p)
+				if !pm[dir] {
+					pm[dir] = true
+					paths = append(paths, dir)
+				}
+			}
+			return nil
+		}
+		return err
+	})
+	return
 }
 
 // readFile makes testing of findFile easier.
