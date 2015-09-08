@@ -99,7 +99,7 @@ func TestScanForPathsAndAddModules(t *testing.T) {
 		}
 	}
 
-	// however, a sub moduleis not a valid argument to GetModule.
+	// however, a sub module is not a valid argument to GetModule.
 	if _, err := ms.GetModule("sub"); err == nil {
 		t.Error("want an error when loading 'sub', got nil")
 	}
