@@ -357,7 +357,7 @@ type Must struct {
 	Extensions []*Statement `yang:"Ext"`
 
 	Description  *Value `yang:"description"`
-	ErrorApTtag  *Value `yang:"error-app-tag"`
+	ErrorAppTag  *Value `yang:"error-app-tag"`
 	ErrorMessage *Value `yang:"error-message"`
 	Reference    *Value `yang:"reference"`
 }
