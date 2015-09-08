@@ -144,6 +144,24 @@ const (
 	OutputEntry
 )
 
+var EntryKindToName = map[EntryKind]string{
+	LeafEntry:         "Leaf",
+	DirectoryEntry:    "Directory",
+	AnyXMLEntry:       "AnyXML",
+	CaseEntry:         "Case",
+	ChoiceEntry:       "Choice",
+	InputEntry:        "Input",
+	NotificationEntry: "Notification",
+	OutputEntry:       "Output",
+}
+
+func (k EntryKind) String() string {
+	if s := EntryKindToName[k]; s != "" {
+		return s
+	}
+	return fmt.Sprintf("unknown-entry-%d", k)
+}
+
 // newDirectory returns an empty directory Entry.
 func newDirectory(n Node) *Entry {
 	return &Entry{
