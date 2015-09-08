@@ -184,8 +184,15 @@ func (e *EnumType) SetNext(name string) error {
 func (e *EnumType) Name(value int64) string { return e.toString[value] }
 
 // Value returns the value associated with name in e associated.  0 is returned
-// if name is not in e.
+// if name is not in e, or if it is the first value in an unnumbered enum. Use
+// IsDefined to definitively confirm name is in e.
 func (e *EnumType) Value(name string) int64 { return e.toInt[name] }
+
+// IsDefined returns true if name is defined in e, else false.
+func (e *EnumType) IsDefined(name string) bool {
+	_, defined := e.toInt[name]
+	return defined
+}
 
 // A YangType is the internal representation of a type in YANG.  It may
 // refer to either a builtin type or type specified with typedef.  Not
