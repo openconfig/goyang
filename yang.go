@@ -46,9 +46,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/pborman/getopt"
 	"github.com/openconfig/goyang/pkg/indent"
 	"github.com/openconfig/goyang/pkg/yang"
+	"github.com/pborman/getopt"
 )
 
 // Types keeps track of all the YangTypes defined.
