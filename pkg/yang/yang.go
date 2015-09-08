@@ -277,7 +277,7 @@ type Typedef struct {
 	Type        *Type  `yang:"type,required"`
 	Units       *Value `yang:"units"`
 
-	YangType *YangType
+	YangType *YangType `json:"-"`
 }
 
 func (Typedef) Kind() string             { return "typedef" }

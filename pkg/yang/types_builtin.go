@@ -200,8 +200,8 @@ func (e *EnumType) IsDefined(name string) bool {
 type YangType struct {
 	Name             string
 	Kind             TypeKind    // Ynone if not a base type
-	Base             *Type       // dervied from
-	Root             *YangType   // root of this type that is the same
+	Base             *Type       `json:"-"` // dervied from
+	Root             *YangType   `json:"-"` // root of this type that is the same
 	Bit              *EnumType   // bit position, "status" is lost
 	Enum             *EnumType   // enum name to value, "status" is lost
 	Units            string      // units to be used for this type
@@ -212,7 +212,7 @@ type YangType struct {
 	Path             string      // the path in a leafref
 	Pattern          []string    // limiting XSD-TYPES expressions on strings
 	Range            YangRange   // range for integers
-	Type             []*YangType // for unions
+	Type             []*YangType `json:"-"` // for unions
 }
 
 // BaseTypedefs is a map of all base types to the Typedef structure manufactured
