@@ -88,7 +88,7 @@ var badYangErrors = []string{
 	`bad.yang:14:5: invalid config value: incorrect`,
 	`bad.yang:17:7: unknown type: base:unknown`,
 	`bad.yang:22:5: unknown group: the-beatles`,
-	`bad.yang:25:3: augment nothing: nothing: no such element`,
+	`bad.yang:25:3: augment nothing not found`,
 	`bad.yang:32:3: duplicate key from bad.yang:35:5: one`,
 }
 

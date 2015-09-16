@@ -17,7 +17,7 @@ package yang
 // This file has functions that search the AST for specified nodes.
 
 import (
-"fmt"
+	"fmt"
 	"reflect"
 	"strings"
 )

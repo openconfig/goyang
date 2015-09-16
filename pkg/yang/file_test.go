@@ -16,11 +16,20 @@ package yang
 
 import (
 	"errors"
+	"io/ioutil"
 	"reflect"
 	"testing"
 )
 
+func testPathReset() {
+	Path = []string{}
+	pathMap = map[string]bool{}
+}
+
 func TestFindFile(t *testing.T) {
+	// clean up global state
+	defer testPathReset()
+
 	for _, tt := range []struct {
 		name  string
 		path  []string
@@ -58,4 +67,41 @@ func TestFindFile(t *testing.T) {
 			t.Errorf("%s: got %v, want %v", tt.name, checked, tt.check)
 		}
 	}
+}
+
+func TestScanForPathsAndAddModules(t *testing.T) {
+	// clean up global state
+	defer testPathReset()
+
+	// disable any readFile mock setup by other tests
+	readFile = ioutil.ReadFile
+
+	// Scan the directory tree for YANG modules
+	paths, err := PathsWithModules("../../testdata")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// we should have seen two directories being testdata and
+	// testdata/subdir.
+	if len(paths) != 2 {
+		t.Errorf("got %d paths imported, want 2", len(paths))
+	}
+	// add the paths found in the scan to the module path
+	AddPath(paths...)
+
+	// confirm we can load the four modules that exist in
+	// the two paths we scanned.
+	modules := []string{"aug", "base", "other", "subdir1"}
+	ms := NewModules()
+	for _, name := range modules {
+		if _, err := ms.GetModule(name); err != nil {
+			t.Error(err)
+		}
+	}
+
+	// however, a sub module is not a valid argument to GetModule.
+	if _, err := ms.GetModule("sub"); err == nil {
+		t.Error("want an error when loading 'sub', got nil")
+	}
+
 }

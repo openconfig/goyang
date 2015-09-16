@@ -184,8 +184,15 @@ func (e *EnumType) SetNext(name string) error {
 func (e *EnumType) Name(value int64) string { return e.toString[value] }
 
 // Value returns the value associated with name in e associated.  0 is returned
-// if name is not in e.
+// if name is not in e, or if it is the first value in an unnumbered enum. Use
+// IsDefined to definitively confirm name is in e.
 func (e *EnumType) Value(name string) int64 { return e.toInt[name] }
+
+// IsDefined returns true if name is defined in e, else false.
+func (e *EnumType) IsDefined(name string) bool {
+	_, defined := e.toInt[name]
+	return defined
+}
 
 // A YangType is the internal representation of a type in YANG.  It may
 // refer to either a builtin type or type specified with typedef.  Not
@@ -193,8 +200,8 @@ func (e *EnumType) Value(name string) int64 { return e.toInt[name] }
 type YangType struct {
 	Name             string
 	Kind             TypeKind    // Ynone if not a base type
-	Base             *Type       // dervied from
-	Root             *YangType   // root of this type that is the same
+	Base             *Type       `json:"-"` // dervied from
+	Root             *YangType   `json:"-"` // root of this type that is the same
 	Bit              *EnumType   // bit position, "status" is lost
 	Enum             *EnumType   // enum name to value, "status" is lost
 	Units            string      // units to be used for this type
@@ -205,7 +212,7 @@ type YangType struct {
 	Path             string      // the path in a leafref
 	Pattern          []string    // limiting XSD-TYPES expressions on strings
 	Range            YangRange   // range for integers
-	Type             []*YangType // for unions
+	Type             []*YangType `json:"-"` // for unions
 }
 
 // BaseTypedefs is a map of all base types to the Typedef structure manufactured

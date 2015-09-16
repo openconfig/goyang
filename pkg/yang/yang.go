@@ -277,7 +277,7 @@ type Typedef struct {
 	Type        *Type  `yang:"type,required"`
 	Units       *Value `yang:"units"`
 
-	YangType *YangType
+	YangType *YangType `json:"-"`
 }
 
 func (Typedef) Kind() string             { return "typedef" }
@@ -357,7 +357,7 @@ type Must struct {
 	Extensions []*Statement `yang:"Ext"`
 
 	Description  *Value `yang:"description"`
-	ErrorApTtag  *Value `yang:"error-app-tag"`
+	ErrorAppTag  *Value `yang:"error-app-tag"`
 	ErrorMessage *Value `yang:"error-message"`
 	Reference    *Value `yang:"reference"`
 }
