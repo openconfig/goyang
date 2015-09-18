@@ -62,6 +62,12 @@ func (t TriState) String() string {
 	}
 }
 
+type ListAttr struct {
+	MinElements *Value // leaf-list or list MUST have at least min-elements
+	MaxElements *Value // leaf-list or list has at most max-elements
+	OrderedBy   *Value // order of entries determined by "system" or "user"
+}
+
 // An Entry represents a single node (directory or leaf) created from the
 // AST.  Directory entries have a non-nil Dir entry.  Leaf nodes have a nil
 // Dir entry.  If Errors is not nil then the only other valid field is Node.
@@ -87,6 +93,9 @@ type Entry struct {
 	// Fields associted with choice statements
 	Choice *Entry // The choice statement the entry is part of
 	Case   *Entry // The case statement, if any, the entry is in
+
+	// Fields associated with list nodes (both lists and leaf-lists)
+	ListAttr *ListAttr
 }
 
 // Print prints e to w in human readable form.
@@ -362,11 +371,13 @@ func ToEntry(n Node) (e *Entry) {
 			When:        s.When,
 		}
 
-		// TODO(borman): Ignored thus far:
-		//  MaxEntrys
-		//  MinEntrys
-		//  OrderedBy
-		return ToEntry(leaf).asList()
+		e := ToEntry(leaf).asList()
+		e.ListAttr = &ListAttr{
+			MinElements: s.MinElements,
+			MaxElements: s.MaxElements,
+			OrderedBy:   s.OrderedBy,
+		}
+		return e
 	case *Uses:
 		g := FindGrouping(s, s.Name)
 		if g == nil {
@@ -383,9 +394,14 @@ func ToEntry(n Node) (e *Entry) {
 	// Special handling of lists.  The only difference between a List
 	// and any other node is that a List has the IsList bit set.  Other
 	// than that it can be processed just like any other Node.
-	switch n.(type) {
+	switch s := n.(type) {
 	case *List:
 		e.asList()
+		e.ListAttr = &ListAttr{
+			MinElements: s.MinElements,
+			MaxElements: s.MaxElements,
+			OrderedBy:   s.OrderedBy,
+		}
 	}
 
 	// Use Elem to get the Value of structure that n is pointing to, not
