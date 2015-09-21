@@ -391,9 +391,10 @@ func ToEntry(n Node) (e *Entry) {
 
 	e = newDirectory(n)
 
-	// Special handling of lists.  The only difference between a List
-	// and any other node is that a List has the IsList bit set.  Other
-	// than that it can be processed just like any other Node.
+	// Special handling of lists.  The difference between a List
+	// and any other node is that a List has the IsList bit set and ListAttr
+	// struct associated with it. Other than that it can be processed just
+	// like any other Node.
 	switch s := n.(type) {
 	case *List:
 		e.asList()
