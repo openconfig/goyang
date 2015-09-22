@@ -62,12 +62,6 @@ func (t TriState) String() string {
 	}
 }
 
-type ListAttr struct {
-	MinElements *Value // leaf-list or list MUST have at least min-elements
-	MaxElements *Value // leaf-list or list has at most max-elements
-	OrderedBy   *Value // order of entries determined by "system" or "user"
-}
-
 // An Entry represents a single node (directory or leaf) created from the
 // AST.  Directory entries have a non-nil Dir entry.  Leaf nodes have a nil
 // Dir entry.  If Errors is not nil then the only other valid field is Node.
@@ -78,7 +72,6 @@ type Entry struct {
 	Description string    // description from node, if any
 	Errors      []error   // list of errors encounterd on this node
 	Kind        EntryKind // kind of Entry
-	IsList      bool      // if true, this node is actually a list
 	Config      TriState  // config state of this entry, if known
 	Prefix      string    // prefix to use from this point down
 
@@ -98,6 +91,13 @@ type Entry struct {
 	ListAttr *ListAttr
 }
 
+// A ListAttr is associated with an Entry that represents a List node
+type ListAttr struct {
+	MinElements *Value // leaf-list or list MUST have at least min-elements
+	MaxElements *Value // leaf-list or list has at most max-elements
+	OrderedBy   *Value // order of entries determined by "system" or "user"
+}
+
 // Print prints e to w in human readable form.
 func (e *Entry) Print(w io.Writer) {
 	if e.Description != "" {
@@ -113,13 +113,13 @@ func (e *Entry) Print(w io.Writer) {
 		fmt.Fprintf(w, "%s ", e.Type.Name)
 	}
 	switch {
-	case e.Dir == nil && e.IsList:
+	case e.Dir == nil && e.ListAttr != nil:
 		fmt.Fprintf(w, "[]%s\n", e.Name)
 		return
 	case e.Dir == nil:
 		fmt.Fprintf(w, "%s\n", e.Name)
 		return
-	case e.IsList:
+	case e.ListAttr != nil:
 		fmt.Fprintf(w, "[%s]%s {\n", e.Key, e.Name) //}
 	default:
 		fmt.Fprintf(w, "%s {\n", e.Name) //}
@@ -265,12 +265,6 @@ func (e *Entry) GetErrors() []error {
 	return errs
 }
 
-// asList annotates e as a list and returns e.
-func (e *Entry) asList() *Entry {
-	e.IsList = true
-	return e
-}
-
 // asKind sets the kind of e to k and returns e.
 func (e *Entry) asKind(k EntryKind) *Entry {
 	e.Kind = k
@@ -371,7 +365,7 @@ func ToEntry(n Node) (e *Entry) {
 			When:        s.When,
 		}
 
-		e := ToEntry(leaf).asList()
+		e := ToEntry(leaf)
 		e.ListAttr = &ListAttr{
 			MinElements: s.MinElements,
 			MaxElements: s.MaxElements,
@@ -392,12 +386,10 @@ func ToEntry(n Node) (e *Entry) {
 	e = newDirectory(n)
 
 	// Special handling of lists.  The difference between a List
-	// and any other node is that a List has the IsList bit set and ListAttr
-	// struct associated with it. Other than that it can be processed just
-	// like any other Node.
+	// and any other node is that a List has the ListAttr field set.
+	// Other than that it can be processed just like any other Node.
 	switch s := n.(type) {
 	case *List:
-		e.asList()
 		e.ListAttr = &ListAttr{
 			MinElements: s.MinElements,
 			MaxElements: s.MaxElements,
