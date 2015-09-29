@@ -200,13 +200,13 @@ func Write(w io.Writer, e *yang.Entry) {
 		fmt.Fprintf(w, "%s ", getTypeName(e))
 	}
 	switch {
-	case e.Dir == nil && e.IsList:
+	case e.Dir == nil && e.ListAttr != nil:
 		fmt.Fprintf(w, "[]%s\n", e.Name)
 		return
 	case e.Dir == nil:
 		fmt.Fprintf(w, "%s\n", e.Name)
 		return
-	case e.IsList:
+	case e.ListAttr != nil:
 		fmt.Fprintf(w, "[%s]%s {\n", e.Key, e.Name) //}
 	default:
 		fmt.Fprintf(w, "%s {\n", e.Name) //}
@@ -265,7 +265,7 @@ func FormatNode(w io.Writer, e *yang.Entry) {
 		if se.Description != "" {
 			fmt.Fprintln(indent.NewWriter(w, "  // "), se.Description)
 		}
-		if se.IsList {
+		if se.ListAttr != nil {
 			fmt.Fprint(w, "  repeated ")
 		} else {
 			fmt.Fprint(w, "  optional ")
