@@ -1,5 +1,23 @@
 # goyang
-YANG parser and compiler to produce Go language objects
+YANG parser and compiler for Go programs.
+
+The yang package (pkg/yang) is used to convert a YANG schema into either an
+in memory abstract syntax trees (ast) or more fully resolved, in memory, "Entry"
+trees.  An Entry tree consists only of Entry structures and has had
+augmentation, imports, and includes all applied.
+
+goyang is a sample program that uses the yang (pkg/yang) package.
+
+goyang uses the yang package to create an in-memory tree representation of
+schemas defined in YANG and then dumps out the contents in several forms.
+The forms include:
+
+*  tree - a simple tree representation
+*  proto - something "protobuf like" as a proof of concept
+*  types - list understood types extracted from the schema
+
+The yang package, and the goyang program, are not complete and are a work in
+progress.
 
 ### Getting started
 
