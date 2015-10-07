@@ -816,6 +816,7 @@ func (s sortedErrors) Less(i, j int) bool {
 
 // errorSort sorts the strings in the errors slice assuming each line starts
 // with file:line:col.  Line and column number are sorted numerically.
+// Duplicate errors are stripped.
 func errorSort(errors []error) []error {
 	switch len(errors) {
 	case 0:
