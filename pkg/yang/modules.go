@@ -18,10 +18,7 @@ package yang
 // include and import statements, which must be done prior to turning the
 // module into an Entry tree.
 
-import (
-	"fmt"
-	"reflect"
-)
+import "fmt"
 
 // Modules contains information about all the top level modules and
 // submodules that are read into it via its Read method.
@@ -203,7 +200,7 @@ func (ms *Modules) FindModuleByPrefix(prefix string) (*Module, error) {
 	}
 	var found *Module
 	for _, m := range ms.Modules {
-		if m.Prefix.Name == prefix  {
+		if m.Prefix.Name == prefix {
 			switch {
 			case m == found:
 			case found != nil:
@@ -280,36 +277,25 @@ func (ms *Modules) process() []error {
 // based on the type and location of the error.
 func (ms *Modules) Process() []error {
 	errs := ms.process()
-	if len(errs) == 0 {
-		for _, m := range ms.Modules {
-			errs = append(errs, ToEntry(m).GetErrors()...)
-		}
-		for _, m := range ms.SubModules {
-			errs = append(errs, ToEntry(m).GetErrors()...)
-		}
+	if len(errs) > 0 {
+		return errorSort(errs)
 	}
 
-	// Now resort the combined set of errors and then de-dup the
-	// errors.  It is possible the same error was reported in two
-	// different modules/sub-modules due include or import statements.
-	errorSort(errs)
-
-	i := 0
-	for _, err := range errs {
-		if i > 0 && reflect.DeepEqual(err, errs[i-1]) {
-			continue
-		}
-		errs[i] = err
-		i++
+	for _, m := range ms.Modules {
+		errs = append(errs, ToEntry(m).GetErrors()...)
 	}
-	if i > 0 {
-		return errs[:i]
+	for _, m := range ms.SubModules {
+		errs = append(errs, ToEntry(m).GetErrors()...)
+	}
+
+	if len(errs) > 0 {
+		return errorSort(errs)
 	}
 
 	// Now handle all the augments.  We don't have a good way to know
 	// what order to process them in, so repeat until no progress is made
 
-	mods := make([]*Module, 0, len(ms.Modules) + len(ms.SubModules))
+	mods := make([]*Module, 0, len(ms.Modules)+len(ms.SubModules))
 	for _, m := range ms.Modules {
 		mods = append(mods, m)
 	}
@@ -350,8 +336,7 @@ func (ms *Modules) Process() []error {
 		ToEntry(m).Augment(true)
 		errs = append(errs, ToEntry(m).GetErrors()...)
 	}
-	errorSort(errs)
-	return errs
+	return errorSort(errs)
 }
 
 // include resolves all the include and import statements for m.  It returns

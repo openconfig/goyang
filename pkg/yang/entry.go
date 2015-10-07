@@ -274,8 +274,7 @@ func (e *Entry) GetErrors() []error {
 			seen[err] = true
 		}
 	})
-	errorSort(errs)
-	return errs
+	return errorSort(errs)
 }
 
 // asKind sets the kind of e to k and returns e.
@@ -817,16 +816,26 @@ func (s sortedErrors) Less(i, j int) bool {
 
 // errorSort sorts the strings in the errors slice assuming each line starts
 // with file:line:col.  Line and column number are sorted numerically.
-func errorSort(errors []error) {
-	if len(errors) < 2 {
-		return
+func errorSort(errors []error) []error {
+	switch len(errors) {
+	case 0:
+		return nil
+	case 1:
+		return errors
 	}
 	elist := make(sortedErrors, len(errors))
 	for x, err := range errors {
 		elist[x] = sError{err.Error(), err}
 	}
 	sort.Sort(elist)
-	for x, err := range elist {
-		errors[x] = err.err
-	}
+	errors = make([]error, len(errors))
+	i := 0
+        for _, err := range elist {
+                if i > 0 && reflect.DeepEqual(err.err, errors[i-1]) {
+                        continue
+                }
+                errors[i] = err.err
+                i++
+        }
+	return errors
 }
