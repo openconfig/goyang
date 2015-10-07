@@ -48,6 +48,8 @@ import (
 	"github.com/pborman/getopt"
 )
 
+// Each format must register a formatter with register.  The function f will
+// be called once with the set of yang Entry trees generated.
 type formatter struct {
 	name string
 	f    func(io.Writer, []*yang.Entry)
