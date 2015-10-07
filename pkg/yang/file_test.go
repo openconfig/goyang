@@ -95,7 +95,7 @@ func TestScanForPathsAndAddModules(t *testing.T) {
 	ms := NewModules()
 	for _, name := range modules {
 		if _, err := ms.GetModule(name); err != nil {
-			t.Error(err)
+			t.Errorf("getting %s: %v", name, err)
 		}
 	}
 

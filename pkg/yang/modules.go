@@ -18,7 +18,10 @@ package yang
 // include and import statements, which must be done prior to turning the
 // module into an Entry tree.
 
-import "fmt"
+import (
+	"fmt"
+	"reflect"
+)
 
 // Modules contains information about all the top level modules and
 // submodules that are read into it via its Read method.
@@ -26,6 +29,7 @@ type Modules struct {
 	Modules    map[string]*Module // All "module" nodes
 	SubModules map[string]*Module // All "submodule" nodes
 	includes   map[*Module]bool   // Modules we have already done include on
+	byPrefix   map[string]*Module // Cache of prefix lookup
 }
 
 // NewModules returns a newly created and initialized Modules.
@@ -34,6 +38,7 @@ func NewModules() *Modules {
 		Modules:    map[string]*Module{},
 		SubModules: map[string]*Module{},
 		includes:   map[*Module]bool{},
+		byPrefix:   map[string]*Module{},
 	}
 }
 
@@ -190,6 +195,31 @@ func (ms *Modules) FindModule(n Node) *Module {
 	return m[name]
 }
 
+// FindModuleByPrefix either returns the Module specified by prefix or returns
+// an error.
+func (ms *Modules) FindModuleByPrefix(prefix string) (*Module, error) {
+	if m, ok := ms.byPrefix[prefix]; ok {
+		return m, nil
+	}
+	var found *Module
+	for _, m := range ms.Modules {
+		if m.Prefix.Name == prefix  {
+			switch {
+			case m == found:
+			case found != nil:
+				return nil, fmt.Errorf("prefix % matches two or more modules (%s, %s)\n", found.Name, m.Name)
+			default:
+				found = m
+			}
+		}
+	}
+	ms.byPrefix[prefix] = found
+	if found == nil {
+		return nil, fmt.Errorf("%s: no such prefix", prefix)
+	}
+	return found, nil
+}
+
 // process satisfies all include and import statements and verifies that all
 // link ref paths reference a known node.  If an import or include references
 // a [sub]module that is not already known, Process will search for a .yang
@@ -227,17 +257,36 @@ func (ms *Modules) process() []error {
 // file using the module's or submodule's name with ".yang" appended.  After
 // searching the current directory, the directories in Path are searched.
 //
+// Process builds Entry trees for each modules and submodules in ms.  These
+// trees are accessed using the ToEntry function.  Process does augmentation
+// on Entry trees once all the modules and submodules in ms have been built.
+// Following augmentation, Process inserts implied case statements.  I.e.,
+//
+//   choice interface-type {
+//       container ethernet { ... }
+//   }
+//
+// has a case statement inserted to become:
+//
+//   choice interface-type {
+//       case ethernet {
+//           container ethernet { ... }
+//       }
+//   }
+//
 // Process may return multiple errors if multiple errors were encountered
 // while processing.  Even though multiple errors may be returned, this does
 // not mean these are all the errors.  Process will terminate processing early
 // based on the type and location of the error.
 func (ms *Modules) Process() []error {
 	errs := ms.process()
-	for _, m := range ms.Modules {
-		errs = append(errs, ToEntry(m).GetErrors()...)
-	}
-	for _, m := range ms.SubModules {
-		errs = append(errs, ToEntry(m).GetErrors()...)
+	if len(errs) == 0 {
+		for _, m := range ms.Modules {
+			errs = append(errs, ToEntry(m).GetErrors()...)
+		}
+		for _, m := range ms.SubModules {
+			errs = append(errs, ToEntry(m).GetErrors()...)
+		}
 	}
 
 	// Now resort the combined set of errors and then de-dup the
@@ -247,13 +296,62 @@ func (ms *Modules) Process() []error {
 
 	i := 0
 	for _, err := range errs {
-		if i > 0 && err == errs[i-1] {
+		if i > 0 && reflect.DeepEqual(err, errs[i-1]) {
 			continue
 		}
 		errs[i] = err
 		i++
 	}
-	return errs[:i]
+	if i > 0 {
+		return errs[:i]
+	}
+
+	// Now handle all the augments.  We don't have a good way to know
+	// what order to process them in, so repeat until no progress is made
+
+	mods := make([]*Module, 0, len(ms.Modules) + len(ms.SubModules))
+	for _, m := range ms.Modules {
+		mods = append(mods, m)
+	}
+	for _, m := range ms.SubModules {
+		mods = append(mods, m)
+	}
+	for len(mods) > 0 {
+		var processed, skipped int
+		for i := 0; i < len(mods); {
+			m := mods[i]
+			p, s := ToEntry(m).Augment(false)
+			processed += p
+			skipped += p
+			if s == 0 {
+				mods[i] = mods[len(mods)-1]
+				mods = mods[:len(mods)-1]
+				continue
+			}
+			i++
+		}
+		if processed == 0 {
+			break
+		}
+	}
+
+	// Now fix up all the choice statements to add in the missing case
+	// statements.
+	for _, m := range ms.Modules {
+		ToEntry(m).FixChoice()
+	}
+	for _, m := range ms.SubModules {
+		ToEntry(m).FixChoice()
+	}
+
+	// Go through any modules that have remaining augments and collect
+	// the errors.
+	for _, m := range mods {
+		ToEntry(m).Augment(true)
+		errs = append(errs, ToEntry(m).GetErrors()...)
+	}
+	errorSort(errs)
+	return errs
 }
 
 // include resolves all the include and import statements for m.  It returns

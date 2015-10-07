@@ -26,6 +26,7 @@ func TestCamelCase(t *testing.T) {
 		{"one_two", "OneTwo"},
 		{"_my_field_name_2", "XMyFieldName_2"},
 		{"Something_Capped", "Something_Capped"},
+		{"/foo/bar", "XFooBar"},
 		{"my_Name", "My_Name"},
 		{"OneTwo", "OneTwo"},
 		{"_", "X"},

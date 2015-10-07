@@ -42,7 +42,14 @@ func TestNilEntry(t *testing.T) {
 	}
 }
 
-var badYangInput = `
+var badInputs = []struct {
+	name   string
+	in     string
+	errors []string
+}{
+	{
+		name: "bad.yang",
+		in: `
 // Base test yang module.
 // This module is syntactally correct (we can build an AST) but it is has
 // invalid parameters in many statements.
@@ -65,14 +72,6 @@ module base {
     // unknown grouping to uses
     uses the-beatles;
   }
-  // augmentation of unknown element
-  augment nothing {
-    leaf bob {
-      type string;
-      // bad config value in unused augment
-      config wrong;
-    }
-  }
   grouping the-group {
     leaf one { type string; }
     // duplicate leaf in unused grouping.
@@ -80,48 +79,70 @@ module base {
   }
   uses the-group;
 }
-`
-
-var badYangErrors = []string{
-	`bad.yang:9:3: invalid config value: bad`,
-	`bad.yang:13:3: duplicate key from bad.yang:20:5: bob`,
-	`bad.yang:14:5: invalid config value: incorrect`,
-	`bad.yang:17:7: unknown type: base:unknown`,
-	`bad.yang:22:5: unknown group: the-beatles`,
-	`bad.yang:25:3: augment nothing not found`,
-	`bad.yang:32:3: duplicate key from bad.yang:35:5: one`,
+`,
+		errors: []string{
+			`bad.yang:9:3: invalid config value: bad`,
+			`bad.yang:13:3: duplicate key from bad.yang:20:5: bob`,
+			`bad.yang:14:5: invalid config value: incorrect`,
+			`bad.yang:17:7: unknown type: base:unknown`,
+			`bad.yang:22:5: unknown group: the-beatles`,
+			`bad.yang:24:3: duplicate key from bad.yang:27:5: one`,
+		},
+	},
+	{
+		name: "bad-augment.yang",
+		in: `
+module base {
+  namespace "urn:mod";
+  prefix "base";
+  // augmentation of unknown element
+  augment erewhon {
+    leaf bob {
+      type string;
+      // bad config value in unused augment
+      config wrong;
+    }
+  }
+}
+`,
+		errors: []string{
+			`bad-augment.yang:6:3: augment erewhon not found`,
+		},
+	},
 }
 
 func TestBadYang(t *testing.T) {
-	typeDict = typeDictionary{dict: map[Node]map[string]*Typedef{}}
-	ms := NewModules()
-	if err := ms.Parse(badYangInput, "bad.yang"); err != nil {
-		t.Fatalf("unexpected error %s", err)
-	}
-	errs := ms.Process()
-	if len(errs) != len(badYangErrors) {
-		t.Errorf("got %d errors, want %d", len(errs), len(badYangErrors))
-	} else {
-		ok := true
-		for x, err := range errs {
-			if err.Error() != badYangErrors[x] {
-				ok = false
-				break
+	for _, tt := range badInputs {
+		typeDict = typeDictionary{dict: map[Node]map[string]*Typedef{}}
+		ms := NewModules()
+		if err := ms.Parse(tt.in, tt.name); err != nil {
+			t.Fatalf("unexpected error %s", err)
+		}
+		errs := ms.Process()
+		if len(errs) != len(tt.errors) {
+			t.Errorf("got %d errors, want %d", len(errs), len(tt.errors))
+		} else {
+			ok := true
+			for x, err := range errs {
+				if err.Error() != tt.errors[x] {
+					ok = false
+					break
+				}
+			}
+			if ok {
+				continue
 			}
 		}
-		if ok {
-			return
-		}
-	}
 
-	var b bytes.Buffer
-	fmt.Fprint(&b, "got errors:\n")
-	for _, err := range errs {
-		fmt.Fprintf(&b, "\t%v\n", err)
+		var b bytes.Buffer
+		fmt.Fprint(&b, "got errors:\n")
+		for _, err := range errs {
+			fmt.Fprintf(&b, "\t%v\n", err)
+		}
+		fmt.Fprint(&b, "want errors:\n")
+		for _, err := range tt.errors {
+			fmt.Fprintf(&b, "\t%s\n", err)
+		}
+		t.Error(b.String())
 	}
-	fmt.Fprint(&b, "want errors:\n")
-	for _, err := range badYangErrors {
-		fmt.Fprintf(&b, "\t%s\n", err)
-	}
-	t.Error(b.String())
 }

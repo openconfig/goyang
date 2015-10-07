@@ -18,6 +18,7 @@ package yang
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 )
@@ -52,7 +53,8 @@ func FindGrouping(n Node, name string) *Grouping {
 		// always a pointer to a structure,
 		e := reflect.ValueOf(n).Elem()
 		if !e.IsValid() {
-			fmt.Printf("%s: unknown grouping\n", name)
+			// TODO(borman): we shoud return an error somehow
+			fmt.Fprintf(os.Stderr, "%s: unknown grouping\n", name)
 			return nil
 		}
 		v := e.FieldByName("Grouping")

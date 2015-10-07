@@ -58,6 +58,16 @@ type Statement struct {
 	col  int // 1's based column number
 }
 
+// FakeStatment returns a statement filled in with keyword, file, line and col.
+func FakeStatement(keyword, file string, line, col int) *Statement {
+	return &Statement{
+		keyword: keyword,
+		file:    file,
+		line:    line,
+		col:     col,
+	}
+}
+
 // Make Statement statisfy Node
 
 func (s *Statement) NName() string         { return s.argument }

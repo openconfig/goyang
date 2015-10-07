@@ -36,12 +36,18 @@ func isASCIIDigit(c byte) bool {
 // lowercases names, it's extremely unlikely to have two fields with different
 // capitalizations.  In short, _my_field_name_2 becomes XMyFieldName_2.
 func CamelCase(s string) string {
+	fix := func (c byte) byte {
+		if c == '/' || c == '-' || c == ':' {
+			return '_'
+		}
+		return c
+	}
 	if s == "" {
 		return ""
 	}
 	t := make([]byte, 0, 32)
 	i := 0
-	if s[0] == '_' || s[0] == '-' {
+	if fix(s[0]) == '_' {
 		// Need a capital letter; drop the '_'.
 		t = append(t, 'X')
 		i++
@@ -51,10 +57,7 @@ func CamelCase(s string) string {
 	// That is, we process a word at a time, where words are marked by _ or
 	// upper case letter. Digits are treated as words.
 	for ; i < len(s); i++ {
-		c := s[i]
-		if c == '-' {
-			c = '_'
-		}
+		c := fix(s[i])
 		if c == '_' && i+1 < len(s) && isASCIILower(s[i+1]) {
 			continue // Skip the underscore in s.
 		}
