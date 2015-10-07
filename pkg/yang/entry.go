@@ -837,5 +837,5 @@ func errorSort(errors []error) []error {
                 errors[i] = err.err
                 i++
         }
-	return errors
+	return errors[:i]
 }
