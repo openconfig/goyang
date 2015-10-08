@@ -29,11 +29,8 @@
 // If PATH is specified, it is considered a comma separated list of paths
 // to append to the search directory.
 //
-// FORMAT, which defaults to "tree", specifes the format of output to produce:
-//
-//   tree   All modules in tree form
-//   proto  All directory nodes as proto structures
-//   types  All type definitions
+// FORMAT, which defaults to "tree", specifes the format of output to produce.
+// Use "goyang --help" for a list of available formats.
 //
 // THIS PROGRAM IS STILL JUST A DEVELOPMENT TOOL.
 package main
@@ -43,30 +40,26 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"runtime/trace"
 	"sort"
 	"strings"
 
-	"github.com/openconfig/goyang/pkg/indent"
 	"github.com/openconfig/goyang/pkg/yang"
 	"github.com/pborman/getopt"
 )
 
-// Types keeps track of all the YangTypes defined.
-type Types map[*yang.YangType]struct{}
+// Each format must register a formatter with register.  The function f will
+// be called once with the set of yang Entry trees generated.
+type formatter struct {
+	name string
+	f    func(io.Writer, []*yang.Entry)
+	help string
+}
 
-// AddEntry adds all types defined in e and its decendents to t.
-func (t Types) AddEntry(e *yang.Entry) {
-	if e == nil {
-		return
-	}
-	if e.Type != nil {
-		t[e.Type.Root] = struct{}{}
-	}
-	for _, d := range e.Dir {
-		t.AddEntry(d)
-	}
-	t.AddEntry(e.Choice)
-	t.AddEntry(e.Case)
+var formatters = map[string]*formatter{}
+
+func register(f *formatter) {
+	formatters[f.name] = f
 }
 
 // exitIfError writes errs to standard error and exits with an exit status of 1.
@@ -76,16 +69,56 @@ func exitIfError(errs []error) {
 		for _, err := range errs {
 			fmt.Fprintln(os.Stderr, err)
 		}
-		os.Exit(1)
+		stop(1)
 	}
 }
 
+var stop = os.Exit
+
 func main() {
 	format := "tree"
+	formats := make([]string, 0, len(formatters))
+	for k := range formatters {
+		formats = append(formats, k)
+	}
+	sort.Strings(formats)
+
+	var traceP string
+	var help bool
 	getopt.CommandLine.ListVarLong(&yang.Path, "path", 0, "comma separated list of directories to add to PATH")
-	getopt.CommandLine.StringVarLong(&format, "format", 0, "format to display: tree, proto, types")
+	getopt.CommandLine.StringVarLong(&format, "format", 0, "format to display: "+strings.Join(formats, ", "))
+	getopt.CommandLine.StringVarLong(&traceP, "trace", 0, "file to write trace into")
+	getopt.CommandLine.BoolVarLong(&help, "help", '?', "display help")
 
 	getopt.Parse()
+
+	if traceP != "" {
+		fp, err := os.Create(traceP)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		trace.Start(fp)
+		stop = func(c int) { trace.Stop(); os.Exit(c) }
+		defer func() { trace.Stop() }()
+	}
+
+	if help {
+		getopt.CommandLine.PrintUsage(os.Stderr)
+		fmt.Fprintf(os.Stderr, "\nFormats:\n")
+		for _, fn := range formats {
+			f := formatters[fn]
+			fmt.Fprintf(os.Stderr, "    %s - %s\n", f.name, f.help)
+		}
+		stop(0)
+	}
+
+	if _, ok := formatters[format]; !ok {
+		fmt.Fprintf(os.Stderr, "%s: invalid format.  Choices are %s\n", format, strings.Join(formats, ", "))
+		stop(1)
+
+	}
+
 	files := getopt.Args()
 
 	if len(files) > 0 && !strings.HasSuffix(files[0], ".yang") {
@@ -107,7 +140,7 @@ func main() {
 		}
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
-			os.Exit(1)
+			stop(1)
 		}
 	}
 
@@ -117,6 +150,9 @@ func main() {
 			continue
 		}
 	}
+
+	// Process the read files, exiting if any errors were found.
+	exitIfError(ms.Process())
 
 	// Keep track of the top level modules we read in.
 	// Those are the only modules we want to print below.
@@ -130,217 +166,10 @@ func main() {
 		}
 	}
 	sort.Strings(names)
-
-	// Print any errors found in the tree.  This will return false if
-	// there were no errors.
-	exitIfError(ms.Process())
-
-	switch format {
-	case "tree":
-		for _, n := range names {
-			Write(os.Stdout, yang.ToEntry(mods[n]))
-		}
-	case "proto":
-		for _, n := range names {
-			for _, e := range flatten(yang.ToEntry(mods[n])) {
-				FormatNode(os.Stdout, e)
-			}
-		}
-	case "types":
-		types := Types{}
-		for _, n := range names {
-			types.AddEntry(yang.ToEntry(mods[n]))
-		}
-
-		for t := range types {
-			YTPrint(os.Stdout, t)
-		}
-	default:
-		fmt.Fprintf(os.Stderr, "unknown format: %s\n", format)
-		os.Exit(1)
-	}
-}
-
-// fixedNames maps a fixed name back to its origial name.
-var fixedNames = map[string]string{}
-
-func fixName(s string) string {
-	cc := yang.CamelCase(s)
-	if cc != s {
-		if o := fixedNames[cc]; o != "" && o != s {
-			fmt.Printf("Collision on %s and %s\n", o, s)
-		}
-		fixedNames[cc] = s
-	}
-	return cc
-}
-
-func getTypeName(e *yang.Entry) string {
-	if e == nil || e.Type == nil {
-		return ""
-	}
-	// Return our root's type name.
-	// This is should be the builtin type-name
-	// for this entry.
-	return e.Type.Root.Name
-}
-
-// Write writes e, formatted, and all of its children, to w.
-func Write(w io.Writer, e *yang.Entry) {
-	if e.Description != "" {
-		fmt.Fprintln(w)
-		fmt.Fprintln(indent.NewWriter(w, "// "), e.Description)
-	}
-	if e.ReadOnly() {
-		fmt.Fprintf(w, "RO: ")
-	} else {
-		fmt.Fprintf(w, "rw: ")
-	}
-	if e.Type != nil {
-		fmt.Fprintf(w, "%s ", getTypeName(e))
-	}
-	switch {
-	case e.Dir == nil && e.ListAttr != nil:
-		fmt.Fprintf(w, "[]%s\n", e.Name)
-		return
-	case e.Dir == nil:
-		fmt.Fprintf(w, "%s\n", e.Name)
-		return
-	case e.ListAttr != nil:
-		fmt.Fprintf(w, "[%s]%s {\n", e.Key, e.Name) //}
-	default:
-		fmt.Fprintf(w, "%s {\n", e.Name) //}
-	}
-	var names []string
-	for k := range e.Dir {
-		names = append(names, k)
-	}
-	sort.Strings(names)
-	for _, k := range names {
-		Write(indent.NewWriter(w, "  "), e.Dir[k])
-	}
-	// { to match the brace below to keep brace matching working
-	fmt.Fprintln(w, "}")
-}
-
-// kind2proto maps base yang types to protocol buffer types.
-// TODO(borman): do TODO types.
-var kind2proto = map[yang.TypeKind]string{
-	yang.Yint8:   "int32",  // int in range [-128, 127]
-	yang.Yint16:  "int32",  // int in range [-32768, 32767]
-	yang.Yint32:  "int32",  // int in range [-2147483648, 2147483647]
-	yang.Yint64:  "int64",  // int in range [-9223372036854775808, 9223372036854775807]
-	yang.Yuint8:  "uint32", // int in range [0, 255]
-	yang.Yuint16: "uint32", // int in range [0, 65535]
-	yang.Yuint32: "uint32", // int in range [0, 4294967295]
-	yang.Yuint64: "uint64", // int in range [0, 18446744073709551615]
-
-	yang.Ybinary:             "bytes",          // arbitrary data
-	yang.Ybits:               "TODO-bits",      // set of bits or flags
-	yang.Ybool:               "bool",           // true or false
-	yang.Ydecimal64:          "TODO-decimal64", // signed decimal number
-	yang.Yenum:               "TODO-enum",      // enumerated strings
-	yang.Yidentityref:        "string",         // reference to abstrace identity
-	yang.YinstanceIdentifier: "TODO-ii",        // reference of a data tree node
-	yang.Yleafref:            "string",         // reference to a leaf instance
-	yang.Ystring:             "string",         // human readable string
-	yang.Yunion:              "TODO-union",     // choice of types
-}
-
-// FormatNode writes e, formatted almost like a protobuf message, to w.
-func FormatNode(w io.Writer, e *yang.Entry) {
-	fmt.Fprintln(w)
-	if e.Description != "" {
-		fmt.Fprintln(indent.NewWriter(w, "// "), e.Description)
-	}
-	fmt.Fprintf(w, "message %s {\n", fixName(e.Name))
-
-	var names []string
-	for k := range e.Dir {
-		names = append(names, k)
-	}
-	sort.Strings(names)
-	for x, k := range names {
-		se := e.Dir[k]
-		if se.Description != "" {
-			fmt.Fprintln(indent.NewWriter(w, "  // "), se.Description)
-		}
-		if se.ListAttr != nil {
-			fmt.Fprint(w, "  repeated ")
-		} else {
-			fmt.Fprint(w, "  optional ")
-		}
-		if len(se.Dir) == 0 && se.Type != nil {
-			// TODO(borman): this is probably an empty container.
-			kind := "UNKNOWN TYPE"
-			if se.Type != nil {
-				kind = kind2proto[se.Type.Kind]
-			}
-			fmt.Fprintf(w, "%s %s = %d; // %s\n", kind, fixName(k), x+1, yang.Source(se.Node))
-			continue
-		}
-		fmt.Fprintf(w, "%s %s = %d; // %s\n", fixName(se.Name), fixName(k), x+1, yang.Source(se.Node))
-	}
-	// { to match the brace below to keep brace matching working
-	fmt.Fprintln(w, "}")
-}
-
-// flatten returns a slice of all directory entries in e and e's decendents.
-func flatten(e *yang.Entry) []*yang.Entry {
-	if e == nil || len(e.Dir) == 0 {
-		return nil
-	}
-	f := []*yang.Entry{e}
-	var names []string
-	for n := range e.Dir {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	for _, n := range names {
-		f = append(f, flatten(e.Dir[n])...)
-	}
-	f = append(f, flatten(e.Choice)...)
-	f = append(f, flatten(e.Case)...)
-	return f
-}
-
-// YTPrint prints type t in a moderately human readable format to w.
-func YTPrint(w io.Writer, t *yang.YangType) {
-	if t.Base != nil {
-		fmt.Fprintf(w, "%s: ", yang.Source(t.Base))
-	}
-	fmt.Fprintf(w, "%s", t.Root.Name)
-	if t.Kind.String() != t.Root.Name {
-		fmt.Fprintf(w, "(%s)", t.Kind)
-	}
-	if t.Units != "" {
-		fmt.Fprintf(w, " units=%s", t.Units)
-	}
-	if t.Default != "" {
-		fmt.Fprintf(w, " default=%q", t.Default)
-	}
-	if t.FractionDigits != 0 {
-		fmt.Fprintf(w, " fraction-digits=%d", t.FractionDigits)
-	}
-	if len(t.Length) > 0 {
-		fmt.Fprintf(w, " length=%s", t.Length)
-	}
-	if t.Kind == yang.YinstanceIdentifier && !t.OptionalInstance {
-		fmt.Fprintf(w, " required")
-	}
-	if t.Kind == yang.Yleafref && t.Path != "" {
-		fmt.Fprintf(w, " path=%q", t.Path)
-	}
-	if len(t.Pattern) > 0 {
-		fmt.Fprintf(w, " pattern=%s", strings.Join(t.Pattern, "|"))
-	}
-	if len(t.Type) > 0 {
-		fmt.Fprintf(w, " union...")
+	entries := make([]*yang.Entry, len(names))
+	for x, n := range names {
+		entries[x] = yang.ToEntry(mods[n])
 	}
 
-	b := yang.BaseTypedefs[t.Kind.String()].YangType
-	if len(t.Range) > 0 && !t.Range.Equal(b.Range) {
-		fmt.Fprintf(w, " range=%s", t.Range)
-	}
-	fmt.Fprintf(w, ";\n")
+	formatters[format].f(os.Stdout, entries)
 }

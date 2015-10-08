@@ -81,14 +81,29 @@ type Entry struct {
 
 	// Fields associated with leaf nodes
 	Type *YangType
-	Exts []*Entry // extensions found
-
-	// Fields associted with choice statements
-	Choice *Entry // The choice statement the entry is part of
-	Case   *Entry // The case statement, if any, the entry is in
+	Exts []*Statement // extensions found
 
 	// Fields associated with list nodes (both lists and leaf-lists)
 	ListAttr *ListAttr
+
+	RPC *RPCEntry // set if we are an RPC
+
+	Augments []*Entry // Augments associated with this entry
+}
+
+// An RPCEntry contains information related to an RPC Node.
+type RPCEntry struct {
+	Input  *Entry
+	Output *Entry
+}
+
+// Modules returns the Modules structure that e is part of.  This is needed
+// when looking for rooted nodes not part of this Entry tree.
+func (e *Entry) Modules() *Modules {
+	for e.Parent != nil {
+		e = e.Parent
+	}
+	return e.Node.(*Module).modules
 }
 
 // A ListAttr is associated with an Entry that represents a List node
@@ -219,14 +234,13 @@ func (e *Entry) importErrors(c *Entry) {
 	for _, err := range c.Errors {
 		e.addError(err)
 	}
-	for _, ce := range e.Exts {
-		e.importErrors(ce)
-	}
+	// TODO(borman): need to determine if the extensions have errors
+	// for _, ce := range e.Exts {
+	// 	e.importErrors(ce)
+	// }
 	for _, ce := range c.Dir {
 		e.importErrors(ce)
 	}
-	e.importErrors(e.Choice)
-	e.importErrors(e.Case)
 }
 
 // checkErrors calls f on every error found in the tree e and its children.
@@ -240,11 +254,10 @@ func (e *Entry) checkErrors(f func(error)) {
 	for _, err := range e.Errors {
 		f(err)
 	}
-	for _, e := range e.Exts {
-		e.checkErrors(f)
-	}
-	e.Choice.checkErrors(f)
-	e.Case.checkErrors(f)
+	// TODO(borman): need to determine if the extensions have errors
+	// for _, e := range e.Exts {
+	// 	e.checkErrors(f)
+	// }
 }
 
 // GetErrors returns a sorted list of errors found in e.
@@ -261,8 +274,7 @@ func (e *Entry) GetErrors() []error {
 			seen[err] = true
 		}
 	})
-	errorSort(errs)
-	return errs
+	return errorSort(errs)
 }
 
 // asKind sets the kind of e to k and returns e.
@@ -309,7 +321,14 @@ func ToEntry(n Node) (e *Entry) {
 		entryCache[n] = e
 	}()
 
-	// TODO(borman): should have a defer to process extensions at this point
+	// Copy in the extensions from our Node, if any.
+	defer func(n Node) {
+		if e != nil {
+			for _, ext := range n.Exts() {
+				e.Exts = append(e.Exts, ext)
+			}
+		}
+	}(n)
 
 	// configValue return TSTrue if i contains the value of true, TSFalse
 	// if it contains the value of false, and TSUnset if i does not have
@@ -385,9 +404,10 @@ func ToEntry(n Node) (e *Entry) {
 
 	e = newDirectory(n)
 
-	// Special handling of lists.  The difference between a List
-	// and any other node is that a List has the ListAttr field set.
-	// Other than that it can be processed just like any other Node.
+	// Special handling for individual Node types.  Lists are like any other
+	// node except a List has a ListAttr.
+	//
+	// Nodes of identified special kinds have their Kind set here.
 	switch s := n.(type) {
 	case *List:
 		e.ListAttr = &ListAttr{
@@ -395,6 +415,18 @@ func ToEntry(n Node) (e *Entry) {
 			MaxElements: s.MaxElements,
 			OrderedBy:   s.OrderedBy,
 		}
+	case *Choice:
+		e.Kind = ChoiceEntry
+	case *Case:
+		e.Kind = CaseEntry
+	case *AnyXML:
+		e.Kind = AnyXMLEntry
+	case *Input:
+		e.Kind = InputEntry
+	case *Output:
+		e.Kind = OutputEntry
+	case *Notification:
+		e.Kind = NotificationEntry
 	}
 
 	// Use Elem to get the Value of structure that n is pointing to, not
@@ -402,10 +434,6 @@ func ToEntry(n Node) (e *Entry) {
 	v := reflect.ValueOf(n).Elem()
 	t := v.Type()
 	found := false
-
-	// Collect all the augment entries and apply them after the tree
-	// is fully read in.
-	var augments []*Entry
 
 	for i := t.NumField() - 1; i > 0; i-- {
 		f := t.Field(i)
@@ -416,8 +444,8 @@ func ToEntry(n Node) (e *Entry) {
 		fv := v.Field(i)
 		name := strings.Split(yang, ",")[0]
 		switch name {
-		default:
-			continue
+		case "":
+			e.addError(fmt.Errorf("%s: nil statement", Source(n)))
 		case "config":
 			e.Config, err = configValue(fv.Interface())
 			e.addError(err)
@@ -433,7 +461,7 @@ func ToEntry(n Node) (e *Entry) {
 			for _, a := range fv.Interface().([]*Augment) {
 				ne := ToEntry(a)
 				ne.Parent = e
-				augments = append(augments, ne)
+				e.Augments = append(e.Augments, ne)
 			}
 		case "anyxml":
 			for _, a := range fv.Interface().([]*AnyXML) {
@@ -488,6 +516,28 @@ func ToEntry(n Node) (e *Entry) {
 			// TODO(borman): what do we do with these?
 			// seems fine to ignore them for now, we are
 			// just interested in the tree structure.
+			for _, r := range fv.Interface().([]*RPC) {
+				e.add(r.Name, ToEntry(r))
+			}
+
+		case "input":
+			if i := fv.Interface().(*Input); i != nil {
+				if e.RPC == nil {
+					e.RPC = &RPCEntry{}
+				}
+				e.RPC.Input = ToEntry(i)
+				e.RPC.Input.Name = "input"
+				e.RPC.Input.Kind = InputEntry
+			}
+		case "output":
+			if o := fv.Interface().(*Output); o != nil {
+				if e.RPC == nil {
+					e.RPC = &RPCEntry{}
+				}
+				e.RPC.Output = ToEntry(o)
+				e.RPC.Output.Name = "output"
+				e.RPC.Output.Kind = OutputEntry
+			}
 		case "uses":
 			for _, a := range fv.Interface().([]*Uses) {
 				e.merge(nil, ToEntry(a))
@@ -496,24 +546,43 @@ func ToEntry(n Node) (e *Entry) {
 			// We don't expect this to happen, so throw an error.
 			// BUG(borman): I think a deviate statement might trigger this.
 			e.addError(fmt.Errorf("%s: unexpected type in %s:%s", Source(n), n.Kind(), n.NName()))
+
+		// TODO(borman): unimplemented keywords
+		case "belongs-to",
+			"contact",
+			"default",
+			"deviation",
+			"extension",
+			"feature",
+			"identity",
+			"if-feature",
+			"mandatory",
+			"max-elements",
+			"min-elements",
+			"must",
+			"namespace",
+			"ordered-by",
+			"organization",
+			"presence",
+			"reference",
+			"revision",
+			"status",
+			"typedef",
+			"unique",
+			"when",
+			"yang-version":
+			continue
+
+		case "Ext", "Name", "Parent", "Statement":
+			// These are meta-keywords used internally
+			continue
+		default:
+			e.addError(fmt.Errorf("%s: unexpected statement: %s", Source(n), name))
+			continue
+
 		}
 		// We found at least one field.
 		found = true
-	}
-
-	// Now process the augments we found
-	// NOTE(borman): is it possible this will fail if the augment refers
-	// to some removed sibling that has not been processed?  Perhaps this
-	// should be done after the entire tree is built.  Is it correct to
-	// assume augment paths are data tree paths and not schema tree paths?
-	for _, a := range augments {
-		ae := a.Find(a.Name)
-		if ae == nil {
-			e.errorf("%s: augment %s not found", Source(a.Node), a.Name)
-			continue
-		}
-		// Augments do not have a prefix we merge in, just a node.
-		ae.merge(nil, a)
 	}
 	if !found {
 		return newError(n, "%T: cannot be converted to a *Entry", n)
@@ -521,18 +590,76 @@ func ToEntry(n Node) (e *Entry) {
 	return e
 }
 
+// Augment processes augments in e, return the number of augments processed
+// and the augments skipped.  If addErrors is true then missing augments will
+// generate errors.
+func (e *Entry) Augment(addErrors bool) (processed, skipped int) {
+	// Now process the augments we found
+	// NOTE(borman): is it possible this will fail if the augment refers
+	// to some removed sibling that has not been processed?  Perhaps this
+	// should be done after the entire tree is built.  Is it correct to
+	// assume augment paths are data tree paths and not schema tree paths?
+	// Augments can depend upon augments.  We need to figure out how to
+	// order the augments (or just keep trying until we can make no further
+	// progress)
+	var sa []*Entry
+	for _, a := range e.Augments {
+		ae := a.Find(a.Name)
+		if ae == nil {
+			if addErrors {
+				e.errorf("%s: augment %s not found", Source(a.Node), a.Name)
+			}
+			skipped++
+			sa = append(sa, a)
+			continue
+		}
+		// Augments do not have a prefix we merge in, just a node.
+		processed++
+		ae.merge(nil, a)
+	}
+	e.Augments = sa
+	return processed, skipped
+}
+
+// FixChoice inserts missing Case entries in a choice
+func (e *Entry) FixChoice() {
+	if e.Kind == ChoiceEntry && len(e.Errors) == 0 {
+		for k, ce := range e.Dir {
+			if ce.Kind != CaseEntry {
+				ne := &Entry{
+					Parent: e,
+					Node:   ce.Node,
+					Name:   ce.Name,
+					Kind:   CaseEntry,
+					Config: ce.Config,
+					Prefix: ce.Prefix,
+					Dir:    map[string]*Entry{ce.Name: ce},
+				}
+				ce.Parent = ne
+				e.Dir[k] = ne
+			}
+		}
+	}
+	for _, ce := range e.Dir {
+		ce.FixChoice()
+	}
+}
+
 // ReadOnly returns true if e is a read-only variable (config == false).
 // If Config is unset in e, then false is returned if e has no parent,
 // otherwise the value parent's ReadOnly is returned.
 func (e *Entry) ReadOnly() bool {
-	if e == nil {
+	switch {
+	case e == nil:
 		// We made it all the way to the root of the tree
 		return false
-	}
-	if e.Config == TSUnset {
+	case e.Kind == OutputEntry:
+		return true
+	case e.Config == TSUnset:
 		return e.Parent.ReadOnly()
+	default:
+		return !e.Config.Value()
 	}
-	return !e.Config.Value()
 }
 
 // Find finds the Entry named by name relative to e.
@@ -545,6 +672,18 @@ func (e *Entry) Find(name string) *Entry {
 		e = e.Parent
 	}
 	parts := strings.Split(name[1:], "/")
+
+	if prefix, _ := getPrefix(parts[0]); prefix != "" {
+		m, err := e.Modules().FindModuleByPrefix(prefix)
+		if err != nil {
+			e.addError(err)
+			return nil
+		}
+		if e.Node.(*Module) != m {
+			e = ToEntry(m)
+		}
+	}
+
 	for _, part := range parts {
 		_, part = getPrefix(part)
 		ne := e.Dir[part]
@@ -677,16 +816,27 @@ func (s sortedErrors) Less(i, j int) bool {
 
 // errorSort sorts the strings in the errors slice assuming each line starts
 // with file:line:col.  Line and column number are sorted numerically.
-func errorSort(errors []error) {
-	if len(errors) < 2 {
-		return
+// Duplicate errors are stripped.
+func errorSort(errors []error) []error {
+	switch len(errors) {
+	case 0:
+		return nil
+	case 1:
+		return errors
 	}
 	elist := make(sortedErrors, len(errors))
 	for x, err := range errors {
 		elist[x] = sError{err.Error(), err}
 	}
 	sort.Sort(elist)
-	for x, err := range elist {
-		errors[x] = err.err
-	}
+	errors = make([]error, len(errors))
+	i := 0
+        for _, err := range elist {
+                if i > 0 && reflect.DeepEqual(err.err, errors[i-1]) {
+                        continue
+                }
+                errors[i] = err.err
+                i++
+        }
+	return errors[:i]
 }
