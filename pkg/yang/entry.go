@@ -846,12 +846,12 @@ func errorSort(errors []error) []error {
 	sort.Sort(elist)
 	errors = make([]error, len(errors))
 	i := 0
-        for _, err := range elist {
-                if i > 0 && reflect.DeepEqual(err.err, errors[i-1]) {
-                        continue
-                }
-                errors[i] = err.err
-                i++
-        }
+	for _, err := range elist {
+		if i > 0 && reflect.DeepEqual(err.err, errors[i-1]) {
+			continue
+		}
+		errors[i] = err.err
+		i++
+	}
 	return errors[:i]
 }

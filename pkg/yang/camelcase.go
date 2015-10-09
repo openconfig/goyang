@@ -36,7 +36,7 @@ func isASCIIDigit(c byte) bool {
 // lowercases names, it's extremely unlikely to have two fields with different
 // capitalizations.  In short, _my_field_name_2 becomes XMyFieldName_2.
 func CamelCase(s string) string {
-	fix := func (c byte) byte {
+	fix := func(c byte) byte {
 		if c == '/' || c == '-' || c == ':' {
 			return '_'
 		}
