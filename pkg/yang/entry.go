@@ -663,34 +663,49 @@ func (e *Entry) ReadOnly() bool {
 }
 
 // Find finds the Entry named by name relative to e.
-// TODO(borman): support relative paths and prefixes.
 func (e *Entry) Find(name string) *Entry {
-	if e == nil || name == "" || name[0] != '/' {
+	if e == nil || name == "" {
 		return nil
 	}
-	for e.Parent != nil {
-		e = e.Parent
-	}
-	parts := strings.Split(name[1:], "/")
+	parts := strings.Split(name, "/")
 
-	if prefix, _ := getPrefix(parts[0]); prefix != "" {
-		m, err := e.Modules().FindModuleByPrefix(prefix)
-		if err != nil {
-			e.addError(err)
-			return nil
+	// If parts[0] is "" then this path started with a /
+	// and we need to find our parent.
+	if parts[0] == "" {
+		for e.Parent != nil {
+			e = e.Parent
 		}
-		if e.Node.(*Module) != m {
-			e = ToEntry(m)
+		parts = parts[1:]
+
+		if prefix, _ := getPrefix(parts[0]); prefix != "" {
+			m, err := e.Modules().FindModuleByPrefix(prefix)
+			if err != nil {
+				e.addError(err)
+				return nil
+			}
+			if e.Node.(*Module) != m {
+				e = ToEntry(m)
+			}
 		}
 	}
 
 	for _, part := range parts {
-		_, part = getPrefix(part)
-		ne := e.Dir[part]
-		if ne == nil {
+		switch {
+		case e == nil:
 			return nil
+		case part == ".":
+		case part == "..":
+			e = e.Parent
+		default:
+			_, part = getPrefix(part)
+			switch part {
+			case ".":
+			case "", "..":
+				return nil
+			default:
+				e = e.Dir[part]
+			}
 		}
-		e = ne
 	}
 	return e
 }
@@ -831,12 +846,12 @@ func errorSort(errors []error) []error {
 	sort.Sort(elist)
 	errors = make([]error, len(errors))
 	i := 0
-        for _, err := range elist {
-                if i > 0 && reflect.DeepEqual(err.err, errors[i-1]) {
-                        continue
-                }
-                errors[i] = err.err
-                i++
-        }
+	for _, err := range elist {
+		if i > 0 && reflect.DeepEqual(err.err, errors[i-1]) {
+			continue
+		}
+		errors[i] = err.err
+		i++
+	}
 	return errors[:i]
 }
