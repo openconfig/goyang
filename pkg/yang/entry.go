@@ -756,6 +756,7 @@ func (e *Entry) merge(prefix *Value, oe *Entry) {
    %s: %s`, k, e.Name, Source(v.Node), v.Name, Source(se.Node), se.Name)
 			e.addError(er.Errors[0])
 		} else {
+			v.Parent = e
 			e.Dir[k] = v
 		}
 	}

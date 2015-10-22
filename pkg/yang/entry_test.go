@@ -146,3 +146,59 @@ func TestBadYang(t *testing.T) {
 		t.Error(b.String())
 	}
 }
+
+var parentTestModules = []struct {
+	name string
+	in   string
+}{
+	{
+		name: "foo.yang",
+		in: `
+module foo {
+  namespace "urn:foo";
+  prefix "foo";
+
+  import bar { prefix "temp-bar"; }
+  container foo-c {
+    leaf zzz { type string; }
+    uses temp-bar:common;
+  }
+  uses temp-bar:common;
+}
+`,
+	},
+	{
+		name: "bar.yang",
+		in: `
+module bar {
+  namespace "urn:bar";
+  prefix "bar";
+
+  grouping common {
+    container test1 { leaf str { type string; } }
+    container test2 { leaf str { type string; } }
+  }
+}
+`,
+	},
+}
+
+func TestUsesParent(t *testing.T) {
+	ms := NewModules()
+	for _, tt := range parentTestModules {
+		_ = ms.Parse(tt.in, tt.name)
+	}
+
+	efoo, _ := ms.GetModule("foo")
+	used := efoo.Dir["foo-c"].Dir["test1"]
+	expected := "/foo/foo-c/test1"
+	if used.Path() != expected {
+		t.Errorf("want %s, got %s", expected, used.Path())
+	}
+
+	used = efoo.Dir["test1"]
+	expected = "/foo/test1"
+	if used.Path() != expected {
+		t.Errorf("want %s, got %s", expected, used.Path())
+	}
+}
