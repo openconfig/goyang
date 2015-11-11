@@ -179,14 +179,23 @@ func (s *Module) FullName() string {
 // GetPrefix returns the proper prefix of m.  Useful when looking up types
 // in modules found by FindModuleByPrefix.
 func (m *Module) GetPrefix() string {
-	if m == nil {
+	pfx := m.getPrefix()
+	if pfx == nil {
 		// This case can be true during testing.
 		return ""
 	}
-	if m.Prefix != nil {
-		return m.Prefix.Name
+	return pfx.Name
+}
+
+func (m *Module) getPrefix() *Value {
+	if m == nil {
+		return nil
+	} else if m.Prefix != nil {
+		return m.Prefix
+	} else if m.BelongsTo != nil {
+		return m.BelongsTo.Prefix
 	}
-	return m.BelongsTo.Prefix.Name
+	return nil
 }
 
 // An Import is defined in: http://tools.ietf.org/html/rfc6020#section-7.1.5
