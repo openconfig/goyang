@@ -189,7 +189,7 @@ func (m *Module) GetPrefix() string {
 	return m.BelongsTo.Prefix.Name
 }
 
-// An Inport is defined in: http://tools.ietf.org/html/rfc6020#section-7.1.5
+// An Import is defined in: http://tools.ietf.org/html/rfc6020#section-7.1.5
 type Import struct {
 	Name       string       `yang:"Name,nomerge"`
 	Source     *Statement   `yang:"Statement,nomerge"`
