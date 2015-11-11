@@ -202,3 +202,19 @@ func TestUsesParent(t *testing.T) {
 		t.Errorf("want %s, got %s", expected, used.Path())
 	}
 }
+
+func TestPrefixes(t *testing.T) {
+	ms := NewModules()
+	for _, tt := range parentTestModules {
+		_ = ms.Parse(tt.in, tt.name)
+	}
+
+	efoo, _ := ms.GetModule("foo")
+	if efoo.Prefix.Name != "foo" {
+		t.Errorf(`want prefix "foo", got %q`, efoo.Prefix.Name)
+	}
+	used := efoo.Dir["foo-c"].Dir["test1"]
+	if used.Prefix.Name != "bar" {
+		t.Errorf(`want prefix "bar", got %q`, used.Prefix.Name)
+	}
+}

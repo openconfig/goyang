@@ -588,6 +588,13 @@ func ToEntry(n Node) (e *Entry) {
 	if !found {
 		return newError(n, "%T: cannot be converted to a *Entry", n)
 	}
+	// If prefix isn't set, provide it based on our root node (module)
+	if e.Prefix == nil {
+		if m := RootNode(e.Node); m != nil {
+			e.Prefix = m.getPrefix()
+		}
+	}
+
 	return e
 }
 
