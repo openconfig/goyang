@@ -188,14 +188,16 @@ func (m *Module) GetPrefix() string {
 }
 
 func (m *Module) getPrefix() *Value {
-	if m == nil {
+	switch {
+	case m == nil:
 		return nil
-	} else if m.Prefix != nil {
+	case m.Prefix != nil:
 		return m.Prefix
-	} else if m.BelongsTo != nil {
+	case m.BelongsTo != nil:
 		return m.BelongsTo.Prefix
+	default:
+		return nil
 	}
-	return nil
 }
 
 // An Import is defined in: http://tools.ietf.org/html/rfc6020#section-7.1.5
