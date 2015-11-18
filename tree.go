@@ -24,17 +24,17 @@ import (
 )
 
 func init() {
-        register(&formatter {
-                name: "tree",
-                f: doTree,
-                help: "display in a tree format",
-        })
+	register(&formatter{
+		name: "tree",
+		f:    doTree,
+		help: "display in a tree format",
+	})
 }
 
 func doTree(w io.Writer, entries []*yang.Entry) {
-        for _, e := range entries {
+	for _, e := range entries {
 		Write(w, e)
-        }
+	}
 }
 
 // Write writes e, formatted, and all of its children, to w.
@@ -66,8 +66,8 @@ func Write(w io.Writer, e *yang.Entry) {
 		fmt.Fprintf(w, "%s ", getTypeName(e))
 	}
 	name := e.Name
-	if e.Prefix != "" {
-		name = e.Prefix + ":" + name
+	if e.Prefix != nil {
+		name = e.Prefix.Name + ":" + name
 	}
 	switch {
 	case e.Dir == nil && e.ListAttr != nil:

@@ -73,7 +73,7 @@ type Entry struct {
 	Errors      []error   // list of errors encounterd on this node
 	Kind        EntryKind // kind of Entry
 	Config      TriState  // config state of this entry, if known
-	Prefix      string    // prefix to use from this point down
+	Prefix      *Value    // prefix to use from this point down
 
 	// Fields associated with directory nodes
 	Dir map[string]*Entry
@@ -168,6 +168,7 @@ const (
 	OutputEntry
 )
 
+// EntryKindToName maps EntryKind to their names
 var EntryKindToName = map[EntryKind]string{
 	LeafEntry:         "Leaf",
 	DirectoryEntry:    "Directory",
@@ -455,7 +456,7 @@ func ToEntry(n Node) (e *Entry) {
 			}
 		case "prefix":
 			if v := fv.Interface().(*Value); v != nil {
-				e.Prefix = v.Name
+				e.Prefix = v
 			}
 		case "augment":
 			for _, a := range fv.Interface().([]*Augment) {
@@ -587,6 +588,13 @@ func ToEntry(n Node) (e *Entry) {
 	if !found {
 		return newError(n, "%T: cannot be converted to a *Entry", n)
 	}
+	// If prefix isn't set, provide it based on our root node (module)
+	if e.Prefix == nil {
+		if m := RootNode(e.Node); m != nil {
+			e.Prefix = m.getPrefix()
+		}
+	}
+
 	return e
 }
 
@@ -748,7 +756,7 @@ func (e *Entry) merge(prefix *Value, oe *Entry) {
 	for k, v := range oe.Dir {
 		v := v.dup()
 		if prefix != nil {
-			v.Prefix = prefix.Name
+			v.Prefix = prefix
 		}
 		if se := e.Dir[k]; se != nil {
 			er := newError(oe.Node, `Duplicate node %q in %q from:

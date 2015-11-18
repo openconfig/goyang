@@ -179,17 +179,28 @@ func (s *Module) FullName() string {
 // GetPrefix returns the proper prefix of m.  Useful when looking up types
 // in modules found by FindModuleByPrefix.
 func (m *Module) GetPrefix() string {
-	if m == nil {
+	pfx := m.getPrefix()
+	if pfx == nil {
 		// This case can be true during testing.
 		return ""
 	}
-	if m.Prefix != nil {
-		return m.Prefix.Name
-	}
-	return m.BelongsTo.Prefix.Name
+	return pfx.Name
 }
 
-// An Inport is defined in: http://tools.ietf.org/html/rfc6020#section-7.1.5
+func (m *Module) getPrefix() *Value {
+	switch {
+	case m == nil:
+		return nil
+	case m.Prefix != nil:
+		return m.Prefix
+	case m.BelongsTo != nil:
+		return m.BelongsTo.Prefix
+	default:
+		return nil
+	}
+}
+
+// An Import is defined in: http://tools.ietf.org/html/rfc6020#section-7.1.5
 type Import struct {
 	Name       string       `yang:"Name,nomerge"`
 	Source     *Statement   `yang:"Statement,nomerge"`
