@@ -303,12 +303,11 @@ func (ms *Modules) Process() []error {
 		mods = append(mods, m)
 	}
 	for len(mods) > 0 {
-		var processed, skipped int
+		var processed int
 		for i := 0; i < len(mods); {
 			m := mods[i]
 			p, s := ToEntry(m).Augment(false)
 			processed += p
-			skipped += p
 			if s == 0 {
 				mods[i] = mods[len(mods)-1]
 				mods = mods[:len(mods)-1]
