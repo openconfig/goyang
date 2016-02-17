@@ -204,7 +204,7 @@ func (ms *Modules) FindModuleByPrefix(prefix string) (*Module, error) {
 			switch {
 			case m == found:
 			case found != nil:
-				return nil, fmt.Errorf("prefix % matches two or more modules (%s, %s)\n", found.Name, m.Name)
+				return nil, fmt.Errorf("prefix %s matches two or more modules (%s, %s)\n", prefix, found.Name, m.Name)
 			default:
 				found = m
 			}
