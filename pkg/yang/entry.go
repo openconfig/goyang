@@ -726,6 +726,30 @@ func (e *Entry) Path() string {
 	return e.Parent.Path() + "/" + e.Name
 }
 
+// Namespace returns the YANG/XML namespace Value for e as mounted in the Entry
+// tree (e.g., as placed by grouping statements).
+//
+// Per RFC6020 section 7.12, the namespace on elements in the tree due to a
+// "uses" statement is that of the where the uses statement occurs, i.e., the
+// user, rather than creator (grouping) of those elements, so we follow the
+// usage (Entry) tree up to the parent before obtaining the (then adjacent) root
+// node for its namespace Value.
+func (e *Entry) Namespace() *Value {
+	// Make e the root parent entry
+	for ; e.Parent != nil; e = e.Parent {
+	}
+
+	// Return the namespace of a valid root parent entry
+	if e != nil && e.Node != nil {
+		if root := RootNode(e.Node); root != nil {
+			return root.Namespace
+		}
+	}
+
+	// Otherwise return an empty namespace Value (rather than nil)
+	return new(Value)
+}
+
 // dup makes a deep duplicate of e.
 func (e *Entry) dup() *Entry {
 	// Warning: if we add any elements to Entry that should not be
