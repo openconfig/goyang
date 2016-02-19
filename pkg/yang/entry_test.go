@@ -178,6 +178,11 @@ module bar {
     container test1 { leaf str { type string; } }
     container test2 { leaf str { type string; } }
   }
+
+  container bar-local {
+    leaf test1 { type string; }
+  }
+
 }
 `,
 	},
@@ -216,5 +221,46 @@ func TestPrefixes(t *testing.T) {
 	used := efoo.Dir["foo-c"].Dir["test1"]
 	if used.Prefix.Name != "bar" {
 		t.Errorf(`want prefix "bar", got %q`, used.Prefix.Name)
+	}
+}
+
+func TestEntryNamespace(t *testing.T) {
+	ms := NewModules()
+	for _, tt := range parentTestModules {
+		_ = ms.Parse(tt.in, tt.name)
+	}
+
+	foo, _ := ms.GetModule("foo")
+	bar, _ := ms.GetModule("bar")
+
+	for _, tc := range []struct {
+		entry *Entry
+		ns    string
+	}{
+		// grouping used in foo always have foo's namespace, even if
+		// it was defined in bar as here.
+		{
+			entry: foo.Dir["foo-c"].Dir["test1"],
+			ns:    "urn:foo",
+		},
+
+		// grouping defined and used in foo has foo's namespace
+		{
+			entry: foo.Dir["foo-c"].Dir["zzz"],
+			ns:    "urn:foo",
+		},
+
+		// grouping defined and used in bar has bar's namespace
+		{
+			entry: bar.Dir["bar-local"].Dir["test1"],
+			ns:    "urn:bar",
+		},
+	} {
+		nsValue := tc.entry.Namespace()
+		if nsValue == nil {
+			t.Errorf("want namespace %s, got nil", tc.ns)
+		} else if tc.ns != nsValue.Name {
+			t.Errorf("want namespace %s, got %s", tc.ns, nsValue.Name)
+		}
 	}
 }
