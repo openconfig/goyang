@@ -204,7 +204,7 @@ func (ms *Modules) FindModuleByPrefix(prefix string) (*Module, error) {
 			switch {
 			case m == found:
 			case found != nil:
-				return nil, fmt.Errorf("prefix % matches two or more modules (%s, %s)\n", found.Name, m.Name)
+				return nil, fmt.Errorf("prefix %s matches two or more modules (%s, %s)\n", prefix, found.Name, m.Name)
 			default:
 				found = m
 			}
@@ -303,12 +303,11 @@ func (ms *Modules) Process() []error {
 		mods = append(mods, m)
 	}
 	for len(mods) > 0 {
-		var processed, skipped int
+		var processed int
 		for i := 0; i < len(mods); {
 			m := mods[i]
 			p, s := ToEntry(m).Augment(false)
 			processed += p
-			skipped += p
 			if s == 0 {
 				mods[i] = mods[len(mods)-1]
 				mods = mods[:len(mods)-1]
