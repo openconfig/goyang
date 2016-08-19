@@ -90,7 +90,7 @@ type Entry struct {
 
 	Augments []*Entry // Augments associated with this entry
 
-	// Extra maps all the unsupported fields to thier values
+	// Extra maps all the unsupported fields to their values
 	Extra map[string][]interface{}
 }
 
