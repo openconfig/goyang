@@ -117,7 +117,7 @@ func doProto(w io.Writer, entries []*yang.Entry) {
 					pf.printFlatNode(&pf.buf, e)
 				}
 			} else {
-				pf.printNextedNode(&pf.buf, child)
+				pf.printNestedNode(&pf.buf, child)
 			}
 		}
 		pf.dumpMessageInfo()
@@ -464,8 +464,8 @@ func (pf *protofile) printFlatNode(w io.Writer, e *yang.Entry) {
 	fmt.Fprintln(w, "}")
 }
 
-// printNextedNode writes e, formatted almost like a protobuf message, to w.
-func (pf *protofile) printNextedNode(w io.Writer, e *yang.Entry) {
+// printNestedNode writes e, formatted almost like a protobuf message, to w.
+func (pf *protofile) printNestedNode(w io.Writer, e *yang.Entry) {
 	nodes := children(e)
 	if len(nodes) == 0 {
 		return
@@ -492,7 +492,7 @@ func (pf *protofile) printNextedNode(w io.Writer, e *yang.Entry) {
 			fmt.Fprintln(indent.NewWriter(w, "  // "), se.Description)
 		}
 		if len(se.Dir) > 0 || se.Type == nil {
-			pf.printNextedNode(indent.NewWriter(w, "  "), se)
+			pf.printNestedNode(indent.NewWriter(w, "  "), se)
 		}
 		fmt.Fprint(w, "  ")
 		if se.ListAttr != nil {
