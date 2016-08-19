@@ -15,7 +15,7 @@
 // Program yang parses YANG files, displays errors, and possibly writes
 // something related to the input on output.
 //
-// Usage: yang [--path PATH] [--format FORMAT] [MODULE] [FILE ...]
+// Usage: yang [--path DIR] [--format FORMAT] [FORMAT OPTIONS] [MODULE] [FILE ...]
 //
 // If MODULE is specified (an argument that does not end in .yang), it is taken
 // as the name of the module to display.  Any FILEs specified are read, and the
@@ -26,11 +26,14 @@
 // If MODULE is missing, then all base modules read from the FILEs are
 // displayed.  If there are no arguments then standard input is parsed.
 //
-// If PATH is specified, it is considered a comma separated list of paths
+// If DIR is specified, it is considered a comma separated list of paths
 // to append to the search directory.
 //
 // FORMAT, which defaults to "tree", specifes the format of output to produce.
 // Use "goyang --help" for a list of available formats.
+//
+// FORMAT OPTIONS are flags that apply to a specific format.  They must follow
+// --format.
 //
 // THIS PROGRAM IS STILL JUST A DEVELOPMENT TOOL.
 package main
@@ -45,15 +48,17 @@ import (
 	"strings"
 
 	"github.com/openconfig/goyang/pkg/yang"
+	"github.com/openconfig/goyang/pkg/indent"
 	"github.com/pborman/getopt"
 )
 
 // Each format must register a formatter with register.  The function f will
 // be called once with the set of yang Entry trees generated.
 type formatter struct {
-	name string
-	f    func(io.Writer, []*yang.Entry)
-	help string
+	name  string
+	f     func(io.Writer, []*yang.Entry)
+	help  string
+	flags *getopt.Set
 }
 
 var formatters = map[string]*formatter{}
@@ -76,7 +81,7 @@ func exitIfError(errs []error) {
 var stop = os.Exit
 
 func main() {
-	format := "tree"
+	var format string
 	formats := make([]string, 0, len(formatters))
 	for k := range formatters {
 		formats = append(formats, k)
@@ -85,12 +90,30 @@ func main() {
 
 	var traceP string
 	var help bool
-	getopt.CommandLine.ListVarLong(&yang.Path, "path", 0, "comma separated list of directories to add to PATH")
-	getopt.CommandLine.StringVarLong(&format, "format", 0, "format to display: "+strings.Join(formats, ", "))
-	getopt.CommandLine.StringVarLong(&traceP, "trace", 0, "file to write trace into")
-	getopt.CommandLine.BoolVarLong(&help, "help", '?', "display help")
+	getopt.ListVarLong(&yang.Path, "path", 0, "comma separated list of directories to add to search path", "DIR[,DIR...]")
+	getopt.StringVarLong(&format, "format", 0, "format to display: "+strings.Join(formats, ", "), "FORMAT")
+	getopt.StringVarLong(&traceP, "trace", 0, "write trace into to TRACEFILE", "TRACEFILE")
+	getopt.BoolVarLong(&help, "help", '?', "display help")
+	getopt.SetParameters("[FORMAT OPTIONS] [SOURCE] [...]")
 
-	getopt.Parse()
+	if err := getopt.Getopt(func(o getopt.Option) bool {
+		if o.Name() == "--format" {
+			f, ok := formatters[format]
+			if !ok {
+				fmt.Fprintf(os.Stderr, "%s: invalid format.  Choices are %s\n", format, strings.Join(formats, ", "))
+				stop(1)
+			}
+			if f.flags != nil {
+				f.flags.VisitAll(func(o getopt.Option) {
+					getopt.AddOption(o)
+				})
+			}
+		}
+		return true
+	}); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		getopt.PrintUsage(os.Stderr)
+	}
 
 	if traceP != "" {
 		fp, err := os.Create(traceP)
@@ -105,14 +128,25 @@ func main() {
 
 	if help {
 		getopt.CommandLine.PrintUsage(os.Stderr)
-		fmt.Fprintf(os.Stderr, "\nFormats:\n")
+		fmt.Fprintf(os.Stderr, `
+SOURCE may be a module name or a .yang file.
+
+Formats:
+`)
 		for _, fn := range formats {
 			f := formatters[fn]
 			fmt.Fprintf(os.Stderr, "    %s - %s\n", f.name, f.help)
+			if f.flags != nil {
+				f.flags.PrintOptions(indent.NewWriter(os.Stderr, "   "))
+			}
+			fmt.Fprintln(os.Stderr)
 		}
 		stop(0)
 	}
 
+	if format == "" {
+		format = "tree"
+	}
 	if _, ok := formatters[format]; !ok {
 		fmt.Fprintf(os.Stderr, "%s: invalid format.  Choices are %s\n", format, strings.Join(formats, ", "))
 		stop(1)

@@ -15,10 +15,14 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -27,25 +31,35 @@ import (
 	"github.com/pborman/getopt"
 )
 
-const protoVersion = 1
+const (
+	protoVersion  = "1"
+	tagPrefix     = "// goyang-tag "
+	versionPrefix = "// goyang-version "
+)
 
 var (
-	protoNoComments bool
-	protoWithSource bool
-	protoNotNested  bool
 	proto2          bool
+	protoDir        string
+	protoNoComments bool
+	protoNotNested  bool
+	protoPreserve   string
+	protoWithSource bool
 )
 
 func init() {
+	flags := getopt.New()
 	register(&formatter{
-		name: "proto",
-		f:    doProto,
-		help: "display tree in a proto like format",
+		name:  "proto",
+		f:     doProto,
+		help:  "display tree in a proto like format",
+		flags: flags,
 	})
-	getopt.CommandLine.BoolVarLong(&protoNoComments, "proto_no_comments", 0, "do not include comments in output")
-	getopt.CommandLine.BoolVarLong(&protoWithSource, "proto_with_source", 0, "add source location comments")
-	getopt.CommandLine.BoolVarLong(&protoNotNested, "proto_not_nested", 0, "do not produce nested protobufs")
-	getopt.CommandLine.BoolVarLong(&proto2, "proto2", 0, "produce proto2 protobufs")
+	flags.BoolVarLong(&proto2, "proto2", 0, "produce proto2 protobufs")
+	flags.StringVarLong(&protoDir, "proto_dir", 0, "write a .proto file for each module in DIR", "DIR")
+	flags.BoolVarLong(&protoNoComments, "proto_no_comments", 0, "do not include comments in output")
+	flags.BoolVarLong(&protoNotNested, "proto_not_nested", 0, "do not produce nested protobufs")
+	flags.StringVarLong(&protoPreserve, "proto_preserve", 0, "preserve existing .proto files as filename.SUFFIX", "SUFFIX")
+	flags.BoolVarLong(&protoWithSource, "proto_with_source", 0, "add source location comments")
 }
 
 // A protofile collects the produced proto along with meta information.
@@ -63,15 +77,36 @@ type messageInfo struct {
 }
 
 func doProto(w io.Writer, entries []*yang.Entry) {
+	failed := false
+	if protoPreserve != "" && protoPreserve[0] != '.' {
+		protoPreserve = "." + protoPreserve
+	}
 	for _, e := range entries {
 		if len(e.Dir) == 0 {
 			// skip modules that have nothing in them
 			continue
 		}
+
 		pf := &protofile{
 			fixedNames: map[string]string{},
 			messages:   map[string]*messageInfo{},
 		}
+
+		var out string
+		// optionally read in tags from old proto
+		if protoDir != "" {
+			out = filepath.Join(protoDir, e.Name+".proto")
+			if fd, err := os.Open(out); err == nil {
+				err = pf.importTags(fd)
+				fd.Close()
+				if err != nil {
+					failed = true
+					fmt.Fprintln(os.Stderr, err)
+					continue
+				}
+			}
+		}
+
 		pf.printHeader(&pf.buf, e)
 		for _, e := range flatten(e) {
 			pf.printService(&pf.buf, e)
@@ -86,7 +121,49 @@ func doProto(w io.Writer, entries []*yang.Entry) {
 			}
 		}
 		pf.dumpMessageInfo()
-		io.Copy(w, &pf.buf)
+		if len(pf.errs) != 0 {
+			for _, err := range pf.errs {
+				failed = true
+				fmt.Fprintf(os.Stderr, "%s: %v\n", e.Name, err)
+			}
+			continue
+		}
+		var closeme io.Closer
+		if out == "" {
+			out = "stdout"
+		} else {
+			var old string
+			if protoPreserve != "" {
+				old = out + protoPreserve
+				if _, err := os.Stat(out); err == nil {
+					if err := os.Rename(out, old); err != nil {
+						failed = true
+						fmt.Fprintf(os.Stderr, "%s: %v\n", e.Name, err)
+						continue
+					}
+				}
+			}
+			fd, err := os.Create(out)
+			if err != nil {
+				failed = true
+				fmt.Fprintln(os.Stderr, err)
+			}
+			w = fd
+			closeme = fd
+		}
+		if _, err := io.Copy(w, &pf.buf); err != nil {
+			failed = true
+			fmt.Fprintf(os.Stderr, "%s: %v\n", out, err)
+		}
+		if closeme != nil {
+			if err := closeme.Close(); err != nil {
+				failed = true
+				fmt.Fprintf(os.Stderr, "%s: %v\n", out, err)
+			}
+		}
+	}
+	if failed {
+		os.Exit(1)
 	}
 }
 
@@ -121,6 +198,7 @@ func (pf *protofile) dumpMessageInfo() {
 		names[x] = name
 		x++
 	}
+	sort.Strings(names)
 	for _, name := range names {
 		mi := pf.messages[name]
 		mi.dump(name, &pf.buf)
@@ -134,10 +212,49 @@ func (mi *messageInfo) dump(mname string, w io.Writer) {
 		names[x] = name
 		x++
 	}
+	sort.Strings(names)
 	for _, name := range names {
 		tag := mi.fields[name]
-		fmt.Fprintf(w, "// %s %s %d\n", mname, name, tag)
+		fmt.Fprintf(w, "%s%s %s %d\n", tagPrefix, mname, name, tag)
 	}
+}
+
+func (pf *protofile) importTags(r io.Reader) error {
+	s := bufio.NewScanner(r)
+	for s.Scan() {
+		line := s.Text()
+		if strings.HasPrefix(line, versionPrefix) {
+			version := strings.TrimSpace(line[len(versionPrefix):])
+			if version != protoVersion {
+				return fmt.Errorf("unsupported goyang proto version: %s", version)
+			}
+			continue
+		}
+		if !strings.HasPrefix(line, tagPrefix) {
+			continue
+		}
+		line = line[len(tagPrefix):]
+		fields := strings.Fields(line)
+		if len(fields) != 3 {
+			return fmt.Errorf("invalid goyang-tag: %s", line)
+		}
+		tag, err := strconv.Atoi(fields[2])
+		if err != nil {
+			return fmt.Errorf("invalid goyang-tag: %s", line)
+		}
+		mi := pf.messages[fields[0]]
+		if mi == nil {
+			mi = &messageInfo{
+				fields: map[string]int{},
+			}
+			pf.messages[fields[0]] = mi
+		}
+		mi.fields[fields[1]] = tag
+		if mi.last < tag {
+			mi.last = tag
+		}
+	}
+	return s.Err()
 }
 
 func (m *messageInfo) tag(name, kind string, isList bool) int {
@@ -174,7 +291,7 @@ var kind2proto = map[yang.TypeKind]string{
 	yang.YinstanceIdentifier: "TODO-ii",        // reference of a data tree node
 	yang.Yleafref:            "string",         // reference to a leaf instance
 	yang.Ystring:             "string",         // human readable string
-	yang.Yunion:              "TODO-union",     // choice of types
+	yang.Yunion:              "inline",         // handled inline
 }
 
 func isStream(e *yang.Entry) bool {
@@ -193,11 +310,13 @@ func (pf *protofile) printHeader(w io.Writer, e *yang.Entry) {
 	}
 	fmt.Fprintf(w, `syntax = %q;
 // Automatically generated by goyang https://github.com/openconfig/goyang
-// compiled %s
+// compiled %s`, syntax, time.Now().UTC().Format(time.RFC3339))
+	fmt.Fprintf(w, `
 // do not delete the next line
-// goyang-version %d
+%s%s`, versionPrefix, protoVersion)
+	fmt.Fprintf(w, `
 // module %q
-`, syntax, time.Now().UTC().Format(time.RFC3339), protoVersion, e.Name)
+`, e.Name)
 
 	if v := e.Extra["revision"]; len(v) > 0 {
 		for _, rev := range v[0].([]*yang.Revision) {
@@ -386,10 +505,7 @@ func (pf *protofile) printNextedNode(w io.Writer, e *yang.Entry) {
 			kind := pf.fixName(se.Name)
 			fmt.Fprintf(w, "%s %s = %d;", kind, name, mi.tag(name, kind, se.ListAttr != nil))
 		} else {
-			kind := "UNKNOWN TYPE"
-			if se.Type != nil {
-				kind = kind2proto[se.Type.Kind]
-			}
+			kind := kind2proto[se.Type.Kind]
 			printed := false
 			if len(se.Type.Type) > 0 {
 				seen := map[string]bool{}
