@@ -58,7 +58,7 @@ func init() {
 	flags.StringVarLong(&protoDir, "proto_dir", 0, "write a .proto file for each module in DIR", "DIR")
 	flags.BoolVarLong(&protoNoComments, "proto_no_comments", 0, "do not include comments in output")
 	flags.BoolVarLong(&protoNotNested, "proto_not_nested", 0, "do not produce nested protobufs")
-	flags.StringVarLong(&protoPreserve, "proto_preserve", 0, "preserve existing .proto files as filename.SUFFIX", "SUFFIX")
+	flags.StringVarLong(&protoPreserve, "proto_save", 0, "preserve existing .proto files as filename.SUFFIX", "SUFFIX")
 	flags.BoolVarLong(&protoWithSource, "proto_with_source", 0, "add source location comments")
 }
 
