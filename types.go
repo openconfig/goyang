@@ -19,7 +19,14 @@ import (
 	"io"
 	"strings"
 
+	"github.com/openconfig/goyang/pkg/indent"
 	"github.com/openconfig/goyang/pkg/yang"
+	"github.com/pborman/getopt"
+)
+
+var (
+	typesDebug   bool
+	typesVerbose bool
 )
 
 func init() {
@@ -28,6 +35,8 @@ func init() {
 		f:    doTypes,
 		help: "display found types",
 	})
+	getopt.CommandLine.BoolVarLong(&typesDebug, "types_debug", 0, "display debug information")
+	getopt.CommandLine.BoolVarLong(&typesVerbose, "types_verbose", 0, "include base information")
 }
 
 func doTypes(w io.Writer, entries []*yang.Entry) {
@@ -37,7 +46,12 @@ func doTypes(w io.Writer, entries []*yang.Entry) {
 	}
 
 	for t := range types {
-		YTPrint(w, t)
+		printType(w, t, typesVerbose)
+	}
+	if typesDebug {
+		for _, e := range entries {
+			showall(w, e)
+		}
 	}
 }
 
@@ -57,10 +71,14 @@ func (t Types) AddEntry(e *yang.Entry) {
 	}
 }
 
-// YTPrint prints type t in a moderately human readable format to w.
-func YTPrint(w io.Writer, t *yang.YangType) {
-	if t.Base != nil {
-		fmt.Fprintf(w, "%s: ", yang.Source(t.Base))
+// printType prints type t in a moderately human readable format to w.
+func printType(w io.Writer, t *yang.YangType, verbose bool) {
+	if verbose && t.Base != nil {
+		base := yang.Source(t.Base)
+		if base == "unknown" {
+			base = "unnamed type"
+		}
+		fmt.Fprintf(w, "%s: ", base)
 	}
 	fmt.Fprintf(w, "%s", t.Root.Name)
 	if t.Kind.String() != t.Root.Name {
@@ -87,13 +105,29 @@ func YTPrint(w io.Writer, t *yang.YangType) {
 	if len(t.Pattern) > 0 {
 		fmt.Fprintf(w, " pattern=%s", strings.Join(t.Pattern, "|"))
 	}
-	if len(t.Type) > 0 {
-		fmt.Fprintf(w, " union...")
-	}
-
 	b := yang.BaseTypedefs[t.Kind.String()].YangType
 	if len(t.Range) > 0 && !t.Range.Equal(b.Range) {
 		fmt.Fprintf(w, " range=%s", t.Range)
 	}
+	if len(t.Type) > 0 {
+		fmt.Fprintf(w, "union{\n")
+		for _, t := range t.Type {
+			printType(indent.NewWriter(w, "  "), t, verbose)
+		}
+		fmt.Fprintf(w, "}")
+	}
 	fmt.Fprintf(w, ";\n")
+}
+
+func showall(w io.Writer, e *yang.Entry) {
+	if e == nil {
+		return
+	}
+	if e.Type != nil {
+		fmt.Fprintf(w, "\n%s\n  ", e.Node.Statement().Location())
+		printType(w, e.Type.Root, false)
+	}
+	for _, d := range e.Dir {
+		showall(w, d)
+	}
 }
