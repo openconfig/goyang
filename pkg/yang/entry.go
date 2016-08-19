@@ -89,6 +89,9 @@ type Entry struct {
 	RPC *RPCEntry // set if we are an RPC
 
 	Augments []*Entry // Augments associated with this entry
+
+	// Extra maps all the unsupported fields to their values
+	Extra map[string][]interface{}
 }
 
 // An RPCEntry contains information related to an RPC Node.
@@ -190,19 +193,21 @@ func (k EntryKind) String() string {
 // newDirectory returns an empty directory Entry.
 func newDirectory(n Node) *Entry {
 	return &Entry{
-		Kind: DirectoryEntry,
-		Dir:  make(map[string]*Entry),
-		Node: n,
-		Name: n.NName(),
+		Kind:  DirectoryEntry,
+		Dir:   make(map[string]*Entry),
+		Node:  n,
+		Name:  n.NName(),
+		Extra: map[string][]interface{}{},
 	}
 }
 
 // newLeaf returns an empty leaf Entry.
 func newLeaf(n Node) *Entry {
 	return &Entry{
-		Kind: LeafEntry,
-		Node: n,
-		Name: n.NName(),
+		Kind:  LeafEntry,
+		Node:  n,
+		Name:  n.NName(),
+		Extra: map[string][]interface{}{},
 	}
 }
 
@@ -572,6 +577,7 @@ func ToEntry(n Node) (e *Entry) {
 			"unique",
 			"when",
 			"yang-version":
+			e.Extra[name] = append(e.Extra[name], fv.Interface())
 			continue
 
 		case "Ext", "Name", "Parent", "Statement":
@@ -642,6 +648,7 @@ func (e *Entry) FixChoice() {
 					Config: ce.Config,
 					Prefix: ce.Prefix,
 					Dir:    map[string]*Entry{ce.Name: ce},
+					Extra:  map[string][]interface{}{},
 				}
 				ce.Parent = ne
 				e.Dir[k] = ne
