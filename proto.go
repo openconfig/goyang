@@ -419,7 +419,7 @@ func (pf *protofile) printFlatNode(w io.Writer, e *yang.Entry) {
 		} else if proto2 {
 			fmt.Fprint(w, "optional ")
 		}
-		name := pf.fixName(k)
+		name := pf.fieldName(k)
 		if len(se.Dir) > 0 || se.Type == nil {
 			kind := pf.fullName(se.Name, se)
 			fmt.Fprintf(w, "%s %s = %d;", kind, name, mi.tag(name, kind, se.ListAttr != nil))
@@ -544,7 +544,7 @@ func (pf *protofile) printNestedNode(w io.Writer, e *yang.Entry) {
 
 func (pf *protofile) fullName(n string, e *yang.Entry) string {
 	parts := []string{pf.fixName(n)}
-	for p := e.Parent; p != nil; p = p.Parent {
+	for p := e.Parent; p != nil && p.Parent != nil; p = p.Parent {
 		parts = append(parts, pf.fixName(p.Name))
 	}
 	for i := 0; i < len(parts)/2; i++ {
