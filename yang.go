@@ -27,7 +27,8 @@
 // displayed.  If there are no arguments then standard input is parsed.
 //
 // If DIR is specified, it is considered a comma separated list of paths
-// to append to the search directory.
+// to append to the search directory.  If DIR appears as DIR/... then
+// DIR and all direct and indirect subdirectories are checked.
 //
 // FORMAT, which defaults to "tree", specifes the format of output to produce.
 // Use "goyang --help" for a list of available formats.
