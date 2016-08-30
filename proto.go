@@ -114,13 +114,12 @@ func doProto(w io.Writer, entries []*yang.Entry) {
 		}
 		for _, child := range children(e) {
 			if protoFlat {
-				for i, e := range flatten(child) {
-					if i != 0 {
-						fmt.Fprintln(&pf.buf)
-					}
+				for _, e := range flatten(child) {
+					fmt.Fprintln(&pf.buf)
 					pf.printNode(&pf.buf, e, false)
 				}
 			} else {
+				fmt.Fprintln(&pf.buf)
 				pf.printNode(&pf.buf, child, true)
 			}
 		}
@@ -298,16 +297,17 @@ var kind2proto = map[yang.TypeKind]string{
 	yang.Yuint32: "uint32", // int in range [0, 4294967295]
 	yang.Yuint64: "uint64", // int in range [0, 18446744073709551615]
 
-	yang.Ybinary:             "bytes",  // arbitrary data
-	yang.Ybits:               "INLINE", // set of bits or flags
-	yang.Ybool:               "bool",   // true or false
-	yang.Ydecimal64:          "INLINE", // signed decimal number
-	yang.Yenum:               "INLINE", // enumerated strings
-	yang.Yidentityref:        "string", // reference to abstract identity
-	yang.YinstanceIdentifier: "string", // reference of a data tree node
-	yang.Yleafref:            "string", // reference to a leaf instance
-	yang.Ystring:             "string", // human readable string
-	yang.Yunion:              "INLINE", // handled inline
+	yang.Ybinary:             "bytes",        // arbitrary data
+	yang.Ybits:               "INLINE-bits",  // set of bits or flags
+	yang.Ybool:               "bool",         // true or false
+	yang.Ydecimal64:          "INLINE-d64",   // signed decimal number
+	yang.Yempty:              "bool",         // value is its presense
+	yang.Yenum:               "INLINE-enum",  // enumerated strings
+	yang.Yidentityref:        "string",       // reference to abstract identity
+	yang.YinstanceIdentifier: "string",       // reference of a data tree node
+	yang.Yleafref:            "string",       // reference to a leaf instance
+	yang.Ystring:             "string",       // human readable string
+	yang.Yunion:              "INLINE-union", // handled inline
 }
 
 func isStream(e *yang.Entry) bool {
@@ -347,7 +347,7 @@ func (pf *protofile) printHeader(w io.Writer, e *yang.Entry) {
 	if !protoNoComments && e.Description != "" {
 		fmt.Fprintln(indent.NewWriter(w, "// "), e.Description)
 	}
-	fmt.Fprintf(w, "package %s;\n\n", pf.fieldName(e.Name))
+	fmt.Fprintf(w, "package %s;\n", pf.fieldName(e.Name))
 }
 
 // printService writes e, formatted almost like a protobuf message, to w.
@@ -406,9 +406,9 @@ func (pf *protofile) printService(w io.Writer, e *yang.Entry) {
 // printNode writes e, formatted almost like a protobuf message, to w.
 func (pf *protofile) printNode(w io.Writer, e *yang.Entry, nest bool) {
 	nodes := children(e)
-	if len(nodes) == 0 {
-		return
-	}
+	// if len(nodes) == 0 {
+	//	return
+	//}
 
 	if !protoNoComments && e.Description != "" {
 		fmt.Fprintln(indent.NewWriter(w, "// "), e.Description)
@@ -471,7 +471,7 @@ func (pf *protofile) printNode(w io.Writer, e *yang.Entry, nest bool) {
 			}
 			if !asComment {
 				fmt.Fprintf(w, "  enum %s {\n", kind)
-				fmt.Fprintf(w, "    FIELD_NOT_SET = 0;\n")
+				fmt.Fprintf(w, "    %s_FIELD_NOT_SET = 0;\n", kind)
 			} else {
 				fmt.Fprintf(w, "  // Values:\n")
 			}
@@ -488,7 +488,7 @@ func (pf *protofile) printNode(w io.Writer, e *yang.Entry, nest bool) {
 					}
 				} else {
 					n := strings.ToUpper(pf.fieldName(ns[0]))
-					fmt.Fprintf(w, "    %s = %d;\n", n, 1<<uint(v))
+					fmt.Fprintf(w, "    %s_%s = %d;\n", kind, n, 1<<uint(v))
 					for _, n := range ns[1:] {
 						n = strings.ToUpper(pf.fieldName(n))
 						fmt.Fprintf(w, "    // %s = %d; (DUPLICATE VALUE)\n", n, 1<<uint(v))
@@ -510,22 +510,18 @@ func (pf *protofile) printNode(w io.Writer, e *yang.Entry, nest bool) {
 			fmt.Fprintln(w)
 
 			for i, n := range se.Type.Enum.Names() {
-				fmt.Fprintf(w, "    %s = %d;\n", strings.ToUpper(n), i)
+				fmt.Fprintf(w, "    %s_%s = %d;\n", kind, strings.ToUpper(pf.fieldName(n)), i)
 			}
 			fmt.Fprintf(w, "  };\n")
 		} else if se.Type.Kind == yang.Yunion {
-			kind = kind2proto[se.Type.Kind]
-			seen := map[string]bool{}
-			var types []string
-			for _, t := range se.Type.Type {
-				kind = kind2proto[t.Kind]
-				if seen[kind] {
-					continue
-				}
-				types = append(types, kind)
-				seen[kind] = true
-			}
-			if len(types) > 1 {
+			types := pf.unionTypes(se.Type, map[string]bool{})
+			switch len(types) {
+			case 0:
+				fmt.Fprintf(w, "    // *WARNING* union %s has no types\n", se.Name)
+				printed = true
+			case 1:
+				kind = types[0]
+			default:
 				iw := w
 				kind = pf.fixName(se.Name)
 				if se.ListAttr != nil {
@@ -537,8 +533,8 @@ func (pf *protofile) printNode(w io.Writer, e *yang.Entry, nest bool) {
 					fmt.Fprintf(w, " // %s", yang.Source(se.Node))
 				}
 				fmt.Fprintln(w)
-				for _, kind := range types {
-					fmt.Fprintf(iw, "    %s as_%s = %d;\n", kind, kind, mi.tag(name, kind, false))
+				for _, tkind := range types {
+					fmt.Fprintf(iw, "    %s %s_%s = %d;\n", tkind, kind, tkind, mi.tag(name, tkind, false))
 				}
 				// { to match the brace below to keep brace matching working
 				fmt.Fprintf(iw, "  }\n")
@@ -561,6 +557,38 @@ func (pf *protofile) printNode(w io.Writer, e *yang.Entry, nest bool) {
 	}
 	// { to match the brace below to keep brace matching working
 	fmt.Fprintln(w, "}")
+}
+
+// unionTypes returns a slice of all types in the union (and sub unions).
+func (pf *protofile) unionTypes(ut *yang.YangType, seen map[string]bool) []string {
+	var types []string
+	for _, t := range ut.Type {
+		k := t.Kind
+		switch k {
+		case yang.Yenum:
+			// TODO(borman): this is not correct for enums that fit in 32 bits
+			k = yang.Yuint64
+		case yang.Ybits:
+			k = yang.Yuint64
+		case yang.Yunion:
+			for _, st := range t.Type {
+				types = append(types, pf.unionTypes(st, seen)...)
+			}
+			continue
+		}
+		kn := kind2proto[k]
+		if k == yang.Ydecimal64 {
+			kn = "Decimal64"
+			pf.hasDecimal64 = true
+		}
+		if seen[kn] {
+			continue
+		}
+		seen[kn] = true
+		types = append(types, kn)
+	}
+	sort.Strings(types)
+	return types
 }
 
 // messageName returns the name for the message defined by e.
