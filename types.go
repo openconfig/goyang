@@ -30,13 +30,15 @@ var (
 )
 
 func init() {
+	flags := getopt.New()
 	register(&formatter{
 		name: "types",
 		f:    doTypes,
 		help: "display found types",
+		flags: flags,
 	})
-	getopt.CommandLine.BoolVarLong(&typesDebug, "types_debug", 0, "display debug information")
-	getopt.CommandLine.BoolVarLong(&typesVerbose, "types_verbose", 0, "include base information")
+	flags.BoolVarLong(&typesDebug, "types_debug", 0, "display debug information")
+	flags.BoolVarLong(&typesVerbose, "types_verbose", 0, "include base information")
 }
 
 func doTypes(w io.Writer, entries []*yang.Entry) {

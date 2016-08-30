@@ -78,6 +78,9 @@ var readFile = ioutil.ReadFile
 // the the name.  The directory that the .yang file is found in is added to Path
 // if not already in Path.
 //
+// If a path has the form dir/... then dir and all direct or indirect
+// subdirectories of dir are searched.
+//
 // The current directory (.) is always checked first, no matter the value of
 // Path.
 func findFile(name string) (string, string, error) {
@@ -97,10 +100,38 @@ func findFile(name string) (string, string, error) {
 	}
 
 	for _, dir := range Path {
-		n := path.Join(dir, name)
+		var n string
+		if path.Base(dir) == "..." {
+			n = findInDir(path.Dir(dir), name)
+		} else {
+			n = path.Join(dir, name)
+		}
+		if n == "" {
+			continue
+		}
 		if data, err := readFile(n); err == nil {
 			return n, string(data), nil
 		}
 	}
 	return "", "", fmt.Errorf("no such file: %s", name)
+}
+
+// findInDir looks for a file named name in dir or any of its subdirectories.
+func findInDir(dir, name string) string {
+	fis, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return ""
+	}
+	for _, fi := range fis {
+		if !fi.IsDir() {
+			if fi.Name() == name {
+				return path.Join(dir, name)
+			}
+			continue
+		}
+		if n := findInDir(path.Join(dir, fi.Name()), name); n != "" {
+			return n
+		}
+	}
+	return ""
 }

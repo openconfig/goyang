@@ -58,7 +58,7 @@ type Statement struct {
 	col  int // 1's based column number
 }
 
-// FakeStatment returns a statement filled in with keyword, file, line and col.
+// FakeStatement returns a statement filled in with keyword, file, line and col.
 func FakeStatement(keyword, file string, line, col int) *Statement {
 	return &Statement{
 		keyword: keyword,
