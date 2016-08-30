@@ -194,6 +194,54 @@ func (e *EnumType) IsDefined(name string) bool {
 	return defined
 }
 
+// Names returns the sorted list of enum string names.
+func (e *EnumType) Names() []string {
+	names := make([]string, len(e.toInt))
+	i := 0
+	for name := range e.toInt {
+		names[i] = name
+		i++
+	}
+	sort.Strings(names)
+	return names
+}
+
+type int64Slice []int64
+
+func (p int64Slice) Len() int           { return len(p) }
+func (p int64Slice) Less(i, j int) bool { return p[i] < p[j] }
+func (p int64Slice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+// Values returns the sorted list of enum values.
+func (e *EnumType) Values() []int64 {
+	values := make([]int64, len(e.toInt))
+	i := 0
+	for _, value := range e.toInt {
+		values[i] = value
+		i++
+	}
+	sort.Sort(int64Slice(values))
+	return values
+}
+
+// NameMap returns a map of names to values.
+func (e *EnumType) NameMap() map[string]int64 {
+	m := make(map[string]int64, len(e.toInt))
+	for name, value := range e.toInt {
+		m[name] = value
+	}
+	return m
+}
+
+// ValueMap returns a map of values to names.
+func (e *EnumType) ValueMap() map[int64]string {
+	m := make(map[int64]string, len(e.toString))
+	for name, value := range e.toString {
+		m[name] = value
+	}
+	return m
+}
+
 // A YangType is the internal representation of a type in YANG.  It may
 // refer to either a builtin type or type specified with typedef.  Not
 // all fields in YangType are used for all types.

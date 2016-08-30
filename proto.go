@@ -41,7 +41,7 @@ var (
 	proto2          bool
 	protoDir        string
 	protoNoComments bool
-	protoNotNested  bool
+	protoFlat       bool
 	protoPreserve   string
 	protoWithSource bool
 )
@@ -57,17 +57,18 @@ func init() {
 	flags.BoolVarLong(&proto2, "proto2", 0, "produce proto2 protobufs")
 	flags.StringVarLong(&protoDir, "proto_dir", 0, "write a .proto file for each module in DIR", "DIR")
 	flags.BoolVarLong(&protoNoComments, "proto_no_comments", 0, "do not include comments in output")
-	flags.BoolVarLong(&protoNotNested, "proto_not_nested", 0, "do not produce nested protobufs")
+	flags.BoolVarLong(&protoFlat, "proto_flat", 0, "do not produce nested protobufs")
 	flags.StringVarLong(&protoPreserve, "proto_save", 0, "preserve existing .proto files as filename.SUFFIX", "SUFFIX")
 	flags.BoolVarLong(&protoWithSource, "proto_with_source", 0, "add source location comments")
 }
 
 // A protofile collects the produced proto along with meta information.
 type protofile struct {
-	buf        bytes.Buffer
-	fixedNames map[string]string // maps a fixed name back to its origial name.
-	errs       []error
-	messages   map[string]*messageInfo
+	buf          bytes.Buffer
+	fixedNames   map[string]string // maps a fixed name back to its origial name.
+	errs         []error
+	messages     map[string]*messageInfo
+	hasDecimal64 bool
 }
 
 // A messageInfo contains tag information about fields in a message.
@@ -112,13 +113,29 @@ func doProto(w io.Writer, entries []*yang.Entry) {
 			pf.printService(&pf.buf, e)
 		}
 		for _, child := range children(e) {
-			if protoNotNested {
-				for _, e := range flatten(child) {
-					pf.printFlatNode(&pf.buf, e)
+			if protoFlat {
+				for i, e := range flatten(child) {
+					if i != 0 {
+						fmt.Fprintln(&pf.buf)
+					}
+					pf.printNode(&pf.buf, e, false)
 				}
 			} else {
-				pf.printNestedNode(&pf.buf, child)
+				pf.printNode(&pf.buf, child, true)
 			}
+		}
+		if pf.hasDecimal64 {
+			prefix := " "
+			if proto2 {
+				prefix = "  optional"
+			}
+			fmt.Fprintf(&pf.buf, `
+// A Decimal64 is the YANG decimal64 type.
+message Decimal64 {
+%s int64  value = 1;            // integeral value
+%s uint32 fraction_digits = 2;  // decimal point position [1..18]
+}
+`, prefix, prefix)
 		}
 		pf.dumpMessageInfo()
 		if len(pf.errs) != 0 {
@@ -189,8 +206,7 @@ func children(e *yang.Entry) []*yang.Entry {
 func (pf *protofile) dumpMessageInfo() {
 	w := &pf.buf
 	fmt.Fprint(w, `
-// Do not delete the lines below.
-// They are used to preserve tag information by goyang.
+// Do not delete the lines below, they preserve tag information for goyang.
 `)
 	names := make([]string, len(pf.messages))
 	x := 0
@@ -282,16 +298,16 @@ var kind2proto = map[yang.TypeKind]string{
 	yang.Yuint32: "uint32", // int in range [0, 4294967295]
 	yang.Yuint64: "uint64", // int in range [0, 18446744073709551615]
 
-	yang.Ybinary:             "bytes",          // arbitrary data
-	yang.Ybits:               "TODO-bits",      // set of bits or flags
-	yang.Ybool:               "bool",           // true or false
-	yang.Ydecimal64:          "TODO-decimal64", // signed decimal number
-	yang.Yenum:               "TODO-enum",      // enumerated strings
-	yang.Yidentityref:        "string",         // reference to abstrace identity
-	yang.YinstanceIdentifier: "TODO-ii",        // reference of a data tree node
-	yang.Yleafref:            "string",         // reference to a leaf instance
-	yang.Ystring:             "string",         // human readable string
-	yang.Yunion:              "inline",         // handled inline
+	yang.Ybinary:             "bytes",  // arbitrary data
+	yang.Ybits:               "INLINE", // set of bits or flags
+	yang.Ybool:               "bool",   // true or false
+	yang.Ydecimal64:          "INLINE", // signed decimal number
+	yang.Yenum:               "INLINE", // enumerated strings
+	yang.Yidentityref:        "string", // reference to abstract identity
+	yang.YinstanceIdentifier: "string", // reference of a data tree node
+	yang.Yleafref:            "string", // reference to a leaf instance
+	yang.Ystring:             "string", // human readable string
+	yang.Yunion:              "INLINE", // handled inline
 }
 
 func isStream(e *yang.Entry) bool {
@@ -334,7 +350,7 @@ func (pf *protofile) printHeader(w io.Writer, e *yang.Entry) {
 	fmt.Fprintf(w, "package %s;\n\n", pf.fieldName(e.Name))
 }
 
-// printFlatNode writes e, formatted almost like a protobuf message, to w.
+// printService writes e, formatted almost like a protobuf message, to w.
 func (pf *protofile) printService(w io.Writer, e *yang.Entry) {
 	var names []string
 
@@ -375,10 +391,10 @@ func (pf *protofile) printService(w io.Writer, e *yang.Entry) {
 	for _, k := range names {
 		rpc := e.Dir[k].RPC
 		if rpc.Input != nil {
-			pf.printFlatNode(w, rpc.Input)
+			pf.printNode(w, rpc.Input, false)
 		}
 		if rpc.Output != nil {
-			pf.printFlatNode(w, rpc.Output)
+			pf.printNode(w, rpc.Output, false)
 		}
 	}
 
@@ -387,163 +403,177 @@ func (pf *protofile) printService(w io.Writer, e *yang.Entry) {
 	}
 }
 
-// printFlatNode writes e, formatted almost like a protobuf message, to w.
-func (pf *protofile) printFlatNode(w io.Writer, e *yang.Entry) {
+// printNode writes e, formatted almost like a protobuf message, to w.
+func (pf *protofile) printNode(w io.Writer, e *yang.Entry, nest bool) {
 	nodes := children(e)
 	if len(nodes) == 0 {
 		return
 	}
 
+	if !protoNoComments && e.Description != "" {
+		fmt.Fprintln(indent.NewWriter(w, "// "), e.Description)
+	}
+
+	messageName := pf.fullName(e)
+	mi := pf.messages[messageName]
+	if mi == nil {
+		mi = &messageInfo{
+			fields: map[string]int{},
+		}
+		pf.messages[messageName] = mi
+	}
+
+	fmt.Fprintf(w, "message %s {", pf.messageName(e)) // matching brace }
+	if protoWithSource {
+		fmt.Fprintf(w, " // %s", yang.Source(e.Node))
+	}
 	fmt.Fprintln(w)
-	if !protoNoComments && e.Description != "" {
-		fmt.Fprintln(indent.NewWriter(w, "// "), e.Description)
-	}
-	messageName := pf.fullName(e.Name, e)
-	mi := pf.messages[messageName]
-	if mi == nil {
-		mi = &messageInfo{
-			fields: map[string]int{},
-		}
-		pf.messages[messageName] = mi
-	}
 
-	fmt.Fprintf(w, "message %s {\n", messageName) // matching brace }
-	for _, se := range nodes {
+	for i, se := range nodes {
 		k := se.Name
 		if !protoNoComments && se.Description != "" {
 			fmt.Fprintln(indent.NewWriter(w, "  // "), se.Description)
 		}
-		fmt.Fprint(w, "  ")
+		if nest && (len(se.Dir) > 0 || se.Type == nil) {
+			pf.printNode(indent.NewWriter(w, "  "), se, true)
+		}
+		prefix := "  "
 		if se.ListAttr != nil {
-			fmt.Fprint(w, "repeated ")
+			prefix = "  repeated "
 		} else if proto2 {
-			fmt.Fprint(w, "optional ")
+			prefix = "  optional "
 		}
 		name := pf.fieldName(k)
+		printed := false
+		var kind string
 		if len(se.Dir) > 0 || se.Type == nil {
-			kind := pf.fullName(se.Name, se)
-			fmt.Fprintf(w, "%s %s = %d;", kind, name, mi.tag(name, kind, se.ListAttr != nil))
-		} else {
-			kind := "UNKNOWN TYPE" // if se.Type is nil, this must be an empty container
-			if se.Type != nil {
-				kind = kind2proto[se.Type.Kind]
-			}
-			printed := false
-			if len(se.Type.Type) > 0 {
-				seen := map[string]bool{}
-				var types []string
-				for _, t := range se.Type.Type {
-					kind = kind2proto[t.Kind]
-					if seen[kind] {
-						continue
-					}
-					types = append(types, kind)
-					seen[kind] = true
+			kind = pf.messageName(se)
+		} else if se.Type.Kind == yang.Ybits {
+			values := dedup(se.Type.Bit.Values())
+			asComment := false
+			switch {
+			case len(values) > 0 && values[len(values)-1] > 63:
+				if i != 0 {
+					fmt.Fprintln(w)
 				}
-				if len(types) > 1 {
-					fmt.Fprintf(w, "oneof %s {\n", name) // matching brace }
-					for _, kind := range types {
-						fmt.Fprintf(w, "    %s as_%s = %d;\n", kind, kind, mi.tag(name, kind, false))
+				fmt.Fprintf(w, "  // *WARNING* bitfield %s has more than 64 positions\n", name)
+				kind = "uint64"
+				asComment = true
+			case len(values) > 0 && values[len(values)-1] > 31:
+				if i != 0 {
+					fmt.Fprintln(w)
+				}
+				fmt.Fprintf(w, "  // bitfield %s to large for enum\n", name)
+				kind = "uint64"
+				asComment = true
+			default:
+				kind = pf.fixName(se.Name)
+			}
+			if !asComment {
+				fmt.Fprintf(w, "  enum %s {\n", kind)
+				fmt.Fprintf(w, "    FIELD_NOT_SET = 0;\n")
+			} else {
+				fmt.Fprintf(w, "  // Values:\n")
+			}
+			names := map[int64][]string{}
+			for n, v := range se.Type.Bit.NameMap() {
+				names[v] = append(names[v], n)
+			}
+			for _, v := range values {
+				ns := names[v]
+				sort.Strings(ns)
+				if asComment {
+					for _, n := range ns {
+						fmt.Fprintf(w, "  //   %s = 1 << %d\n", n, v)
 					}
-					// { to match the brace below to keep brace matching working
-					fmt.Fprintf(w, "  }")
+				} else {
+					n := strings.ToUpper(pf.fieldName(ns[0]))
+					fmt.Fprintf(w, "    %s = %d;\n", n, 1<<uint(v))
+					for _, n := range ns[1:] {
+						n = strings.ToUpper(pf.fieldName(n))
+						fmt.Fprintf(w, "    // %s = %d; (DUPLICATE VALUE)\n", n, 1<<uint(v))
+					}
+				}
+			}
+			if !asComment {
+				fmt.Fprintf(w, "  };\n")
+			}
+		} else if se.Type.Kind == yang.Ydecimal64 {
+			kind = "Decimal64"
+			pf.hasDecimal64 = true
+		} else if se.Type.Kind == yang.Yenum {
+			kind = pf.fixName(se.Name)
+			fmt.Fprintf(w, "  enum %s {", kind)
+			if protoWithSource {
+				fmt.Fprintf(w, " // %s", yang.Source(se.Node))
+			}
+			fmt.Fprintln(w)
+
+			for i, n := range se.Type.Enum.Names() {
+				fmt.Fprintf(w, "    %s = %d;\n", strings.ToUpper(n), i)
+			}
+			fmt.Fprintf(w, "  };\n")
+		} else if se.Type.Kind == yang.Yunion {
+			kind = kind2proto[se.Type.Kind]
+			seen := map[string]bool{}
+			var types []string
+			for _, t := range se.Type.Type {
+				kind = kind2proto[t.Kind]
+				if seen[kind] {
+					continue
+				}
+				types = append(types, kind)
+				seen[kind] = true
+			}
+			if len(types) > 1 {
+				iw := w
+				kind = pf.fixName(se.Name)
+				if se.ListAttr != nil {
+					fmt.Fprintf(w, "  message %s {\n", kind)
+					iw = indent.NewWriter(w, "  ")
+				}
+				fmt.Fprintf(iw, "  oneof %s {", kind) // matching brace }
+				if protoWithSource {
+					fmt.Fprintf(w, " // %s", yang.Source(se.Node))
+				}
+				fmt.Fprintln(w)
+				for _, kind := range types {
+					fmt.Fprintf(iw, "    %s as_%s = %d;\n", kind, kind, mi.tag(name, kind, false))
+				}
+				// { to match the brace below to keep brace matching working
+				fmt.Fprintf(iw, "  }\n")
+				if se.ListAttr != nil {
+					fmt.Fprintf(w, "  }\n")
+				} else {
 					printed = true
 				}
-				// kind is now the value of the only base type we found in the union.
 			}
-			if !printed {
-				fmt.Fprintf(w, "%s %s = %d;", kind, name, mi.tag(name, kind, se.ListAttr != nil))
+		} else {
+			kind = kind2proto[se.Type.Kind]
+		}
+		if !printed {
+			fmt.Fprintf(w, "%s%s %s = %d;", prefix, kind, name, mi.tag(name, kind, se.ListAttr != nil))
+			if protoWithSource {
+				fmt.Fprintf(w, " // %s", yang.Source(se.Node))
 			}
+			fmt.Fprintln(w)
 		}
-		if protoWithSource {
-			fmt.Fprintf(w, " // %s", yang.Source(se.Node))
-		}
-		fmt.Fprintln(w)
 	}
 	// { to match the brace below to keep brace matching working
 	fmt.Fprintln(w, "}")
 }
 
-// printNestedNode writes e, formatted almost like a protobuf message, to w.
-func (pf *protofile) printNestedNode(w io.Writer, e *yang.Entry) {
-	nodes := children(e)
-	if len(nodes) == 0 {
-		return
+// messageName returns the name for the message defined by e.
+func (pf *protofile) messageName(e *yang.Entry) string {
+	if protoFlat {
+		return pf.fullName(e)
 	}
-
-	if !protoNoComments && e.Description != "" {
-		fmt.Fprintln(indent.NewWriter(w, "// "), e.Description)
-	}
-
-	messageName := pf.fullName(e.Name, e)
-	mi := pf.messages[messageName]
-	if mi == nil {
-		mi = &messageInfo{
-			fields: map[string]int{},
-		}
-		pf.messages[messageName] = mi
-	}
-
-	fmt.Fprintf(w, "message %s {\n", pf.fixName(e.Name)) // matching brace }
-
-	for _, se := range nodes {
-		k := se.Name
-		if !protoNoComments && se.Description != "" {
-			fmt.Fprintln(indent.NewWriter(w, "  // "), se.Description)
-		}
-		if len(se.Dir) > 0 || se.Type == nil {
-			pf.printNestedNode(indent.NewWriter(w, "  "), se)
-		}
-		fmt.Fprint(w, "  ")
-		if se.ListAttr != nil {
-			fmt.Fprint(w, "repeated ")
-		} else if proto2 {
-			fmt.Fprint(w, "optional ")
-		}
-		name := pf.fieldName(k)
-		if len(se.Dir) > 0 || se.Type == nil {
-			kind := pf.fixName(se.Name)
-			fmt.Fprintf(w, "%s %s = %d;", kind, name, mi.tag(name, kind, se.ListAttr != nil))
-		} else {
-			kind := kind2proto[se.Type.Kind]
-			printed := false
-			if len(se.Type.Type) > 0 {
-				seen := map[string]bool{}
-				var types []string
-				for _, t := range se.Type.Type {
-					kind = kind2proto[t.Kind]
-					if seen[kind] {
-						continue
-					}
-					types = append(types, kind)
-					seen[kind] = true
-				}
-				if len(types) > 1 {
-					fmt.Fprintf(w, "oneof %s {\n", name) // matching brace }
-					for _, kind := range types {
-						fmt.Fprintf(w, "    %s as_%s = %d;\n", kind, kind, mi.tag(name, kind, false))
-					}
-					// { to match the brace below to keep brace matching working
-					fmt.Fprintf(w, "  }")
-					printed = true
-				}
-				// kind is now the value of the only base type we found in the union.
-			}
-			if !printed {
-				fmt.Fprintf(w, "%s %s = %d;", kind, name, mi.tag(name, kind, se.ListAttr != nil))
-			}
-		}
-		if protoWithSource {
-			fmt.Fprintf(w, " // %s", yang.Source(se.Node))
-		}
-		fmt.Fprintln(w)
-	}
-	// { to match the brace below to keep brace matching working
-	fmt.Fprintln(w, "}")
+	return pf.fixName(e.Name)
 }
 
-func (pf *protofile) fullName(n string, e *yang.Entry) string {
-	parts := []string{pf.fixName(n)}
+// fullName always returns the full pathname of entry e.
+func (pf *protofile) fullName(e *yang.Entry) string {
+	parts := []string{pf.fixName(e.Name)}
 	for p := e.Parent; p != nil && p.Parent != nil; p = p.Parent {
 		parts = append(parts, pf.fixName(p.Name))
 	}
@@ -592,4 +622,20 @@ func flatten(e *yang.Entry) []*yang.Entry {
 		f = append(f, flatten(e.Dir[n])...)
 	}
 	return f
+}
+
+// dedump returns the sorted slice a with duplicate values removed.
+func dedup(a []int64) []int64 {
+	if len(a) == 0 {
+		return a
+	}
+	b := []int64{a[0]}
+	last := a[0]
+	for _, v := range a[1:] {
+		if v != last {
+			b = append(b, v)
+			last = v
+		}
+	}
+	return b
 }
