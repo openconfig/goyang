@@ -585,7 +585,16 @@ func (pf *protofile) fullName(e *yang.Entry) string {
 
 // fieldName simply changes -'s to _'s.
 func (pf *protofile) fieldName(s string) string {
+	if s == "" {
+		return ""
+	}
 	fn := strings.Replace(s, "-", "_", -1)
+	switch {
+	case fn[0] >= 'a' && fn[0] <= 'z':
+	case fn[0] >= 'A' && fn[0] <= 'Z':
+	default:
+		fn = "X_" + fn
+	}
 	if fn != s {
 		if o := pf.fixedNames[fn]; o != "" && o != s {
 			pf.errs = append(pf.errs, fmt.Errorf("collision on %s and %s\n", o, s))
