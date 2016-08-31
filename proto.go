@@ -406,9 +406,6 @@ func (pf *protofile) printService(w io.Writer, e *yang.Entry) {
 // printNode writes e, formatted almost like a protobuf message, to w.
 func (pf *protofile) printNode(w io.Writer, e *yang.Entry, nest bool) {
 	nodes := children(e)
-	// if len(nodes) == 0 {
-	//	return
-	//}
 
 	if !protoNoComments && e.Description != "" {
 		fmt.Fprintln(indent.NewWriter(w, "// "), e.Description)
@@ -599,11 +596,24 @@ func (pf *protofile) messageName(e *yang.Entry) string {
 	return pf.fixName(e.Name)
 }
 
+// isPlural returns true if p is the plural of s.
+func isPlural(s, p string) bool {
+	if s == "" || p == "" {
+		return false
+	}
+	n := len(p)
+	return s == p[:n-1] && p[n-1] == 's'
+}
+
 // fullName always returns the full pathname of entry e.
 func (pf *protofile) fullName(e *yang.Entry) string {
 	parts := []string{pf.fixName(e.Name)}
 	for p := e.Parent; p != nil && p.Parent != nil; p = p.Parent {
 		parts = append(parts, pf.fixName(p.Name))
+		// Don't output Foos_Foo_, just output Foo_
+		if len(p.Parent.Dir) == 1 && isPlural(p.Name, p.Parent.Name) {
+			p = p.Parent
+		}
 	}
 	for i := 0; i < len(parts)/2; i++ {
 		parts[i], parts[len(parts)-i-1] = parts[len(parts)-i-1], parts[i]
@@ -646,7 +656,7 @@ func (pf *protofile) fixName(s string) string {
 
 // flatten returns a slice of all directory entries in e and e's decendents.
 func flatten(e *yang.Entry) []*yang.Entry {
-	if e == nil || len(e.Dir) == 0 {
+	if e == nil || (len(e.Dir) == 0 && e.Type != nil) {
 		return nil
 	}
 	f := []*yang.Entry{e}

@@ -32,9 +32,9 @@ var (
 func init() {
 	flags := getopt.New()
 	register(&formatter{
-		name: "types",
-		f:    doTypes,
-		help: "display found types",
+		name:  "types",
+		f:     doTypes,
+		help:  "display found types",
 		flags: flags,
 	})
 	flags.BoolVarLong(&typesDebug, "types_debug", 0, "display debug information")
