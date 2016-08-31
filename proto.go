@@ -537,6 +537,8 @@ func (pf *protofile) printNode(w io.Writer, e *yang.Entry, nest bool) {
 				fmt.Fprintf(iw, "  }\n")
 				if se.ListAttr != nil {
 					fmt.Fprintf(w, "  }\n")
+				} else {
+					printed = true
 				}
 			}
 		} else {
