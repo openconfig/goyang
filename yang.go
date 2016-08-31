@@ -156,16 +156,6 @@ Formats:
 
 	files := getopt.Args()
 
-	if len(files) > 0 && !strings.HasSuffix(files[0], ".yang") {
-		e, errs := yang.GetModule(files[0], files[1:]...)
-		exitIfError(errs)
-		Write(os.Stdout, e)
-		return
-	}
-
-	// Okay, either there are no arguments and we read stdin, or there
-	// is one or more file names listed.  Read them in and display them.
-
 	ms := yang.NewModules()
 
 	if len(files) == 0 {
