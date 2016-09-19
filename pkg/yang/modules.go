@@ -196,6 +196,9 @@ func (ms *Modules) FindModule(n Node) *Module {
 // an error.
 func (ms *Modules) FindModuleByPrefix(prefix string) (*Module, error) {
 	if m, ok := ms.byPrefix[prefix]; ok {
+		if m == nil {
+			return nil, fmt.Errorf("%s: no such prefix", prefix)
+		}
 		return m, nil
 	}
 	var found *Module
