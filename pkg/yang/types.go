@@ -40,7 +40,7 @@ type typeDictionary struct {
 // process them completely independently of eachother.
 var typeDict = typeDictionary{dict: map[Node]map[string]*Typedef{}}
 
-// add adds an entry to the typeDictorary d.
+// add adds an entry to the typeDictionary d.
 func (d *typeDictionary) add(n Node, name string, td *Typedef) {
 	defer d.mu.Unlock()
 	d.mu.Lock()
@@ -214,6 +214,7 @@ check:
 		return []error{fmt.Errorf("%s: no YangType defined for %s %s", Source(td), source, td.Name)}
 	}
 	y := *td.YangType
+
 	y.Base = td.Type
 	t.YangType = &y
 
@@ -238,6 +239,11 @@ check:
 		y.FractionDigits = int(i)
 	case t.FractionDigits != nil:
 		errs = append(errs, fmt.Errorf("%s: fraction-digits only allowed for decimal64 values", Source(t)))
+	case y.Kind == Yidentityref:
+		if t.IdentityBase == nil {
+			errs = append(errs, fmt.Errorf("%s: an identityref must specify a base", Source(t)))
+		}
+		y.IdentityBase = t.IdentityBase
 	}
 
 	if t.Range != nil {
