@@ -50,6 +50,12 @@ func TestTypeResolve(t *testing.T) {
 		},
 		{
 			in: &Type{
+				Name: "identityref",
+			},
+			err: "unknown: an identityref must specify a base",
+		},
+		{
+			in: &Type{
 				Name:           "decimal64",
 				FractionDigits: &Value{Name: "42"},
 			},

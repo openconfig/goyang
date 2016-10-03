@@ -148,12 +148,13 @@ func (s *Module) Kind() string {
 	}
 	return "module"
 }
-func (s *Module) ParentNode() Node       { return s.Parent }
-func (s *Module) NName() string          { return s.Name }
-func (s *Module) Statement() *Statement  { return s.Source }
-func (s *Module) Exts() []*Statement     { return s.Extensions }
-func (s *Module) Groupings() []*Grouping { return s.Grouping }
-func (s *Module) Typedefs() []*Typedef   { return s.Typedef }
+func (s *Module) ParentNode() Node        { return s.Parent }
+func (s *Module) NName() string           { return s.Name }
+func (s *Module) Statement() *Statement   { return s.Source }
+func (s *Module) Exts() []*Statement      { return s.Extensions }
+func (s *Module) Groupings() []*Grouping  { return s.Grouping }
+func (s *Module) Typedefs() []*Typedef    { return s.Typedef }
+func (s *Module) Identities() []*Identity { return s.Identity }
 
 // Current returns the most recent revision of this module, or "" if the module
 // has no revisions.
@@ -306,7 +307,7 @@ type Type struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Base            *Value     `yang:"base"` // Name == identityref
+	IdentityBase    *Value     `yang:"base"` // Name == identityref
 	Bit             []*Bit     `yang:"bit"`
 	Enum            []*Enum    `yang:"enum"`
 	FractionDigits  *Value     `yang:"fraction-digits"` // Name == decimal64

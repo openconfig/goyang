@@ -88,6 +88,10 @@ type Entry struct {
 
 	RPC *RPCEntry // set if we are an RPC
 
+	// Identities that are defined in this context, this is set if the Entry
+	// is a module only.
+	Identities []*Identity
+
 	Augments []*Entry // Augments associated with this entry
 
 	// Extra maps all the unsupported fields to their values
@@ -544,6 +548,10 @@ func ToEntry(n Node) (e *Entry) {
 				e.RPC.Output.Name = "output"
 				e.RPC.Output.Kind = OutputEntry
 			}
+		case "identity":
+			if i := fv.Interface().([]*Identity); i != nil {
+				e.Identities = i
+			}
 		case "uses":
 			for _, a := range fv.Interface().([]*Uses) {
 				e.merge(nil, ToEntry(a))
@@ -553,6 +561,10 @@ func ToEntry(n Node) (e *Entry) {
 			// BUG(borman): I think a deviate statement might trigger this.
 			e.addError(fmt.Errorf("%s: unexpected type in %s:%s", Source(n), n.Kind(), n.NName()))
 
+		// Keywords that do not need to be handled as an Entry as they are added
+		// to other dictionaries.
+		case "typedef":
+			continue
 		// TODO(borman): unimplemented keywords
 		case "belongs-to",
 			"contact",
@@ -560,7 +572,6 @@ func ToEntry(n Node) (e *Entry) {
 			"deviation",
 			"extension",
 			"feature",
-			"identity",
 			"if-feature",
 			"mandatory",
 			"max-elements",
@@ -573,7 +584,6 @@ func ToEntry(n Node) (e *Entry) {
 			"reference",
 			"revision",
 			"status",
-			"typedef",
 			"unique",
 			"when",
 			"yang-version":
