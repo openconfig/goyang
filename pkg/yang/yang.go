@@ -138,7 +138,8 @@ type Module struct {
 	// as the schema tree has multiple root elements.
 	// typedefs is a list of all top level typedefs in this
 	// module.
-	modules  *Modules
+	modules *Modules
+
 	typedefs map[string]*Typedef
 }
 
@@ -772,6 +773,7 @@ type Identity struct {
 	Description *Value `yang:"description"`
 	Reference   *Value `yang:"reference"`
 	Status      *Value `yang:"status"`
+	Values      []*Identity
 }
 
 func (Identity) Kind() string             { return "identity" }

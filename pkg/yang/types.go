@@ -242,8 +242,16 @@ check:
 	case y.Kind == Yidentityref:
 		if t.IdentityBase == nil {
 			errs = append(errs, fmt.Errorf("%s: an identityref must specify a base", Source(t)))
+			break
 		}
-		y.IdentityBase = t.IdentityBase
+
+		root := RootNode(t.Parent)
+		resolvedBase, baseErr := findIdentityBase(t.IdentityBase.Name, root)
+		if baseErr != nil {
+			errs = append(errs, baseErr...)
+		}
+
+		y.IdentityBase = resolvedBase.Identity
 	}
 
 	if t.Range != nil {

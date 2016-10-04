@@ -246,6 +246,9 @@ func (ms *Modules) process() []error {
 
 	// Append any errors found trying to resolve typedefs
 	errs = append(errs, resolveTypedefs()...)
+
+	errs = append(errs, ms.resolveIdentities()...)
+
 	return errs
 }
 
@@ -376,6 +379,7 @@ func (ms *Modules) include(m *Module) error {
 		if err := ms.include(im); err != nil {
 			return err
 		}
+
 		i.Module = im
 	}
 	return nil
