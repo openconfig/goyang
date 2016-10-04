@@ -782,6 +782,27 @@ func (s *Identity) NName() string         { return s.Name }
 func (s *Identity) Statement() *Statement { return s.Source }
 func (s *Identity) Exts() []*Statement    { return s.Extensions }
 
+// IsDefined behaves the same as the implementation for Enum - it returns
+// true if an identity with the name is defined within the Values of the
+// identity
+func (s *Identity) IsDefined(name string) bool {
+	if s.GetValue(name) != nil {
+		return true
+	}
+	return false
+}
+
+// GetValue returns a pointer to the identity with name "name" that is within
+// the values of the identity
+func (s *Identity) GetValue(name string) *Identity {
+	for _, v := range s.Values {
+		if v.Name == name {
+			return v
+		}
+	}
+	return nil
+}
+
 // An Extension is defined in: http://tools.ietf.org/html/rfc6020#section-7.17
 type Extension struct {
 	Name       string       `yang:"Name,nomerge"`
