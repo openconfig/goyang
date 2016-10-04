@@ -406,6 +406,9 @@ func TestIdentityTree(t *testing.T) {
 						t.Errorf("identityref leaf %s was not properly formed", tidr.name)
 					}
 
+					// Check whether the identityref leaf had an Identity within the
+					// Values that corresponds to the one that we were asked to retrieve
+					// within the test data.
 					for _, v := range leaf.Type.IdentityBase.Values {
 						if _, ok := tMap[v.Name]; ok {
 							tMap[v.Name] = true
@@ -414,12 +417,31 @@ func TestIdentityTree(t *testing.T) {
 						}
 					}
 
+					// Check whether GetValue returns the defined value
+					for _, k := range tidr.values {
+						if v := leaf.Type.IdentityBase.GetValue(k); v == nil {
+							t.Errorf("couldn't retrieve identity value %s with GetValue from %s",
+								k, leaf.Type.IdentityBase.Name)
+						}
+					}
+
+					// Check whether IsDefined returns the right result.
+					for _, k := range tidr.values {
+						if c := leaf.Type.IdentityBase.IsDefined(k); !c {
+							t.Errorf("couldn't retrieve identity value %s with IsDefiend from %s",
+								k, leaf.Type.IdentityBase.Name)
+						}
+					}
+
+					// If any entries are false in the tMap, this means that it did not
+					// match when we walked through the values that are defined.
 					for k, v := range tMap {
 						if v == false {
-							t.Errorf("couldn't find identty value %s from base identity of %s",
+							t.Errorf("couldn't find identity value %s from base identity of %s",
 								k, tidr.name)
 						}
 					}
+
 				} else {
 					t.Errorf("couldn't find identityref leaf %s in module %s", tidr.module,
 						tidr.name)
