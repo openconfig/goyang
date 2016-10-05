@@ -244,10 +244,12 @@ func (ms *Modules) process() []error {
 		}
 	}
 
+	// Resolve identities before resolving typedefs, otherwise when we resolve a
+	// typedef that has an identityref within it, then the identity dictionary
+	// has not yet been built.
+	errs = append(errs, ms.resolveIdentities()...)
 	// Append any errors found trying to resolve typedefs
 	errs = append(errs, resolveTypedefs()...)
-
-	errs = append(errs, ms.resolveIdentities()...)
 
 	return errs
 }

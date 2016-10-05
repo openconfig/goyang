@@ -296,6 +296,52 @@ var treeTestCases = []*basicIdentityTestCase{
 			},
 		},
 	},
+	&basicIdentityTestCase{
+		in: []*modIn{
+			&modIn{
+				name: "base.yang",
+				content: `
+  module base4 {
+    namespace "urn:base";
+    prefix "base4";
+
+		identity BASE4;
+		identity CHILD4 {
+			base BASE4;
+		}
+
+		typedef t {
+			type identityref {
+				base BASE4;
+			}
+		}
+
+		leaf tref {
+			type t;
+		}
+  }
+        `},
+		},
+		out: &basicIdentityModOut{
+			modules: []string{"base4"},
+			identities: []*identityOut{
+				&identityOut{
+					idName: "BASE4",
+				},
+				&identityOut{
+					idName:   "CHILD4",
+					baseName: "BASE4",
+				},
+			},
+			idrefs: []*idrefOut{
+				&idrefOut{
+					module: "base4",
+					name:   "tref",
+					values: []string{"CHILD4"},
+				},
+			},
+		},
+	},
 }
 
 // TestIdentityTree - check inheritance of identities from local and remote

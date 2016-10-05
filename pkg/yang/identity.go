@@ -83,10 +83,9 @@ func findIdentityBase(baseStr string, mod *Module) (*resolvedIdentity, []error) 
 		// This is a local identity which is defined within the current
 		// module
 		keyName := fmt.Sprintf("%s:%s", rootPrefix, baseName)
-
 		base, ok = identityDict.dict[keyName]
 		if !ok {
-			errs = append(errs, fmt.Errorf("can't resolve the local base %s", baseStr))
+			errs = append(errs, fmt.Errorf("can't resolve the local base %s as %s", baseStr, keyName))
 		}
 	default:
 		// This is an identity which is defined within another module
