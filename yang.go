@@ -44,12 +44,14 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"runtime/trace"
 	"sort"
 	"strings"
 
 	"github.com/openconfig/goyang/pkg/indent"
 	"github.com/openconfig/goyang/pkg/yang"
+
 	"github.com/pborman/getopt"
 )
 
@@ -91,7 +93,8 @@ func main() {
 
 	var traceP string
 	var help bool
-	getopt.ListVarLong(&yang.Path, "path", 0, "comma separated list of directories to add to search path", "DIR[,DIR...]")
+	var paths []string
+	getopt.ListVarLong(&paths, "path", 0, "comma separated list of directories to add to search path", "DIR[,DIR...]")
 	getopt.StringVarLong(&format, "format", 0, "format to display: "+strings.Join(formats, ", "), "FORMAT")
 	getopt.StringVarLong(&traceP, "trace", 0, "write trace into to TRACEFILE", "TRACEFILE")
 	getopt.BoolVarLong(&help, "help", '?', "display help")
@@ -143,6 +146,28 @@ Formats:
 			fmt.Fprintln(os.Stderr)
 		}
 		stop(0)
+	}
+
+	// Anonymous function called to append paths to the existing set of paths.
+	// This allows us to recurse into the directories that are under some
+	// particular include path that is specified on the command line.
+	wfunc := func(path string, info os.FileInfo, err error) error {
+		// If there was any error reading this file, then simply return and don't
+		// add the path.
+		if err != nil {
+			return nil
+		}
+		// Else, add a directory to the YANG path that will be used.
+		if info.IsDir() {
+			yang.Path = append(yang.Path, path)
+		}
+		return nil
+	}
+
+	// Recurse through the command line specified paths and extend the yang.Path
+	// setting so that we can search for includes in these directories.
+	for _, path := range paths {
+		filepath.Walk(path, wfunc)
 	}
 
 	if format == "" {
