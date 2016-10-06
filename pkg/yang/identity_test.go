@@ -14,7 +14,10 @@
 
 package yang
 
-import "testing"
+import (
+  "testing"
+  "reflect"
+)
 
 type modIn struct {
 	name    string
@@ -23,9 +26,9 @@ type modIn struct {
 
 type basicIdentityModOut struct {
 	name       string
-	identities []*identityOut
+	identities []identityOut
 	modules    []string
-	idrefs     []*idrefOut
+	idrefs     []idrefOut
 }
 
 type idrefOut struct {
@@ -42,16 +45,16 @@ type identityOut struct {
 
 type basicIdentityTestCase struct {
 	name string
-	in   []*modIn
-	out  *basicIdentityModOut
+	in   []modIn
+	out  basicIdentityModOut
 	err  string
 }
 
 // A set of test modules to parse as part of the test case.
-var basicTestCases = []*basicIdentityTestCase{
-	&basicIdentityTestCase{
-		in: []*modIn{
-			&modIn{
+var basicTestCases = []basicIdentityTestCase{
+	basicIdentityTestCase{
+		in: []modIn{
+			modIn{
 				name: "idtest-one",
 				content: `
 module idtest-one {
@@ -62,19 +65,19 @@ module idtest-one {
 }
     `},
 		},
-		out: &basicIdentityModOut{
+		out: basicIdentityModOut{
 			name: "idtest-one",
-			identities: []*identityOut{
-				&identityOut{
+			identities: []identityOut{
+				identityOut{
 					idName: "TEST_ID",
 				},
 			},
 		},
 		err: "tc1: could not resolve identities",
 	},
-	&basicIdentityTestCase{
-		in: []*modIn{
-			&modIn{
+	basicIdentityTestCase{
+		in: []modIn{
+			modIn{
 				name: "idtest-two",
 				content: `
 module idtest-two {
@@ -89,16 +92,16 @@ module idtest-two {
 }
     `},
 		},
-		out: &basicIdentityModOut{
+		out: basicIdentityModOut{
 			name: "idtest-two",
-			identities: []*identityOut{
-				&identityOut{
+			identities: []identityOut{
+				identityOut{
 					idName: "TEST_ID",
 				},
-				&identityOut{
+				identityOut{
 					idName: "TEST_ID_TWO",
 				},
-				&identityOut{
+				identityOut{
 					idName:   "TEST_CHILD",
 					baseName: "TEST_ID",
 				},
@@ -149,10 +152,10 @@ func TestIdentityExtract(t *testing.T) {
 	}
 }
 
-var treeTestCases = []*basicIdentityTestCase{
-	&basicIdentityTestCase{
-		in: []*modIn{
-			&modIn{
+var treeTestCases = []basicIdentityTestCase{
+	basicIdentityTestCase{
+		in: []modIn{
+			modIn{
 				name: "base.yang",
 				content: `
   module base {
@@ -166,7 +169,7 @@ var treeTestCases = []*basicIdentityTestCase{
     }
   }
         `},
-			&modIn{
+			modIn{
 				name: "remote.yang",
 				content: `
   module remote {
@@ -177,23 +180,23 @@ var treeTestCases = []*basicIdentityTestCase{
   }
       `},
 		},
-		out: &basicIdentityModOut{
+		out: basicIdentityModOut{
 			modules: []string{"remote", "base"},
-			identities: []*identityOut{
-				&identityOut{
+			identities: []identityOut{
+				identityOut{
 					idName: "REMOTE_BASE",
 					values: []string{"LOCAL_REMOTE_BASE"},
 				},
-				&identityOut{
+				identityOut{
 					idName:   "LOCAL_REMOTE_BASE",
 					baseName: "r:REMOTE_BASE",
 				},
 			},
 		},
 	},
-	&basicIdentityTestCase{
-		in: []*modIn{
-			&modIn{
+	basicIdentityTestCase{
+		in: []modIn{
+			modIn{
 				name: "base.yang",
 				content: `
   module base {
@@ -222,41 +225,41 @@ var treeTestCases = []*basicIdentityTestCase{
   }
         `},
 		},
-		out: &basicIdentityModOut{
+		out: basicIdentityModOut{
 			modules: []string{"base"},
-			identities: []*identityOut{
-				&identityOut{
+			identities: []identityOut{
+				identityOut{
 					idName: "GREATGRANDFATHER",
 					values: []string{"GRANDFATHER", "FATHER", "UNCLE", "SON", "BROTHER"},
 				},
-				&identityOut{
+				identityOut{
 					idName:   "GRANDFATHER",
 					baseName: "GREATGRANDFATHER",
 					values:   []string{"FATHER", "UNCLE", "SON", "BROTHER"},
 				},
-				&identityOut{
+				identityOut{
 					idName:   "FATHER",
 					baseName: "GRANDFATHER",
 					values:   []string{"SON", "BROTHER"},
 				},
-				&identityOut{
+				identityOut{
 					idName:   "UNCLE",
 					baseName: "GRANDFATHER",
 				},
-				&identityOut{
+				identityOut{
 					idName:   "SON",
 					baseName: "FATHER",
 				},
-				&identityOut{
+				identityOut{
 					idName:   "BROTHER",
 					baseName: "FATHER",
 				},
 			},
 		},
 	},
-	&basicIdentityTestCase{
-		in: []*modIn{
-			&modIn{
+	basicIdentityTestCase{
+		in: []modIn{
+			modIn{
 				name: "base.yang",
 				content: `
   module base {
@@ -276,19 +279,19 @@ var treeTestCases = []*basicIdentityTestCase{
   }
         `},
 		},
-		out: &basicIdentityModOut{
+		out: basicIdentityModOut{
 			modules: []string{"base"},
-			identities: []*identityOut{
-				&identityOut{
+			identities: []identityOut{
+				identityOut{
 					idName: "BASE",
 				},
-				&identityOut{
+				identityOut{
 					idName:   "NOTBASE",
 					baseName: "BASE",
 				},
 			},
-			idrefs: []*idrefOut{
-				&idrefOut{
+			idrefs: []idrefOut{
+				idrefOut{
 					module: "base",
 					name:   "idref",
 					values: []string{"NOTBASE"},
@@ -296,9 +299,9 @@ var treeTestCases = []*basicIdentityTestCase{
 			},
 		},
 	},
-	&basicIdentityTestCase{
-		in: []*modIn{
-			&modIn{
+	basicIdentityTestCase{
+		in: []modIn{
+			modIn{
 				name: "base.yang",
 				content: `
   module base4 {
@@ -322,19 +325,19 @@ var treeTestCases = []*basicIdentityTestCase{
   }
         `},
 		},
-		out: &basicIdentityModOut{
+		out: basicIdentityModOut{
 			modules: []string{"base4"},
-			identities: []*identityOut{
-				&identityOut{
+			identities: []identityOut{
+				identityOut{
 					idName: "BASE4",
 				},
-				&identityOut{
+				identityOut{
 					idName:   "CHILD4",
 					baseName: "BASE4",
 				},
 			},
-			idrefs: []*idrefOut{
-				&idrefOut{
+			idrefs: []idrefOut{
+				idrefOut{
 					module: "base4",
 					name:   "tref",
 					values: []string{"CHILD4"},
@@ -363,7 +366,7 @@ func TestIdentityTree(t *testing.T) {
 		identityValues := make(map[string][]string)
 		var foundIdentities []*Identity
 
-		if testCase.out == nil {
+    if reflect.DeepEqual(testCase.out, basicIdentityModOut{}){
 			continue
 		}
 
