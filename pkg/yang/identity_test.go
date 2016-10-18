@@ -14,47 +14,43 @@
 
 package yang
 
-import (
-  "testing"
-  "reflect"
-)
+import "testing"
 
-type modIn struct {
-	name    string
-	content string
-}
-
-type basicIdentityModOut struct {
-	name       string
-	identities []identityOut
-	modules    []string
-	idrefs     []idrefOut
+// inputModule is a mock input YANG module.
+type inputModule struct {
+	name    string // The filename of the YANG module.
+	content string // The contents of the YANG module.
 }
 
 type idrefOut struct {
-	module string
-	name   string
-	values []string
+	module string   // The module that the identityref is within.
+	name   string   // The name of the identityref.
+	values []string // Names of the identities that the identityref relates to.
 }
 
+// identityOut is the output for a particular identity within the test case.
 type identityOut struct {
-	idName   string
-	baseName string
-	values   []string
+	module   string   // The module that the identity is within.
+	name     string   // The name of the identity.
+	baseName string   // The base of the identity as a string.
+	values   []string // The string names of derived identities.
 }
 
-type basicIdentityTestCase struct {
-	name string
-	in   []modIn
-	out  basicIdentityModOut
-	err  string
+// identityTestCase is a test case for a module which contains identities.
+type identityTestCase struct {
+	name       string
+	in         []inputModule // The set of input modules for the test
+	identities []identityOut // Slice of the identity values expected
+	idrefs     []idrefOut    // Slice of identityref results expected
+	err        string        // Test case error string
 }
 
-// A set of test modules to parse as part of the test case.
-var basicTestCases = []basicIdentityTestCase{
-	basicIdentityTestCase{
-		in: []modIn{
-			modIn{
+// Test cases for basic identity extraction.
+var basicTestCases = []identityTestCase{
+	identityTestCase{
+		name: "basic-test-case-1: Check identity is found in module.",
+		in: []inputModule{
+			inputModule{
 				name: "idtest-one",
 				content: `
 module idtest-one {
@@ -65,19 +61,15 @@ module idtest-one {
 }
     `},
 		},
-		out: basicIdentityModOut{
-			name: "idtest-one",
-			identities: []identityOut{
-				identityOut{
-					idName: "TEST_ID",
-				},
-			},
+		identities: []identityOut{
+			identityOut{module: "idtest-one", name: "TEST_ID"},
 		},
-		err: "tc1: could not resolve identities",
+		err: "basic-test-case-1: could not resolve identities",
 	},
-	basicIdentityTestCase{
-		in: []modIn{
-			modIn{
+	identityTestCase{
+		name: "basic-test-case-2: Check identity with base is found in module.",
+		in: []inputModule{
+			inputModule{
 				name: "idtest-two",
 				content: `
 module idtest-two {
@@ -92,70 +84,67 @@ module idtest-two {
 }
     `},
 		},
-		out: basicIdentityModOut{
-			name: "idtest-two",
-			identities: []identityOut{
-				identityOut{
-					idName: "TEST_ID",
-				},
-				identityOut{
-					idName: "TEST_ID_TWO",
-				},
-				identityOut{
-					idName:   "TEST_CHILD",
-					baseName: "TEST_ID",
-				},
-			},
+		identities: []identityOut{
+			identityOut{module: "idtest-two", name: "TEST_ID"},
+			identityOut{module: "idtest-two", name: "TEST_ID_TWO"},
+			identityOut{module: "idtest-two", name: "TEST_CHILD", baseName: "TEST_ID"},
 		},
-		err: "could not resolve identities",
+		err: "basic-test-case-2: could not resolve identities",
 	},
 }
 
+// Test the ability to extract identities from a module with the correct base
+// statements.
 func TestIdentityExtract(t *testing.T) {
-	for _, testCase := range basicTestCases {
+	for _, tt := range basicTestCases {
 		ms := NewModules()
-		for _, mod := range testCase.in {
+		for _, mod := range tt.in {
 			_ = ms.Parse(mod.content, mod.name)
 		}
-		parsedMod, err := ms.GetModule(testCase.out.name)
 
-		if err != nil {
-			t.Errorf("could not parse module: %s", testCase.out.name)
-			continue
-		}
+		for _, ti := range tt.identities {
+			parsedMod, err := ms.GetModule(ti.module)
 
-		identityNames := make(map[string]*Identity)
-		for _, id := range parsedMod.Identities {
-			identityNames[id.Name] = id
-		}
-
-		for _, expID := range testCase.out.identities {
-			identity, ok := identityNames[expID.idName]
-
-			if !ok {
-				t.Errorf("%s: couldn't find %s", testCase.err, expID.idName)
+			if err != nil {
+				t.Errorf("Could not parse module : %s", ti.module)
 				continue
 			}
 
-			if expID.baseName != "" {
-				if expID.baseName != identity.Base.Name {
-					t.Errorf("%s: couldn't resolve expected base %s", testCase.err,
-						expID.baseName)
+			foundIdentity := false
+			var thisID *Identity
+			for _, identity := range parsedMod.Identities {
+				if identity.Name == ti.name {
+					foundIdentity = true
+					thisID = identity
+					break
+				}
+			}
+
+			if foundIdentity == false {
+				t.Errorf("Could not found identity %s in %s", ti.name, ti.module)
+			}
+
+			if ti.baseName != "" {
+				if ti.baseName != thisID.Base.Name {
+					t.Errorf("Identity %s did not have expected base %s, had %s", ti.name,
+						ti.baseName, thisID.Base.Name)
 				}
 			} else {
-				if identity.Base != nil {
-					t.Errorf("%s: identity had an unexpected base %s: %v", testCase.err,
-						identity.Name, identity.Base)
+				if thisID.Base != nil {
+					t.Errorf("Identity %s had an unexpected base %s", thisID.Name,
+						thisID.Base.Name)
 				}
 			}
 		}
 	}
 }
 
-var treeTestCases = []basicIdentityTestCase{
-	basicIdentityTestCase{
-		in: []modIn{
-			modIn{
+// Test cases for validating that identities can be resolved correctly.
+var treeTestCases = []identityTestCase{
+	identityTestCase{
+		name: "tree-test-case-1: Validate identity resolution across modules",
+		in: []inputModule{
+			inputModule{
 				name: "base.yang",
 				content: `
   module base {
@@ -169,7 +158,7 @@ var treeTestCases = []basicIdentityTestCase{
     }
   }
         `},
-			modIn{
+			inputModule{
 				name: "remote.yang",
 				content: `
   module remote {
@@ -180,23 +169,23 @@ var treeTestCases = []basicIdentityTestCase{
   }
       `},
 		},
-		out: basicIdentityModOut{
-			modules: []string{"remote", "base"},
-			identities: []identityOut{
-				identityOut{
-					idName: "REMOTE_BASE",
-					values: []string{"LOCAL_REMOTE_BASE"},
-				},
-				identityOut{
-					idName:   "LOCAL_REMOTE_BASE",
-					baseName: "r:REMOTE_BASE",
-				},
+		identities: []identityOut{
+			identityOut{
+				module: "remote",
+				name:   "REMOTE_BASE",
+				values: []string{"LOCAL_REMOTE_BASE"},
+			},
+			identityOut{
+				module:   "base",
+				name:     "LOCAL_REMOTE_BASE",
+				baseName: "r:REMOTE_BASE",
 			},
 		},
 	},
-	basicIdentityTestCase{
-		in: []modIn{
-			modIn{
+	identityTestCase{
+		name: "tree-test-case-2: Multi-level inheritance validation.",
+		in: []inputModule{
+			inputModule{
 				name: "base.yang",
 				content: `
   module base {
@@ -220,46 +209,56 @@ var treeTestCases = []basicIdentityTestCase{
 			base "FATHER";
 		}
 		identity GREATUNCLE {
-			base "GRANDFATHER";
+			base "GREATGRANDFATHER";
 		}
   }
         `},
 		},
-		out: basicIdentityModOut{
-			modules: []string{"base"},
-			identities: []identityOut{
-				identityOut{
-					idName: "GREATGRANDFATHER",
-					values: []string{"GRANDFATHER", "FATHER", "UNCLE", "SON", "BROTHER"},
+		identities: []identityOut{
+			identityOut{
+				module: "base",
+				name:   "GREATGRANDFATHER",
+				values: []string{
+					"GRANDFATHER",
+					"GREATUNCLE",
+					"FATHER",
+					"UNCLE",
+					"SON",
+					"BROTHER",
 				},
-				identityOut{
-					idName:   "GRANDFATHER",
-					baseName: "GREATGRANDFATHER",
-					values:   []string{"FATHER", "UNCLE", "SON", "BROTHER"},
-				},
-				identityOut{
-					idName:   "FATHER",
-					baseName: "GRANDFATHER",
-					values:   []string{"SON", "BROTHER"},
-				},
-				identityOut{
-					idName:   "UNCLE",
-					baseName: "GRANDFATHER",
-				},
-				identityOut{
-					idName:   "SON",
-					baseName: "FATHER",
-				},
-				identityOut{
-					idName:   "BROTHER",
-					baseName: "FATHER",
-				},
+			},
+			identityOut{
+				module:   "base",
+				name:     "GRANDFATHER",
+				baseName: "GREATGRANDFATHER",
+				values:   []string{"FATHER", "UNCLE", "SON", "BROTHER"},
+			},
+			identityOut{
+				module:   "base",
+				name:     "GREATUNCLE",
+				baseName: "GREATGRANDFATHER",
+			},
+			identityOut{
+				module:   "base",
+				name:     "FATHER",
+				baseName: "GRANDFATHER",
+				values:   []string{"SON", "BROTHER"},
+			},
+			identityOut{
+				module:   "base",
+				name:     "UNCLE",
+				baseName: "GRANDFATHER",
+			},
+			identityOut{
+				module:   "base",
+				name:     "BROTHER",
+				baseName: "FATHER",
 			},
 		},
 	},
-	basicIdentityTestCase{
-		in: []modIn{
-			modIn{
+	identityTestCase{
+		in: []inputModule{
+			inputModule{
 				name: "base.yang",
 				content: `
   module base {
@@ -279,29 +278,29 @@ var treeTestCases = []basicIdentityTestCase{
   }
         `},
 		},
-		out: basicIdentityModOut{
-			modules: []string{"base"},
-			identities: []identityOut{
-				identityOut{
-					idName: "BASE",
-				},
-				identityOut{
-					idName:   "NOTBASE",
-					baseName: "BASE",
-				},
+		identities: []identityOut{
+			identityOut{
+				module: "base",
+				name:   "BASE",
+				values: []string{"NOTBASE"},
 			},
-			idrefs: []idrefOut{
-				idrefOut{
-					module: "base",
-					name:   "idref",
-					values: []string{"NOTBASE"},
-				},
+			identityOut{
+				module:   "base",
+				name:     "NOTBASE",
+				baseName: "BASE",
+			},
+		},
+		idrefs: []idrefOut{
+			idrefOut{
+				module: "base",
+				name:   "idref",
+				values: []string{"NOTBASE"},
 			},
 		},
 	},
-	basicIdentityTestCase{
-		in: []modIn{
-			modIn{
+	identityTestCase{
+		in: []inputModule{
+			inputModule{
 				name: "base.yang",
 				content: `
   module base4 {
@@ -325,23 +324,23 @@ var treeTestCases = []basicIdentityTestCase{
   }
         `},
 		},
-		out: basicIdentityModOut{
-			modules: []string{"base4"},
-			identities: []identityOut{
-				identityOut{
-					idName: "BASE4",
-				},
-				identityOut{
-					idName:   "CHILD4",
-					baseName: "BASE4",
-				},
+		identities: []identityOut{
+			identityOut{
+				module: "base4",
+				name:   "BASE4",
+				values: []string{"CHILD4"},
 			},
-			idrefs: []idrefOut{
-				idrefOut{
-					module: "base4",
-					name:   "tref",
-					values: []string{"CHILD4"},
-				},
+			identityOut{
+				module:   "base4",
+				name:     "CHILD4",
+				baseName: "BASE4",
+			},
+		},
+		idrefs: []idrefOut{
+			idrefOut{
+				module: "base4",
+				name:   "tref",
+				values: []string{"CHILD4"},
 			},
 		},
 	},
@@ -351,149 +350,64 @@ var treeTestCases = []basicIdentityTestCase{
 // sources. The Values of an Identity correspond to the values that are
 // referenced by that identity, which need to be inherited.
 func TestIdentityTree(t *testing.T) {
-	for _, testCase := range treeTestCases {
+	for _, tt := range treeTestCases {
 		ms := NewModules()
 
-		for _, mod := range testCase.in {
+		for _, mod := range tt.in {
 			_ = ms.Parse(mod.content, mod.name)
 		}
 
 		if errs := ms.Process(); len(errs) != 0 {
-			t.Errorf("couldn't process modules: %v", errs)
+			t.Errorf("Couldn't process modules: %v", errs)
 			continue
 		}
 
-		identityValues := make(map[string][]string)
-		var foundIdentities []*Identity
-
-    if reflect.DeepEqual(testCase.out, basicIdentityModOut{}){
-			continue
-		}
-
-		// Go through and find all the identities and values for later comparison
-		for _, mn := range testCase.out.modules {
-			m, errs := ms.GetModule(mn)
+		// Walk through the identities that are defined in the test case output
+		// and validate that they exist, and their base and values are as expected.
+		for _, chkID := range tt.identities {
+			m, errs := ms.GetModule(chkID.module)
 			if errs != nil {
-				t.Errorf("couldn't find expected module: %v", errs)
+				t.Errorf("Couldn't find expected module: %v", errs)
 			}
+
+			var foundID *Identity
 			for _, i := range m.Identities {
-				foundIdentities = append(foundIdentities, i)
-				identityValues[i.Name] = make([]string, 0)
-				for _, j := range i.Values {
-					identityValues[i.Name] = append(identityValues[i.Name], j.Name)
-				}
-			}
-		}
-
-		// For each of the test cases, go through and compare whether we can find
-		// the identity, and the relevant base if one exists.
-		for _, tc := range testCase.out.identities {
-			nMatch := false
-			//vMatch := false
-			bMatch := 0
-			if tc.baseName != "" {
-				bMatch = -1
-			}
-
-			for _, fid := range foundIdentities {
-				if fid.Name == tc.idName {
-					nMatch = true
-					if bMatch < 0 && fid.Base != nil {
-						if fid.Base.Name == tc.baseName {
-							bMatch = 1
-						}
-					}
-					if tc.values != nil {
-						// Need to check values - create a map keyed by value with a bool
-						// as the value, we set this to true when we find the value, and
-						// then check for any values that are false.
-						rem := make(map[string]bool)
-						for _, v := range tc.values {
-							rem[v] = false
-						}
-
-						for _, v := range fid.Values {
-							if _, ok := rem[v.Name]; ok {
-								rem[v.Name] = true
-							}
-						}
-
-						for k, v := range rem {
-							if v == false {
-								t.Errorf("unable to find value %s for %s", k, tc.idName)
-							}
-						}
-					}
+				if i.Name == chkID.name {
+					foundID = i
+					break
 				}
 			}
 
-			if nMatch == false {
-				t.Errorf("couldn't find identity %s", tc.idName)
+			if foundID == nil {
+				t.Errorf("Couldn't find identity %s in module %s", chkID.name,
+					chkID.module)
 			}
-			if bMatch < 0 {
-				t.Errorf("couldn't find identity %s base %s", tc.idName, tc.baseName)
-			}
-		}
 
-		// Check the identityrefs that we have been asked to check and test
-		// whether the identity pointer is set up correctly.
-		if testCase.out.idrefs != nil {
-			for _, tidr := range testCase.out.idrefs {
-				mod, errs := ms.GetModule(tidr.module)
-				if errs != nil {
-					t.Errorf("can't find module %s for idref %s", tidr.module, tidr.name)
+			if chkID.baseName != "" {
+				if chkID.baseName != foundID.Base.Name {
+					t.Errorf("Couldn't find base %s for ID %s", chkID.baseName,
+						foundID.Base.Name)
+				}
+			}
+
+			valueMap := make(map[string]bool)
+
+			for _, val := range chkID.values {
+				valueMap[val] = false
+			}
+
+			for _, chkv := range foundID.Values {
+				_, ok := valueMap[chkv.Name]
+				if !ok {
+					t.Errorf("Found unexpected value %s for %s", chkv.Name, chkID.name)
 					continue
 				}
-				if leaf, ok := mod.Dir[tidr.name]; ok {
-					tMap := make(map[string]bool)
-					for _, v := range tidr.values {
-						tMap[v] = false
-					}
+				valueMap[chkv.Name] = true
+			}
 
-					if leaf.Type == nil || leaf.Type.IdentityBase == nil ||
-						leaf.Type.IdentityBase.Values == nil {
-						t.Errorf("identityref leaf %s was not properly formed", tidr.name)
-					}
-
-					// Check whether the identityref leaf had an Identity within the
-					// Values that corresponds to the one that we were asked to retrieve
-					// within the test data.
-					for _, v := range leaf.Type.IdentityBase.Values {
-						if _, ok := tMap[v.Name]; ok {
-							tMap[v.Name] = true
-						} else {
-							t.Errorf("couldn't find identity value %s in base identity", v)
-						}
-					}
-
-					// Check whether GetValue returns the defined value
-					for _, k := range tidr.values {
-						if v := leaf.Type.IdentityBase.GetValue(k); v == nil {
-							t.Errorf("couldn't retrieve identity value %s with GetValue from %s",
-								k, leaf.Type.IdentityBase.Name)
-						}
-					}
-
-					// Check whether IsDefined returns the right result.
-					for _, k := range tidr.values {
-						if c := leaf.Type.IdentityBase.IsDefined(k); !c {
-							t.Errorf("couldn't retrieve identity value %s with IsDefiend from %s",
-								k, leaf.Type.IdentityBase.Name)
-						}
-					}
-
-					// If any entries are false in the tMap, this means that it did not
-					// match when we walked through the values that are defined.
-					for k, v := range tMap {
-						if v == false {
-							t.Errorf("couldn't find identity value %s from base identity of %s",
-								k, tidr.name)
-						}
-					}
-
-				} else {
-					t.Errorf("couldn't find identityref leaf %s in module %s", tidr.module,
-						tidr.name)
+			for k, v := range valueMap {
+				if v == false {
+					t.Errorf("Could not find identity %s for %s", k, chkID.name)
 				}
 			}
 		}

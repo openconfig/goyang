@@ -141,7 +141,7 @@ func (t *Typedef) resolve() []error {
 
 	if t.Type.IdentityBase != nil {
 		// We need to copy over the IdentityBase statement if the type has one
-		if idBase, err := findIdentityBase(t.Type.IdentityBase.Name, RootNode(t)); err == nil {
+		if idBase, err := RootNode(t).findIdentityBase(t.Type.IdentityBase.Name); err == nil {
 			y.IdentityBase = idBase.Identity
 		} else {
 			return []error{fmt.Errorf("Could not resolve identity base for typedef: %s",
@@ -262,7 +262,7 @@ check:
 		}
 
 		root := RootNode(t.Parent)
-		resolvedBase, baseErr := findIdentityBase(t.IdentityBase.Name, root)
+		resolvedBase, baseErr := root.findIdentityBase(t.IdentityBase.Name)
 		if baseErr != nil {
 			errs = append(errs, baseErr...)
 			break

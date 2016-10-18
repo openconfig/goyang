@@ -22,29 +22,38 @@ import (
 // This file implements data structures and functions that relate to the
 // identity type.
 
+// identityDictionary stores a global set of identities that have been resolved
+// to be identified by their module and name.
 type identityDictionary struct {
 	mu   sync.Mutex
-	dict map[string]*resolvedIdentity
+	dict map[string]resolvedIdentity
 }
 
 // Global dictionary of resolved identities
+var identities = identityDictionary{dict: map[string]resolvedIdentity{}}
 
-var identityDict = identityDictionary{dict: map[string]*resolvedIdentity{}}
-
+// resolvedIdentity is an Identity that has been disambiguated.
 type resolvedIdentity struct {
 	Module   *Module
 	Identity *Identity
-	//Children []*resolvedIdentity
 }
 
-func makeResolvedIdentity(m *Module, i *Identity) (string, *resolvedIdentity) {
+// isEmpty determines whether the resolvedIdentity struct value was defined.
+func (r resolvedIdentity) isEmpty() bool {
+	if r.Module == nil && r.Identity == nil {
+		return true
+	}
+	return false
+}
+
+// newResolvedIdentity creates a resolved identity from an identity and its
+// associated value.
+func newResolvedIdentity(m *Module, i *Identity) (string, *resolvedIdentity) {
 	r := &resolvedIdentity{
 		Module:   m,
 		Identity: i,
 	}
-	prefix := RootNode(i).GetPrefix()
-	keyName := fmt.Sprintf("%s:%s", prefix, i.Name)
-	return keyName, r
+	return i.PrefixedName(), r
 }
 
 func appendIfNotIn(ids []*Identity, chk *Identity) []*Identity {
@@ -56,22 +65,21 @@ func appendIfNotIn(ids []*Identity, chk *Identity) []*Identity {
 	return append(ids, chk)
 }
 
-func learnChildren(r *Identity, ids []*Identity) []*Identity {
-	// Learn this child
+// addChildren recursively adds the identity r to ids.
+func addChildren(r *Identity, ids []*Identity) []*Identity {
 	ids = appendIfNotIn(ids, r)
-	// But if it doesn't have any children, then return
-	if r.Values == nil {
-		return ids
-	}
-	// Else iterate through them
+
+	// Iterate through the values of r.
 	for _, ch := range r.Values {
-		ids = learnChildren(ch, ids)
+		ids = addChildren(ch, ids)
 	}
 	return ids
 }
 
-func findIdentityBase(baseStr string, mod *Module) (*resolvedIdentity, []error) {
-	var base *resolvedIdentity
+// findIdentityBase returns the resolved identity that is corresponds to the
+// baseStr string in the context of the Module mod.
+func (mod *Module) findIdentityBase(baseStr string) (*resolvedIdentity, []error) {
+	var base resolvedIdentity
 	var ok bool
 	var errs []error
 
@@ -83,23 +91,26 @@ func findIdentityBase(baseStr string, mod *Module) (*resolvedIdentity, []error) 
 		// This is a local identity which is defined within the current
 		// module
 		keyName := fmt.Sprintf("%s:%s", rootPrefix, baseName)
-		base, ok = identityDict.dict[keyName]
+		base, ok = identities.dict[keyName]
 		if !ok {
-			errs = append(errs, fmt.Errorf("can't resolve the local base %s as %s", baseStr, keyName))
+			errs = append(errs, fmt.Errorf("can't resolve the local base %s as %s",
+				baseStr, keyName))
 		}
+		break
 	default:
 		// This is an identity which is defined within another module
-		externalModule := FindModuleByPrefix(mod, basePrefix)
-		if externalModule == nil {
-			errs = append(errs, fmt.Errorf("can't find external module with prefix %s", basePrefix))
+		extmod := FindModuleByPrefix(mod, basePrefix)
+		if extmod == nil {
+			errs = append(errs,
+				fmt.Errorf("can't find external module with prefix %s", basePrefix))
 		}
 
 		// Run through the identities within the remote module and find the
 		// one that matches the base that we have been specified.
-		for _, rid := range externalModule.Identities() {
+		for _, rid := range extmod.Identities() {
 			if rid.Name == baseName {
-				key, _ := makeResolvedIdentity(externalModule, rid)
-				if id, ok := identityDict.dict[key]; ok {
+				key := rid.PrefixedName()
+				if id, ok := identities.dict[key]; ok {
 					base = id
 				} else {
 					errs = append(errs, fmt.Errorf("can't find base %s", baseStr))
@@ -109,29 +120,27 @@ func findIdentityBase(baseStr string, mod *Module) (*resolvedIdentity, []error) 
 		}
 		// Error if we did not find the identity that had the name specified in
 		// the module it was expected to be in.
-		if base == nil {
+		if base.isEmpty() {
 			errs = append(errs, fmt.Errorf("can't resolve remote base %s", baseStr))
 		}
 	}
-	return base, errs
+	return &base, errs
 }
 
 func (ms *Modules) resolveIdentities() []error {
-
-	// We are inplace modifying this global, and hence we have a lock on it.
-	defer identityDict.mu.Unlock()
-	identityDict.mu.Lock()
+	defer identities.mu.Unlock()
+	identities.mu.Lock()
 
 	var errs []error
 
 	// Across all modules, read the identity values that have been extracted
-	// from them, and compile them into a "fully resolved" map that mean that
+	// from them, and compile them into a "fully resolved" map that means that
 	// we can look them up based on the 'real' prefix of the module and the
 	// name of the identity.
 	for _, mod := range ms.Modules {
 		for _, i := range mod.Identities() {
-			keyName, r := makeResolvedIdentity(mod, i)
-			identityDict.dict[keyName] = r
+			keyName, r := newResolvedIdentity(mod, i)
+			identities.dict[keyName] = *r
 		}
 	}
 
@@ -139,15 +148,15 @@ func (ms *Modules) resolveIdentities() []error {
 	// fully resolved identity statement. The intention here is to make sure
 	// that the Children slice is fully populated with pointers to all identities
 	// that have a base, so that we can do inheritance of these later.
-	for _, i := range identityDict.dict {
+	for _, i := range identities.dict {
 		if i.Identity.Base != nil {
 			// This identity inherits from another identity.
 
 			root := RootNode(i.Identity)
-			base, baseErr := findIdentityBase(i.Identity.Base.asString(), root)
+			base, baseErr := root.findIdentityBase(i.Identity.Base.asString())
 
 			if baseErr != nil {
-				errs = append(errs, errs...)
+				errs = append(errs, baseErr...)
 				continue
 			}
 
@@ -157,10 +166,10 @@ func (ms *Modules) resolveIdentities() []error {
 	}
 
 	// Do a final sweep through the identities to build up their children.
-	for _, i := range identityDict.dict {
+	for _, i := range identities.dict {
 		newValues := []*Identity{}
 		for _, j := range i.Identity.Values {
-			newValues = learnChildren(j, newValues)
+			newValues = addChildren(j, newValues)
 		}
 		i.Identity.Values = newValues
 	}

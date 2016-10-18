@@ -782,6 +782,11 @@ func (s *Identity) NName() string         { return s.Name }
 func (s *Identity) Statement() *Statement { return s.Source }
 func (s *Identity) Exts() []*Statement    { return s.Extensions }
 
+// PrefixedName returns the prefix-qualified name for the identity
+func (s *Identity) PrefixedName() string {
+	return fmt.Sprintf("%s:%s", RootNode(s).GetPrefix(), s.Name)
+}
+
 // IsDefined behaves the same as the implementation for Enum - it returns
 // true if an identity with the name is defined within the Values of the
 // identity
