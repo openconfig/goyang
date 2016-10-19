@@ -53,12 +53,12 @@ var basicTestCases = []identityTestCase{
 			inputModule{
 				name: "idtest-one",
 				content: `
-module idtest-one {
-  namespace "urn:idone";
-  prefix "idone";
+					module idtest-one {
+					  namespace "urn:idone";
+					  prefix "idone";
 
-  identity TEST_ID;
-}
+					  identity TEST_ID;
+					}
     `},
 		},
 		identities: []identityOut{
@@ -72,16 +72,16 @@ module idtest-one {
 			inputModule{
 				name: "idtest-two",
 				content: `
-module idtest-two {
-  namespace "urn:idtwo";
-  prefix "idone";
+					module idtest-two {
+					  namespace "urn:idtwo";
+					  prefix "idone";
 
-  identity TEST_ID;
-  identity TEST_ID_TWO;
-  identity TEST_CHILD {
-    base TEST_ID;
-  }
-}
+					  identity TEST_ID;
+					  identity TEST_ID_TWO;
+					  identity TEST_CHILD {
+					    base TEST_ID;
+					  }
+					}
     `},
 		},
 		identities: []identityOut{
@@ -147,26 +147,26 @@ var treeTestCases = []identityTestCase{
 			inputModule{
 				name: "base.yang",
 				content: `
-  module base {
-    namespace "urn:base";
-    prefix "base";
+				  module base {
+				    namespace "urn:base";
+				    prefix "base";
 
-    import remote { prefix "r"; }
+				    import remote { prefix "r"; }
 
-    identity LOCAL_REMOTE_BASE {
-      base r:REMOTE_BASE;
-    }
-  }
+				    identity LOCAL_REMOTE_BASE {
+				      base r:REMOTE_BASE;
+				    }
+				  }
         `},
 			inputModule{
 				name: "remote.yang",
 				content: `
-  module remote {
-    namespace "urn:remote";
-    prefix "remote";
+				  module remote {
+				    namespace "urn:remote";
+				    prefix "remote";
 
-    identity REMOTE_BASE;
-  }
+				    identity REMOTE_BASE;
+				  }
       `},
 		},
 		identities: []identityOut{
@@ -188,30 +188,30 @@ var treeTestCases = []identityTestCase{
 			inputModule{
 				name: "base.yang",
 				content: `
-  module base {
-    namespace "urn:base";
-    prefix "base";
+				  module base {
+				    namespace "urn:base";
+				    prefix "base";
 
-    identity GREATGRANDFATHER;
-		identity GRANDFATHER {
-			base "GREATGRANDFATHER";
-		}
-		identity FATHER {
-			base "GRANDFATHER";
-		}
-		identity SON {
-			base "FATHER";
-		}
-		identity UNCLE {
-			base "GRANDFATHER";
-		}
-		identity BROTHER {
-			base "FATHER";
-		}
-		identity GREATUNCLE {
-			base "GREATGRANDFATHER";
-		}
-  }
+				    identity GREATGRANDFATHER;
+						identity GRANDFATHER {
+							base "GREATGRANDFATHER";
+						}
+						identity FATHER {
+							base "GRANDFATHER";
+						}
+						identity SON {
+							base "FATHER";
+						}
+						identity UNCLE {
+							base "GRANDFATHER";
+						}
+						identity BROTHER {
+							base "FATHER";
+						}
+						identity GREATUNCLE {
+							base "GREATGRANDFATHER";
+						}
+				  }
         `},
 		},
 		identities: []identityOut{
@@ -261,21 +261,21 @@ var treeTestCases = []identityTestCase{
 			inputModule{
 				name: "base.yang",
 				content: `
-  module base {
-    namespace "urn:base";
-    prefix "base";
+				  module base {
+				    namespace "urn:base";
+				    prefix "base";
 
-		identity BASE;
-		identity NOTBASE {
-			base BASE;
-		}
+						identity BASE;
+						identity NOTBASE {
+							base BASE;
+						}
 
-		leaf idref {
-			type identityref {
-				base "BASE";
-			}
-		}
-  }
+						leaf idref {
+							type identityref {
+								base "BASE";
+							}
+						}
+				  }
         `},
 		},
 		identities: []identityOut{
@@ -303,25 +303,25 @@ var treeTestCases = []identityTestCase{
 			inputModule{
 				name: "base.yang",
 				content: `
-  module base4 {
-    namespace "urn:base";
-    prefix "base4";
+				  module base4 {
+				    namespace "urn:base";
+				    prefix "base4";
 
-		identity BASE4;
-		identity CHILD4 {
-			base BASE4;
-		}
+						identity BASE4;
+						identity CHILD4 {
+							base BASE4;
+						}
 
-		typedef t {
-			type identityref {
-				base BASE4;
-			}
-		}
+						typedef t {
+							type identityref {
+								base BASE4;
+							}
+						}
 
-		leaf tref {
-			type t;
-		}
-  }
+						leaf tref {
+							type t;
+						}
+				  }
         `},
 		},
 		identities: []identityOut{

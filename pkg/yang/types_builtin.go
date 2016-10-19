@@ -249,10 +249,8 @@ type YangType struct {
 	Name string
 	Kind TypeKind // Ynone if not a base type
 	// Base represents the base Type if this is a derived type
-	Base *Type `json:"-"` // dervied from
-	// IdentityBase represents the "base" statement of an Identityref type.
-	// It is distinct from the Base specified above.
-	IdentityBase     *Identity
+	Base *Type `json:"-"`        // Base type for non-builtin types
+	IdentityBase     *Identity   // Base statement for a type using identityref
 	Root             *YangType   `json:"-"` // root of this type that is the same
 	Bit              *EnumType   // bit position, "status" is lost
 	Enum             *EnumType   // enum name to value, "status" is lost

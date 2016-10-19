@@ -40,14 +40,12 @@ type resolvedIdentity struct {
 
 // isEmpty determines whether the resolvedIdentity struct value was defined.
 func (r resolvedIdentity) isEmpty() bool {
-	if r.Module == nil && r.Identity == nil {
-		return true
-	}
-	return false
+	return r.Module == nil && r.Identity == nil
 }
 
 // newResolvedIdentity creates a resolved identity from an identity and its
-// associated value.
+// associated value, and returns the prefixed name (Prefix:IdentityName)
+// along with the resolved identity.
 func newResolvedIdentity(m *Module, i *Identity) (string, *resolvedIdentity) {
 	r := &resolvedIdentity{
 		Module:   m,
@@ -103,6 +101,7 @@ func (mod *Module) findIdentityBase(baseStr string) (*resolvedIdentity, []error)
 		if extmod == nil {
 			errs = append(errs,
 				fmt.Errorf("can't find external module with prefix %s", basePrefix))
+			break
 		}
 
 		// Run through the identities within the remote module and find the

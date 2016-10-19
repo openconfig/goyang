@@ -144,8 +144,7 @@ func (t *Typedef) resolve() []error {
 		if idBase, err := RootNode(t).findIdentityBase(t.Type.IdentityBase.Name); err == nil {
 			y.IdentityBase = idBase.Identity
 		} else {
-			return []error{fmt.Errorf("Could not resolve identity base for typedef: %s",
-				t.Type.IdentityBase.Name)}
+			return []error{fmt.Errorf("Could not resolve identity base for typedef: %s", t.Type.IdentityBase.Name)}
 		}
 	}
 
