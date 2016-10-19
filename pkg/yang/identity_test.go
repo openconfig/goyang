@@ -59,7 +59,7 @@ var basicTestCases = []identityTestCase{
 
 					  identity TEST_ID;
 					}
-    `},
+    	`},
 		},
 		identities: []identityOut{
 			identityOut{module: "idtest-one", name: "TEST_ID"},
@@ -82,7 +82,7 @@ var basicTestCases = []identityTestCase{
 					    base TEST_ID;
 					  }
 					}
-    `},
+    	`},
 		},
 		identities: []identityOut{
 			identityOut{module: "idtest-two", name: "TEST_ID"},
@@ -157,7 +157,7 @@ var treeTestCases = []identityTestCase{
 				      base r:REMOTE_BASE;
 				    }
 				  }
-        `},
+      `},
 			inputModule{
 				name: "remote.yang",
 				content: `
@@ -212,7 +212,7 @@ var treeTestCases = []identityTestCase{
 							base "GREATGRANDFATHER";
 						}
 				  }
-        `},
+      `},
 		},
 		identities: []identityOut{
 			identityOut{
@@ -276,7 +276,7 @@ var treeTestCases = []identityTestCase{
 							}
 						}
 				  }
-        `},
+      `},
 		},
 		identities: []identityOut{
 			identityOut{
@@ -322,7 +322,7 @@ var treeTestCases = []identityTestCase{
 							type t;
 						}
 				  }
-        `},
+      `},
 		},
 		identities: []identityOut{
 			identityOut{
