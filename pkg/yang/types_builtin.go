@@ -246,10 +246,9 @@ func (e *EnumType) ValueMap() map[int64]string {
 // refer to either a builtin type or type specified with typedef.  Not
 // all fields in YangType are used for all types.
 type YangType struct {
-	Name string
-	Kind TypeKind // Ynone if not a base type
-	// Base represents the base Type if this is a derived type
-	Base *Type `json:"-"`        // Base type for non-builtin types
+	Name             string
+	Kind             TypeKind    // Ynone if not a base type
+	Base             *Type       `json:"-"` // Base type for non-builtin types
 	IdentityBase     *Identity   // Base statement for a type using identityref
 	Root             *YangType   `json:"-"` // root of this type that is the same
 	Bit              *EnumType   // bit position, "status" is lost
