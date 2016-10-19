@@ -138,7 +138,8 @@ type Module struct {
 	// as the schema tree has multiple root elements.
 	// typedefs is a list of all top level typedefs in this
 	// module.
-	modules  *Modules
+	modules *Modules
+
 	typedefs map[string]*Typedef
 }
 
@@ -148,12 +149,13 @@ func (s *Module) Kind() string {
 	}
 	return "module"
 }
-func (s *Module) ParentNode() Node       { return s.Parent }
-func (s *Module) NName() string          { return s.Name }
-func (s *Module) Statement() *Statement  { return s.Source }
-func (s *Module) Exts() []*Statement     { return s.Extensions }
-func (s *Module) Groupings() []*Grouping { return s.Grouping }
-func (s *Module) Typedefs() []*Typedef   { return s.Typedef }
+func (s *Module) ParentNode() Node        { return s.Parent }
+func (s *Module) NName() string           { return s.Name }
+func (s *Module) Statement() *Statement   { return s.Source }
+func (s *Module) Exts() []*Statement      { return s.Extensions }
+func (s *Module) Groupings() []*Grouping  { return s.Grouping }
+func (s *Module) Typedefs() []*Typedef    { return s.Typedef }
+func (s *Module) Identities() []*Identity { return s.Identity }
 
 // Current returns the most recent revision of this module, or "" if the module
 // has no revisions.
@@ -306,7 +308,7 @@ type Type struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Base            *Value     `yang:"base"` // Name == identityref
+	IdentityBase    *Value     `yang:"base"` // Name == identityref
 	Bit             []*Bit     `yang:"bit"`
 	Enum            []*Enum    `yang:"enum"`
 	FractionDigits  *Value     `yang:"fraction-digits"` // Name == decimal64
@@ -771,6 +773,7 @@ type Identity struct {
 	Description *Value `yang:"description"`
 	Reference   *Value `yang:"reference"`
 	Status      *Value `yang:"status"`
+	Values      []*Identity
 }
 
 func (Identity) Kind() string             { return "identity" }
@@ -778,6 +781,32 @@ func (s *Identity) ParentNode() Node      { return s.Parent }
 func (s *Identity) NName() string         { return s.Name }
 func (s *Identity) Statement() *Statement { return s.Source }
 func (s *Identity) Exts() []*Statement    { return s.Extensions }
+
+// PrefixedName returns the prefix-qualified name for the identity
+func (s *Identity) PrefixedName() string {
+	return fmt.Sprintf("%s:%s", RootNode(s).GetPrefix(), s.Name)
+}
+
+// IsDefined behaves the same as the implementation for Enum - it returns
+// true if an identity with the name is defined within the Values of the
+// identity
+func (s *Identity) IsDefined(name string) bool {
+	if s.GetValue(name) != nil {
+		return true
+	}
+	return false
+}
+
+// GetValue returns a pointer to the identity with name "name" that is within
+// the values of the identity
+func (s *Identity) GetValue(name string) *Identity {
+	for _, v := range s.Values {
+		if v.Name == name {
+			return v
+		}
+	}
+	return nil
+}
 
 // An Extension is defined in: http://tools.ietf.org/html/rfc6020#section-7.17
 type Extension struct {

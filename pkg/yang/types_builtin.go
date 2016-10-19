@@ -248,7 +248,8 @@ func (e *EnumType) ValueMap() map[int64]string {
 type YangType struct {
 	Name             string
 	Kind             TypeKind    // Ynone if not a base type
-	Base             *Type       `json:"-"` // dervied from
+	Base             *Type       `json:"-"` // Base type for non-builtin types
+	IdentityBase     *Identity   // Base statement for a type using identityref
 	Root             *YangType   `json:"-"` // root of this type that is the same
 	Bit              *EnumType   // bit position, "status" is lost
 	Enum             *EnumType   // enum name to value, "status" is lost

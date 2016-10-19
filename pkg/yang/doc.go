@@ -29,7 +29,7 @@
 // module:
 //
 //	// Get the tree for the module module-name by looking for the source
-//	// file namaed module-name.yang.
+//	// file named module-name.yang.
 //	e, errs := yang.GetModule("module-name" [, optional sources...])
 //	if len(errs) > 0 {
 //		for _, err := range errs {

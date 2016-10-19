@@ -40,7 +40,7 @@ type typeDictionary struct {
 // process them completely independently of eachother.
 var typeDict = typeDictionary{dict: map[Node]map[string]*Typedef{}}
 
-// add adds an entry to the typeDictorary d.
+// add adds an entry to the typeDictionary d.
 func (d *typeDictionary) add(n Node, name string, td *Typedef) {
 	defer d.mu.Unlock()
 	d.mu.Lock()
@@ -139,6 +139,15 @@ func (t *Typedef) resolve() []error {
 		y.Default = t.Default.Name
 	}
 
+	if t.Type.IdentityBase != nil {
+		// We need to copy over the IdentityBase statement if the type has one
+		if idBase, err := RootNode(t).findIdentityBase(t.Type.IdentityBase.Name); err == nil {
+			y.IdentityBase = idBase.Identity
+		} else {
+			return []error{fmt.Errorf("Could not resolve identity base for typedef: %s", t.Type.IdentityBase.Name)}
+		}
+	}
+
 	// If we changed something, we are the new root.
 	if y.Root == t.Type.YangType || !y.Equal(y.Root) {
 		y.Root = &y
@@ -214,6 +223,7 @@ check:
 		return []error{fmt.Errorf("%s: no YangType defined for %s %s", Source(td), source, td.Name)}
 	}
 	y := *td.YangType
+
 	y.Base = td.Type
 	t.YangType = &y
 
@@ -238,6 +248,30 @@ check:
 		y.FractionDigits = int(i)
 	case t.FractionDigits != nil:
 		errs = append(errs, fmt.Errorf("%s: fraction-digits only allowed for decimal64 values", Source(t)))
+	case y.Kind == Yidentityref:
+		if source != "builtin" {
+			// This is a typedef that refers to an identityref, so we want to simply
+			// maintain the base that the typedef resolution provided
+			break
+		}
+
+		if t.IdentityBase == nil {
+			errs = append(errs, fmt.Errorf("%s: an identityref must specify a base", Source(t)))
+			break
+		}
+
+		root := RootNode(t.Parent)
+		resolvedBase, baseErr := root.findIdentityBase(t.IdentityBase.Name)
+		if baseErr != nil {
+			errs = append(errs, baseErr...)
+			break
+		}
+
+		if resolvedBase.Identity == nil {
+			errs = append(errs, fmt.Errorf("%s: identity has a null base", t.IdentityBase.Name))
+			break
+		}
+		y.IdentityBase = resolvedBase.Identity
 	}
 
 	if t.Range != nil {
