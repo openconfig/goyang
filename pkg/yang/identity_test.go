@@ -394,6 +394,25 @@ func TestIdentityTree(t *testing.T) {
 
 			for _, val := range chkID.values {
 				valueMap[val] = false
+				// Check that IsDefined returns the right result
+				if !foundID.IsDefined(val) {
+					t.Errorf("Couldn't find defined value %s  for %s", val, chkID.name)
+				}
+
+				// Check that GetValue returns the right Identity
+				idval := foundID.GetValue(val)
+				if idval == nil {
+					t.Errorf("Couldn't GetValue(%s) for %s", val, chkID.name)
+				}
+			}
+
+			// Ensure that IsDefined does not return false positives
+			if foundID.IsDefined("DoesNotExist") {
+				t.Errorf("Non-existent value IsDefined for %s", foundID.Name)
+			}
+
+			if foundID.GetValue("DoesNotExist") != nil {
+				t.Errorf("Non-existent value GetValue not nil for %s", foundID.Name)
 			}
 
 			for _, chkv := range foundID.Values {
