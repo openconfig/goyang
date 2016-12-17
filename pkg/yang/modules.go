@@ -27,6 +27,7 @@ type Modules struct {
 	SubModules map[string]*Module // All "submodule" nodes
 	includes   map[*Module]bool   // Modules we have already done include on
 	byPrefix   map[string]*Module // Cache of prefix lookup
+	byNS       map[string]*Module // Cache of namespace lookup
 }
 
 // NewModules returns a newly created and initialized Modules.
@@ -36,6 +37,7 @@ func NewModules() *Modules {
 		SubModules: map[string]*Module{},
 		includes:   map[*Module]bool{},
 		byPrefix:   map[string]*Module{},
+		byNS:       map[string]*Module{},
 	}
 }
 
@@ -190,6 +192,35 @@ func (ms *Modules) FindModule(n Node) *Module {
 		return n
 	}
 	return m[name]
+}
+
+// FindModuleByNamespace either returns the Module specified by the namespace
+// or returns an error.
+func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
+	if m, ok := ms.byNS[ns]; ok {
+		if m == nil {
+			return nil, fmt.Errorf("%s: no such namespace", ns)
+		}
+		return m, nil
+	}
+	var found *Module
+	for _, m := range ms.Modules {
+		if m.Namespace.Name == ns {
+			switch {
+			case m == found:
+			case found != nil:
+				return nil, fmt.Errorf("namespace %s matches two or more modules (%s, %s)\n",
+					ns, found.Name, m.Name)
+			default:
+				found = m
+			}
+		}
+	}
+	ms.byNS[ns] = found
+	if found == nil {
+		return nil, fmt.Errorf("%s: no such namespace", ns)
+	}
+	return found, nil
 }
 
 // FindModuleByPrefix either returns the Module specified by prefix or returns
