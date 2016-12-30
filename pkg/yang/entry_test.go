@@ -285,7 +285,7 @@ module defaults {
 
   typedef string-default {
     type string;
-    default "typedef default string";
+    default "typedef default value";
   }
 
   grouping common {
@@ -297,7 +297,7 @@ module defaults {
     container common-withdefault {
       leaf string {
         type string;
-        default "default string";
+        default "default value";
       }
     }
     container common-typedef-withdefault {
