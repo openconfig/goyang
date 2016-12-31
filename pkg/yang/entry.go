@@ -70,6 +70,7 @@ type Entry struct {
 	Node        Node      // the base node this Entry was derived from.
 	Name        string    // our name, same as the key in our parent Dirs
 	Description string    // description from node, if any
+	Default     string    // default from node, if any
 	Errors      []error   // list of errors encounterd on this node
 	Kind        EntryKind // kind of Entry
 	Config      TriState  // config state of this entry, if known
@@ -370,6 +371,9 @@ func ToEntry(n Node) (e *Entry) {
 		if s.Description != nil {
 			e.Description = s.Description.Name
 		}
+		if s.Default != nil {
+			e.Default = s.Default.Name
+		}
 		e.Type = s.Type.YangType
 		entryCache[n] = e
 		e.Config, err = configValue(s.Config)
@@ -563,12 +567,12 @@ func ToEntry(n Node) (e *Entry) {
 
 		// Keywords that do not need to be handled as an Entry as they are added
 		// to other dictionaries.
-		case "typedef":
+		case "default",
+			"typedef":
 			continue
 		// TODO(borman): unimplemented keywords
 		case "belongs-to",
 			"contact",
-			"default",
 			"deviation",
 			"extension",
 			"feature",
@@ -904,4 +908,15 @@ func errorSort(errors []error) []error {
 		i++
 	}
 	return errors[:i]
+}
+
+// DefaultValue returns the schema default value for e, if any. If the leaf
+// has no explicit default, its type default (if any) will be used.
+func (e *Entry) DefaultValue() string {
+	if len(e.Default) > 0 {
+		return e.Default
+	} else if typ := e.Type; typ != nil {
+		return typ.Default
+	}
+	return ""
 }

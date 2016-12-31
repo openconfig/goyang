@@ -17,6 +17,7 @@ package yang
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -261,6 +262,115 @@ func TestEntryNamespace(t *testing.T) {
 			t.Errorf("want namespace %s, got nil", tc.ns)
 		} else if tc.ns != nsValue.Name {
 			t.Errorf("want namespace %s, got %s", tc.ns, nsValue.Name)
+		}
+	}
+}
+
+func TestEntryDefaultValue(t *testing.T) {
+	getdir := func(e *Entry, elements ...string) (*Entry, error) {
+		for _, elem := range elements {
+			next := e.Dir[elem]
+			if next == nil {
+				return nil, fmt.Errorf("%s missing directory %q", e.Path(), elem)
+			}
+			e = next
+		}
+		return e, nil
+	}
+
+	modtext := `
+module defaults {
+  namespace "urn:defaults";
+  prefix "defaults";
+
+  typedef string-default {
+    type string;
+    default "typedef default value";
+  }
+
+  grouping common {
+    container common-nodefault {
+      leaf string {
+        type string;
+      }
+    }
+    container common-withdefault {
+      leaf string {
+        type string;
+        default "default value";
+      }
+    }
+    container common-typedef-withdefault {
+      leaf string {
+        type string-default;
+      }
+    }
+  }
+
+  container defaults {
+    leaf uint32-withdefault {
+      type uint32;
+      default 13;
+    }
+    leaf string-withdefault {
+      type string-default;
+    }
+    leaf nodefault {
+      type string;
+    }
+    uses common;
+  }
+
+}
+`
+
+	ms := NewModules()
+	if err := ms.Parse(modtext, "defaults.yang"); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, tc := range []struct {
+		want string
+		path []string
+	}{
+		{
+			path: []string{"defaults", "string-withdefault"},
+			want: "typedef default string",
+		},
+		{
+			path: []string{"defaults", "uint32-withdefault"},
+			want: "13",
+		},
+		{
+			path: []string{"defaults", "nodefault"},
+			want: "",
+		},
+		{
+			path: []string{"defaults", "common-withdefault", "string"},
+			want: "default string",
+		},
+		{
+			path: []string{"defaults", "common-typedef-withdefault", "string"},
+			want: "typedef default string",
+		},
+		{
+			path: []string{"defaults", "common-nodefault", "string"},
+			want: "",
+		},
+	} {
+		tname := strings.Join(tc.path, "/")
+
+		mod, err := ms.FindModuleByPrefix("defaults")
+		if err != nil {
+			t.Fatalf("[%d_%s] module not found: %v", i, tname, err)
+		}
+		defaults := ToEntry(mod)
+		dir, err := getdir(defaults, tc.path...)
+		if err != nil {
+			t.Fatalf("[%d_%s] could not retrieve path: %v", i, tname, err)
+		}
+		if got := dir.DefaultValue(); tc.want != got {
+			t.Errorf("[%d_%s] want DefaultValue %q, got %q", i, tname, tc.want, got)
 		}
 	}
 }
