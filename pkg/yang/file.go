@@ -56,7 +56,7 @@ func PathsWithModules(root string) (paths []string, err error) {
 				return nil
 			}
 			if !info.IsDir() && strings.HasSuffix(p, ".yang") {
-				dir := path.Dir(p)
+				dir := filepath.Dir(p)
 				if !pm[dir] {
 					pm[dir] = true
 					paths = append(paths, dir)
@@ -92,7 +92,7 @@ func findFile(name string) (string, string, error) {
 
 	switch data, err := readFile(name); true {
 	case err == nil:
-		AddPath(path.Dir(name))
+		AddPath(filepath.Dir(name))
 		return name, string(data), nil
 	case slash >= 0:
 		// If there are any /'s in the name then don't search Path.
@@ -101,10 +101,10 @@ func findFile(name string) (string, string, error) {
 
 	for _, dir := range Path {
 		var n string
-		if path.Base(dir) == "..." {
-			n = findInDir(path.Dir(dir), name)
+		if filepath.Base(dir) == "..." {
+			n = findInDir(filepath.Dir(dir), name)
 		} else {
-			n = path.Join(dir, name)
+			n = filepath.Join(dir, name)
 		}
 		if n == "" {
 			continue
