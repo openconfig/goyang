@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 )
@@ -125,11 +124,11 @@ func findInDir(dir, name string) string {
 	for _, fi := range fis {
 		if !fi.IsDir() {
 			if fi.Name() == name {
-				return path.Join(dir, name)
+				return filepath.Join(dir, name)
 			}
 			continue
 		}
-		if n := findInDir(path.Join(dir, fi.Name()), name); n != "" {
+		if n := findInDir(filepath.Join(dir, fi.Name()), name); n != "" {
 			return n
 		}
 	}
