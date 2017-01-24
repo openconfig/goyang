@@ -335,7 +335,7 @@ module defaults {
 	}{
 		{
 			path: []string{"defaults", "string-withdefault"},
-			want: "typedef default string",
+			want: "typedef default value",
 		},
 		{
 			path: []string{"defaults", "uint32-withdefault"},
@@ -347,11 +347,11 @@ module defaults {
 		},
 		{
 			path: []string{"defaults", "common-withdefault", "string"},
-			want: "default string",
+			want: "default value",
 		},
 		{
 			path: []string{"defaults", "common-typedef-withdefault", "string"},
-			want: "typedef default string",
+			want: "typedef default value",
 		},
 		{
 			path: []string{"defaults", "common-nodefault", "string"},
