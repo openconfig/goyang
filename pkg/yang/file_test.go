@@ -18,6 +18,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -61,6 +62,9 @@ func TestFindFile(t *testing.T) {
 		readFile = func(path string) ([]byte, error) {
 			checked = append(checked, path)
 			return nil, errors.New("no such file")
+		}
+		scanDir = func(dir, name string, recurse bool) string {
+			return filepath.Join(dir, name)
 		}
 		if _, _, err := findFile(tt.name); err == nil {
 			t.Errorf("%s unexpectedly succeeded", tt.name)
