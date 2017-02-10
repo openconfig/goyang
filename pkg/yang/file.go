@@ -138,15 +138,17 @@ func findInDir(dir, name string, recurse bool) string {
 	}
 
 	for _, fi := range fis {
-		if !fi.IsDir() {
-			if fi.Name() == name {
+		switch {
+		case !fi.IsDir():
+			if fn := fi.Name(); fn == name {
 				return filepath.Join(dir, name)
-			} else if !strings.Contains(name, "@") && strings.HasPrefix(fi.Name(), mname+"@") && strings.HasSuffix(fi.Name(), ".yang") {
-				candidates = append(candidates, fi.Name())
+			} else if !strings.Contains(name, "@") {
+				// the query had no revision-date so look for candidate revisions
+				if strings.HasPrefix(fn, mname+"@") && strings.HasSuffix(fn, ".yang") {
+					candidates = append(candidates, fn)
+				}
 			}
-			continue
-		}
-		if recurse {
+		case recurse:
 			if n := findInDir(filepath.Join(dir, fi.Name()), name, recurse); n != "" {
 				return n
 			}
@@ -159,8 +161,5 @@ func findInDir(dir, name string, recurse bool) string {
 	// the case of revision-date fields per the module file name format (RFC6020
 	// section 5.2) should be the newest candidate.
 	sort.Strings(candidates)
-	if best := candidates[len(candidates)-1]; best != "" {
-		return filepath.Join(dir, best)
-	}
-	return ""
+	return filepath.Join(dir, candidates[len(candidates)-1])
 }
