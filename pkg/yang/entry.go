@@ -570,10 +570,19 @@ func ToEntry(n Node) (e *Entry) {
 		case "default",
 			"typedef":
 			continue
+		case "deviation":
+			if a := fv.Interface().([]*Deviation); a != nil {
+				for _, d := range a {
+					for _, sd := range d.Deviate {
+						if sd.Type != nil {
+							sd.Type.resolve()
+						}
+					}
+				}
+			}
 		// TODO(borman): unimplemented keywords
 		case "belongs-to",
 			"contact",
-			"deviation",
 			"extension",
 			"feature",
 			"if-feature",
