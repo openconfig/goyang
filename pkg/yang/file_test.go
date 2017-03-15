@@ -17,6 +17,7 @@ package yang
 import (
 	"errors"
 	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -29,6 +30,8 @@ func testPathReset() {
 func TestFindFile(t *testing.T) {
 	// clean up global state
 	defer testPathReset()
+
+	sep := string(os.PathSeparator)
 
 	for _, tt := range []struct {
 		name  string
@@ -50,7 +53,7 @@ func TestFindFile(t *testing.T) {
 		{
 			name:  "four",
 			path:  []string{"dir1", "dir2"},
-			check: []string{"four.yang", "dir1/four.yang", "dir2/four.yang"},
+			check: []string{"four.yang", "dir1" + sep + "four.yang", "dir2" + sep + "four.yang"},
 		},
 	} {
 		var checked []string
