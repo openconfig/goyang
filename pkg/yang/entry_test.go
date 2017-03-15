@@ -264,3 +264,109 @@ func TestEntryNamespace(t *testing.T) {
 		}
 	}
 }
+
+func TestIgnoreCircularDependencies(t *testing.T) {
+	tests := []struct {
+		name            string
+		inModules       map[string]string
+		inIgnoreCircDep bool
+		wantErrs        bool
+	}{{
+		name: "validation that non-circular dependencies are correct",
+		inModules: map[string]string{
+			"mod-a": `
+			module mod-a {
+				namespace "urn:a";
+				prefix "a";
+
+				include subm-x;
+				include subm-y;
+
+				leaf marker { type string; }
+			}
+			`,
+			"subm-x": `
+				submodule subm-x {
+					belongs-to mod-a { prefix a; }
+				}
+			`,
+			"subm-y": `
+        submodule subm-y {
+          belongs-to mod-a { prefix a; }
+          // Not circular.
+          include subm-x;
+        }
+      `},
+	}, {
+		name: "circular dependency error identified",
+		inModules: map[string]string{
+			"mod-a": `
+    module mod-a {
+      namespace "urn:a";
+      prefix "a";
+
+      include subm-x;
+      include subm-y;
+
+      leaf marker { type string; }
+    }
+    `,
+			"subm-x": `
+      submodule subm-x {
+        belongs-to mod-a { prefix a; }
+        // Circular
+        include subm-y;
+      }
+    `,
+			"subm-y": `
+      submodule subm-y {
+        belongs-to mod-a { prefix a; }
+        // Circular
+        include subm-x;
+      }
+    `},
+		wantErrs: true,
+	}, {
+		name: "circular dependency error identified",
+		inModules: map[string]string{
+			"mod-a": `
+    module mod-a {
+      namespace "urn:a";
+      prefix "a";
+
+      include subm-x;
+      include subm-y;
+
+      leaf marker { type string; }
+    }
+    `,
+			"subm-x": `
+      submodule subm-x {
+        belongs-to mod-a { prefix a; }
+        // Circular
+        include subm-y;
+      }
+    `,
+			"subm-y": `
+      submodule subm-y {
+        belongs-to mod-a { prefix a; }
+        // Circular
+        include subm-x;
+      }
+    `},
+		inIgnoreCircDep: true,
+	}}
+
+	for _, tt := range tests {
+		ms := NewModules()
+		ParseOptions.IgnoreSubmoduleCircularDependencies = tt.inIgnoreCircDep
+		for n, m := range tt.inModules {
+			if err := ms.Parse(m, n); err != nil {
+				if !tt.wantErrs {
+					t.Errorf("%s: could not parse modules, got: %v, want: nil", tt.name, err)
+				}
+				continue
+			}
+		}
+	}
+}
