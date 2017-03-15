@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -71,11 +72,16 @@ func PathsWithModules(root string) (paths []string, err error) {
 // readFile makes testing of findFile easier.
 var readFile = ioutil.ReadFile
 
+// scanDir makes testing of findFile easier.
+var scanDir = findInDir
+
 // findFile returns the name and contents of the .yang file associated with
 // name, or an error.  If name is a module name rather than a file name (it does
 // not have a .yang extension and there is no / in name), .yang is appended to
 // the the name.  The directory that the .yang file is found in is added to Path
-// if not already in Path.
+// if not already in Path. If a file is not found by exact match, directories
+// are scanned for "name@revision-date.yang" files, the latest (sorted by
+// YYYY-MM-DD revision-date) of these will be selected.
 //
 // If a path has the form dir/... then dir and all direct or indirect
 // subdirectories of dir are searched.
@@ -84,9 +90,12 @@ var readFile = ioutil.ReadFile
 // Path.
 func findFile(name string) (string, string, error) {
 	slash := strings.Index(name, "/")
-
 	if slash < 0 && !strings.HasSuffix(name, ".yang") {
 		name += ".yang"
+		if best := scanDir(".", name, false); best != "" {
+			// we found a matching candidate in the local directory
+			name = best
+		}
 	}
 
 	switch data, err := readFile(name); true {
@@ -101,7 +110,7 @@ func findFile(name string) (string, string, error) {
 	for _, dir := range Path {
 		var n string
 		if filepath.Base(dir) == "..." {
-			n = findInDir(filepath.Dir(dir), name)
+			n = scanDir(filepath.Dir(dir), name, true)
 		} else {
 			n = filepath.Join(dir, name)
 		}
@@ -115,22 +124,42 @@ func findFile(name string) (string, string, error) {
 	return "", "", fmt.Errorf("no such file: %s", name)
 }
 
-// findInDir looks for a file named name in dir or any of its subdirectories.
-func findInDir(dir, name string) string {
+// findInDir looks for a file named name in dir or any of its subdirectories if
+// recurse is true. if recurse is false, scan only the directory dir.
+func findInDir(dir, name string, recurse bool) string {
 	fis, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return ""
 	}
+	var candidates []string
+	mname := name
+	if strings.HasSuffix(mname, ".yang") {
+		mname = name[:len(name)-len(".yang")]
+	}
+
 	for _, fi := range fis {
-		if !fi.IsDir() {
-			if fi.Name() == name {
+		switch {
+		case !fi.IsDir():
+			if fn := fi.Name(); fn == name {
 				return filepath.Join(dir, name)
+			} else if !strings.Contains(name, "@") {
+				// the query had no revision-date so look for candidate revisions
+				if strings.HasPrefix(fn, mname+"@") && strings.HasSuffix(fn, ".yang") {
+					candidates = append(candidates, fn)
+				}
 			}
-			continue
-		}
-		if n := findInDir(filepath.Join(dir, fi.Name()), name); n != "" {
-			return n
+		case recurse:
+			if n := findInDir(filepath.Join(dir, fi.Name()), name, recurse); n != "" {
+				return n
+			}
 		}
 	}
-	return ""
+	if len(candidates) == 0 {
+		return ""
+	}
+	// sort the candidates and return the ultimate ("highest") value, which in
+	// the case of revision-date fields per the module file name format (RFC6020
+	// section 5.2) should be the newest candidate.
+	sort.Strings(candidates)
+	return filepath.Join(dir, candidates[len(candidates)-1])
 }

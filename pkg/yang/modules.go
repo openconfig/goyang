@@ -390,7 +390,6 @@ func (ms *Modules) include(m *Module) error {
 	for _, i := range m.Include {
 		im := ms.FindModule(i)
 		if im == nil {
-			// TODO(borman): should print @rev if available
 			return fmt.Errorf("no such submodule: %s", i.Name)
 		}
 		// Process the include statements in our included module.
@@ -405,7 +404,6 @@ func (ms *Modules) include(m *Module) error {
 	for _, i := range m.Import {
 		im := ms.FindModule(i)
 		if im == nil {
-			// TODO(borman): should print @rev if available
 			return fmt.Errorf("no such module: %s", i.Name)
 		}
 		// Process the include statements in our included module.
