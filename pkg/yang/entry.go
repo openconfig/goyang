@@ -509,12 +509,12 @@ func ToEntry(n Node) (e *Entry) {
 				// us to ensure that we do not process circular dependencies that exist
 				// in some module's include chains.
 				switch {
-				case a.Module.NName() == n.NName() && !ParseOptions.IgnoreSubmoduleCircularDependencies:
-					e.addError(fmt.Errorf("%s: has a circular dependency", n.NName()))
-				case a.Module.NName() == n.NName():
+				case a.Module.NName() != n.NName():
+					e.merge(a.Module.Prefix, ToEntry(a.Module))
+				case ParseOptions.IgnoreSubmoduleCircularDependencies:
 					continue
 				default:
-					e.merge(a.Module.Prefix, ToEntry(a.Module))
+					e.addError(fmt.Errorf("%s: has a circular dependency", n.NName()))
 				}
 			}
 		case "leaf":
