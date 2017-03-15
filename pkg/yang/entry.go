@@ -504,7 +504,18 @@ func ToEntry(n Node) (e *Entry) {
 			// available.  There is nothing else for us to do.
 		case "include":
 			for _, a := range fv.Interface().([]*Include) {
-				e.merge(a.Module.Prefix, ToEntry(a.Module))
+				// Specifically handle the case that the submodule's name is the same
+				// as the node that we are currently converting to an entry. This allows
+				// us to ensure that we do not process circular dependencies that exist
+				// in some module's include chains.
+				switch {
+				case a.Module.NName() != n.NName():
+					e.merge(a.Module.Prefix, ToEntry(a.Module))
+				case ParseOptions.IgnoreSubmoduleCircularDependencies:
+					continue
+				default:
+					e.addError(fmt.Errorf("%s: has a circular dependency", n.NName()))
+				}
 			}
 		case "leaf":
 			for _, a := range fv.Interface().([]*Leaf) {

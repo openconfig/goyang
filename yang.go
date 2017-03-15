@@ -95,6 +95,7 @@ func main() {
 	getopt.StringVarLong(&format, "format", 0, "format to display: "+strings.Join(formats, ", "), "FORMAT")
 	getopt.StringVarLong(&traceP, "trace", 0, "write trace into to TRACEFILE", "TRACEFILE")
 	getopt.BoolVarLong(&help, "help", '?', "display help")
+	getopt.BoolVarLong(&yang.ParseOptions.IgnoreSubmoduleCircularDependencies, "ignore-circdep", 0, "ignore circular dependencies between submodules")
 	getopt.SetParameters("[FORMAT OPTIONS] [SOURCE] [...]")
 
 	if err := getopt.Getopt(func(o getopt.Option) bool {
