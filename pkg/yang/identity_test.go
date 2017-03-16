@@ -14,7 +14,10 @@
 
 package yang
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 // inputModule is a mock input YANG module.
 type inputModule struct {
@@ -344,6 +347,58 @@ var treeTestCases = []identityTestCase{
 			},
 		},
 	},
+	identityTestCase{
+		in: []inputModule{
+			inputModule{
+				name: "base.yang",
+				content: `
+					module base5 {
+						namespace "urn:base";
+						prefix "base5";
+
+						identity BASE5A;
+						identity BASE5B;
+
+						identity FIVE_ONE {
+							base BASE5A;
+						}
+
+						identity FIVE_TWO {
+							base BASE5B;
+						}
+
+						leaf union {
+							type union {
+								type identityref {
+									base BASE5A;
+								}
+								type identityref {
+									base BASE5B;
+								}
+							}
+						}
+					}`},
+		},
+		identities: []identityOut{
+			identityOut{
+				module: "base5",
+				name:   "BASE5A",
+				values: []string{"FIVE_ONE"},
+			},
+			identityOut{
+				module: "base5",
+				name:   "BASE5B",
+				values: []string{"FIVE_TWO"},
+			},
+		},
+		idrefs: []idrefOut{
+			idrefOut{
+				module: "base5",
+				name:   "union",
+				values: []string{"FIVE_ONE", "FIVE_TWO"},
+			},
+		},
+	},
 }
 
 // TestIdentityTree - check inheritance of identities from local and remote
@@ -428,6 +483,41 @@ func TestIdentityTree(t *testing.T) {
 				if v == false {
 					t.Errorf("Could not find identity %s for %s", k, chkID.name)
 				}
+			}
+		}
+
+		for _, idr := range tt.idrefs {
+			m, errs := ms.GetModule(idr.module)
+			if errs != nil {
+				t.Errorf("Couldn't find expected module %s: %v", idr.module, errs)
+				continue
+			}
+
+			if _, ok := m.Dir[idr.name]; !ok {
+				t.Errorf("Could not find expected identity, got: nil, want: %v", idr.name)
+				continue
+			}
+
+			identity := m.Dir[idr.name]
+			var vals []*Identity
+			switch len(identity.Type.Type) {
+			case 0:
+				vals = identity.Type.IdentityBase.Values
+			default:
+				for _, b := range identity.Type.Type {
+					if b.IdentityBase != nil {
+						vals = append(vals, b.IdentityBase.Values...)
+					}
+				}
+			}
+
+			var valNames []string
+			for _, v := range vals {
+				valNames = append(valNames, v.Name)
+			}
+
+			if !reflect.DeepEqual(idr.values, valNames) {
+				t.Errorf("Identity %s did not have expected values, got: %v, want: %v", idr.name, valNames, idr.values)
 			}
 		}
 	}

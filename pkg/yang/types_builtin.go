@@ -320,6 +320,7 @@ func (y *YangType) Equal(t *YangType) bool {
 		y.Units != t.Units,
 		y.Default != t.Default,
 		y.FractionDigits != t.FractionDigits,
+		y.IdentityBase != t.IdentityBase,
 		len(y.Length) != len(t.Length),
 		!y.Length.Equal(t.Length),
 		y.OptionalInstance != t.OptionalInstance,
