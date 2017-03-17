@@ -431,6 +431,9 @@ func ToEntry(n Node) (e *Entry) {
 		}
 	case *Choice:
 		e.Kind = ChoiceEntry
+		if s.Default != nil {
+			e.Default = s.Default.Name
+		}
 	case *Case:
 		e.Kind = CaseEntry
 	case *AnyXML:
