@@ -309,6 +309,11 @@ func (e *Entry) add(key string, value *Entry) *Entry {
 // converted nodes.
 var entryCache = map[Node]*Entry{}
 
+// mergedSubmodule is used to prevent re-parsing a submodule that has already
+// been merged into a particular entity when circular dependencies are being
+// ignored.
+var mergedSubmodule = map[string]map[string]bool{}
+
 var depth = 0
 
 // ToEntry expands node n into a directory Entry.  Expansion is based on the
@@ -406,7 +411,7 @@ func ToEntry(n Node) (e *Entry) {
 		}
 		return e
 	case *Uses:
-		g := FindGrouping(s, s.Name)
+		g := FindGrouping(s, s.Name, map[string]bool{})
 		if g == nil {
 			return newError(n, "unknown group: %s", s.Name)
 		}
@@ -504,17 +509,27 @@ func ToEntry(n Node) (e *Entry) {
 			// available.  There is nothing else for us to do.
 		case "include":
 			for _, a := range fv.Interface().([]*Include) {
-				// Specifically handle the case that the submodule's name is the same
-				// as the node that we are currently converting to an entry. This allows
-				// us to ensure that we do not process circular dependencies that exist
-				// in some module's include chains.
+				// Handle circular dependencies between submodules. This can occur in
+				// two ways:
+				//  - Where submodule A imports submodule B, and vice versa then the
+				//    whilst processing A we will also try and process A (learnt via
+				//    B). The default case of the switch handles this case.
+				//  - Where submodule A imports submodule B that imports C, which also
+				//    imports A, then we need to check whether we already have merged
+				//    the specified module during this parse attempt. We check this
+				//    against a map of merged submodules.
+				_, merged := mergedSubmodule[a.Module.NName()][n.NName()]
 				switch {
-				case a.Module.NName() != n.NName():
+				case !merged && a.Module.NName() != n.NName():
+					if _, ok := mergedSubmodule[a.Module.NName()]; !ok {
+						mergedSubmodule[a.Module.NName()] = map[string]bool{}
+					}
+					mergedSubmodule[a.Module.NName()][n.NName()] = true
 					e.merge(a.Module.Prefix, ToEntry(a.Module))
 				case ParseOptions.IgnoreSubmoduleCircularDependencies:
 					continue
 				default:
-					e.addError(fmt.Errorf("%s: has a circular dependency", n.NName()))
+					e.addError(fmt.Errorf("%s: has a circular dependency, importing %s", a.Module.Name, n.NName()))
 				}
 			}
 		case "leaf":

@@ -46,7 +46,7 @@ func trimPrefix(n Node, name string) string {
 // FindGrouping finds the grouping named name in one of the parent node's
 // grouping fields.  If no parent has the named grouping, nil is returned.
 // Imported and included modules are also checked.
-func FindGrouping(n Node, name string) *Grouping {
+func FindGrouping(n Node, name string, checkedInclude map[string]bool) *Grouping {
 	name = trimPrefix(n, name)
 	for n != nil {
 		// Grab the Grouping field of the underlying structure.  n is
@@ -74,7 +74,7 @@ func FindGrouping(n Node, name string) *Grouping {
 				if pname == name {
 					continue
 				}
-				if g := FindGrouping(i.Module, pname); g != nil {
+				if g := FindGrouping(i.Module, pname, checkedInclude); g != nil {
 					return g
 				}
 			}
@@ -82,7 +82,20 @@ func FindGrouping(n Node, name string) *Grouping {
 		v = e.FieldByName("Include")
 		if v.IsValid() {
 			for _, i := range v.Interface().([]*Include) {
-				if g := FindGrouping(i.Module, name); g != nil {
+				if _, c := checkedInclude[i.Module.Name]; c {
+					switch ParseOptions.IgnoreSubmoduleCircularDependencies {
+					case true:
+						continue
+					default:
+						// We have an undetected circular dependency that has occurred.
+						// This should not be possible to hit, since ToEntry should have
+						// converted the entries successfully, however, we return nil to
+						// avoid infinitely looping and causing a panic.
+						return nil
+					}
+				}
+				checkedInclude[i.Module.Name] = true
+				if g := FindGrouping(i.Module, name, checkedInclude); g != nil {
 					return g
 				}
 			}
