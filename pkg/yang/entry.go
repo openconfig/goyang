@@ -311,8 +311,9 @@ var entryCache = map[Node]*Entry{}
 
 // mergedSubmodule is used to prevent re-parsing a submodule that has already
 // been merged into a particular entity when circular dependencies are being
-// ignored.
-var mergedSubmodule = map[string]map[string]bool{}
+// ignored. The keys of the map are a string that is formed by concatenating
+// the name of the including (sub)module and the included submodule.
+var mergedSubmodule = map[string]bool{}
 
 var depth = 0
 
@@ -518,13 +519,14 @@ func ToEntry(n Node) (e *Entry) {
 				//    imports A, then we need to check whether we already have merged
 				//    the specified module during this parse attempt. We check this
 				//    against a map of merged submodules.
-				_, merged := mergedSubmodule[a.Module.NName()][n.NName()]
+				// The key of the map used is a synthesised value which is formed by
+				// concatenating the name of this node and the included submodule,
+				// separated by a ":".
+				key := n.NName() + ":" + a.Module.NName()
+				merged := mergedSubmodule[key]
 				switch {
 				case !merged && a.Module.NName() != n.NName():
-					if _, ok := mergedSubmodule[a.Module.NName()]; !ok {
-						mergedSubmodule[a.Module.NName()] = map[string]bool{}
-					}
-					mergedSubmodule[a.Module.NName()][n.NName()] = true
+					mergedSubmodule[key] = true
 					e.merge(a.Module.Prefix, ToEntry(a.Module))
 				case ParseOptions.IgnoreSubmoduleCircularDependencies:
 					continue
