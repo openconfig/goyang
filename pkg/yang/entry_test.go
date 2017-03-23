@@ -328,7 +328,7 @@ func TestIgnoreCircularDependencies(t *testing.T) {
     `},
 		wantErrs: true,
 	}, {
-		name: "circular dependency error identified",
+		name: "circular dependency error skipped",
 		inModules: map[string]string{
 			"mod-a": `
     module mod-a {
@@ -477,6 +477,74 @@ module defaults {
 		}
 		if got := dir.DefaultValue(); tc.want != got {
 			t.Errorf("[%d_%s] want DefaultValue %q, got %q", i, tname, tc.want, got)
+		}
+	}
+}
+
+func TestFullModuleProcess(t *testing.T) {
+	tests := []struct {
+		name             string
+		inModules        map[string]string
+		inIgnoreCircDeps bool
+	}{{
+		name: "circular import via child",
+		inModules: map[string]string{
+			"test": `
+      module test {
+      	prefix "t";
+      	namespace "urn:t";
+
+      	include test-router;
+      	include test-router-bgp;
+      	include test-router-isis;
+
+      	container configure {
+      		uses test-router;
+      	}
+      }`,
+			"test-router": `
+      submodule test-router {
+      	belongs-to test { prefix "t"; }
+
+      	include test-router-bgp;
+      	include test-router-isis;
+      	include test-router-ldp;
+
+      	grouping test-router {
+      		uses test-router-ldp;
+      	}
+      }`,
+			"test-router-ldp": `
+      submodule test-router-ldp {
+      	belongs-to test { prefix "t"; }
+
+      	grouping test-router-ldp { }
+      }`,
+			"test-router-isis": `
+      submodule test-router-isis {
+      	belongs-to test { prefix "t"; }
+
+      	include test-router;
+      }`,
+			"test-router-bgp": `
+      submodule test-router-bgp {
+      	belongs-to test { prefix "t"; }
+      }`,
+		},
+		inIgnoreCircDeps: true,
+	}}
+
+	for _, tt := range tests {
+		ms := NewModules()
+		ParseOptions.IgnoreSubmoduleCircularDependencies = tt.inIgnoreCircDeps
+		for n, m := range tt.inModules {
+			if err := ms.Parse(m, n); err != nil {
+				t.Errorf("%s: error parsing module %s, got: %v, want: nil", tt.name, n, err)
+			}
+		}
+
+		if errs := ms.Process(); len(errs) > 0 {
+			t.Errorf("%s: error processing modules, got: %v, want: nil", tt.name, errs)
 		}
 	}
 }
