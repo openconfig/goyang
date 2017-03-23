@@ -622,13 +622,53 @@ func TestFullModuleProcess(t *testing.T) {
 				}`,
 		},
 		wantLeaves: map[string][]string{
-			"bgp": []string{"parent", "son", "grandson"},
+			"bgp": {"parent", "son", "grandson"},
+		},
+	}, {
+		name: "parent to son and daughter with common grandchild",
+		inModules: map[string]string{
+			"parent": `
+			module parent {
+				prefix "p";
+				namespace "urn:p";
+				include son;
+				include daughter;
+
+				leaf p { type string; }
+			}
+			`,
+			"son": `
+			submodule son {
+				belongs-to parent { prefix "p"; }
+				include grandchild;
+
+				leaf s { type string; }
+			}
+			`,
+			"daughter": `
+			submodule daughter {
+				belongs-to parent { prefix "p"; }
+				include grandchild;
+
+				leaf d { type string; }
+			}
+			`,
+			"grandchild": `
+			submodule grandchild {
+				belongs-to parent { prefix "p"; }
+
+				leaf g { type string; }
+			}
+			`,
+		},
+		wantLeaves: map[string][]string{
+			"parent": {"p", "s", "d", "g"},
 		},
 	}}
 
 	for _, tt := range tests {
 		ms := NewModules()
-        mergedSubmodule = map[string]bool{}
+		mergedSubmodule = map[string]bool{}
 
 		ParseOptions.IgnoreSubmoduleCircularDependencies = tt.inIgnoreCircDeps
 		for n, m := range tt.inModules {

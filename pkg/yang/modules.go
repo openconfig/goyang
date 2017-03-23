@@ -315,10 +315,10 @@ func (ms *Modules) process() []error {
 // not mean these are all the errors.  Process will terminate processing early
 // based on the type and location of the error.
 func (ms *Modules) Process() []error {
-    // Reset globals that may remain stale if multiple Process() calls are
-    // made by the same caller.
-    mergedSubmodule = map[string]bool{}
-    entryCache = map[Node]*Entry{}
+	// Reset globals that may remain stale if multiple Process() calls are
+	// made by the same caller.
+	mergedSubmodule = map[string]bool{}
+	entryCache = map[Node]*Entry{}
 
 	errs := ms.process()
 	if len(errs) > 0 {

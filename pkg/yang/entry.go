@@ -531,15 +531,16 @@ func ToEntry(n Node) (e *Entry) {
 				case !merged && a.Module.NName() != n.NName():
 					parentkey := a.Module.Name + ":" + a.Module.BelongsTo.Name
 					if mergedSubmodule[parentkey] {
-						// Don't try and re-import submodules that our parent actually
-						// imported. This avoids duplication in the case that we have:
-						//      Parent
-						//        / \
-						//       v  v
-						//      Son->Daughter
+						// Don't try and re-import submodules that have already been imported
+						// into the top-level module. Note that this ensures that we get to the
+						// top the tree (whichever the actual module for the chain of
+						// submodules is). The tracking of the immediate parent is achieved
+						// through 'key', which ensures that we do not end up in loops
+						// walking through a sub-cycle of the include graph.
 						continue
 					}
 					mergedSubmodule[key] = true
+					mergedSubmodule[parentkey] = true
 					e.merge(a.Module.Prefix, ToEntry(a.Module))
 				case ParseOptions.IgnoreSubmoduleCircularDependencies:
 					continue
