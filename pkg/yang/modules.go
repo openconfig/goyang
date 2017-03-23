@@ -317,7 +317,7 @@ func (ms *Modules) process() []error {
 func (ms *Modules) Process() []error {
     // Reset globals that may remain stale if multiple Process() calls are
     // made by the same caller.
-    mergedSubmodules = map[string]bool{}
+    mergedSubmodule = map[string]bool{}
     entryCache = map[Node]*Entry{}
 
 	errs := ms.process()
