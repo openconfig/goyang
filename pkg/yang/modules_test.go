@@ -40,7 +40,7 @@ func testModulesForTestdataModulesText(t *testing.T) *yang.Modules {
 	}
 	if errs := ms.Process(); errs != nil {
 		for _, err := range errs {
-			t.Errorf("error %d: %v", err)
+			t.Errorf("error: %v", err)
 		}
 		t.Fatalf("fatal error(s) calling Process()")
 	}
