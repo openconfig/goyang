@@ -525,16 +525,26 @@ func ToEntry(n Node) (e *Entry) {
 				// The key of the map used is a synthesised value which is formed by
 				// concatenating the name of this node and the included submodule,
 				// separated by a ":".
-				key := n.NName() + ":" + a.Module.NName()
+				key := a.Module.Name + ":" + n.NName()
 				merged := mergedSubmodule[key]
 				switch {
 				case !merged && a.Module.NName() != n.NName():
+					parentkey := a.Module.Name + ":" + a.Module.BelongsTo.Name
+					if mergedSubmodule[parentkey] {
+						// Don't try and re-import submodules that our parent actually
+						// imported. This avoids duplication in the case that we have:
+						//      Parent
+						//        / \
+						//       v  v
+						//      Son->Daughter
+						continue
+					}
 					mergedSubmodule[key] = true
 					e.merge(a.Module.Prefix, ToEntry(a.Module))
 				case ParseOptions.IgnoreSubmoduleCircularDependencies:
 					continue
 				default:
-					e.addError(fmt.Errorf("%s: has a circular dependency, importing %s", a.Module.Name, n.NName()))
+					e.addError(fmt.Errorf("%s: has a circular dependency, importing %s", n.NName(), a.Module.NName()))
 				}
 			}
 		case "leaf":
