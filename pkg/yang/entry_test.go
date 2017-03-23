@@ -17,6 +17,8 @@ package yang
 import (
 	"bytes"
 	"fmt"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -486,6 +488,8 @@ func TestFullModuleProcess(t *testing.T) {
 		name             string
 		inModules        map[string]string
 		inIgnoreCircDeps bool
+		wantLeaves       map[string][]string
+		wantErr          bool
 	}{{
 		name: "circular import via child",
 		inModules: map[string]string{
@@ -532,10 +536,140 @@ func TestFullModuleProcess(t *testing.T) {
       }`,
 		},
 		inIgnoreCircDeps: true,
+	}, {
+		name: "non-circular via child",
+		inModules: map[string]string{
+			"bgp": `
+			module bgp {
+			  prefix "bgp";
+			  namespace "urn:bgp";
+
+			  include bgp-son;
+			  include bgp-daughter;
+
+			  leaf parent { type string; }
+			}`,
+			"bgp-son": `
+			submodule bgp-son {
+			  belongs-to bgp { prefix "bgp"; }
+
+			  leaf son { type string; }
+			}`,
+			"bgp-daughter": `
+			submodule bgp-daughter {
+			  belongs-to bgp { prefix "bgp"; }
+			  include bgp-son;
+
+			  leaf daughter { type string; }
+			}`,
+		},
+	}, {
+		name: "simple circular via child",
+		inModules: map[string]string{
+			"parent": `
+			module parent {
+			  prefix "p";
+			  namespace "urn:p";
+				include son;
+				include daughter;
+
+			  leaf p { type string; }
+			}
+			`,
+			"son": `
+			submodule son {
+			  belongs-to parent { prefix "p"; }
+			  include daughter;
+
+			  leaf s { type string; }
+			}
+			`,
+			"daughter": `
+			submodule daughter {
+			  belongs-to parent { prefix "p"; }
+			  include son;
+
+			  leaf d { type string; }
+			}
+			`,
+		},
+		wantErr: true,
+	}, {
+		name: "merge via grandchild",
+		inModules: map[string]string{
+			"bgp": `
+				module bgp {
+				  prefix "bgp";
+				  namespace "urn:bgp";
+
+				  include bgp-son;
+
+				  leaf parent { type string; }
+				}`,
+			"bgp-son": `
+				submodule bgp-son {
+				  belongs-to bgp { prefix "bgp"; }
+
+					include bgp-grandson;
+
+				  leaf son { type string; }
+				}`,
+			"bgp-grandson": `
+				submodule bgp-grandson {
+				  belongs-to bgp { prefix "bgp"; }
+
+				  leaf grandson { type string; }
+				}`,
+		},
+		wantLeaves: map[string][]string{
+			"bgp": {"parent", "son", "grandson"},
+		},
+	}, {
+		name: "parent to son and daughter with common grandchild",
+		inModules: map[string]string{
+			"parent": `
+			module parent {
+				prefix "p";
+				namespace "urn:p";
+				include son;
+				include daughter;
+
+				leaf p { type string; }
+			}
+			`,
+			"son": `
+			submodule son {
+				belongs-to parent { prefix "p"; }
+				include grandchild;
+
+				leaf s { type string; }
+			}
+			`,
+			"daughter": `
+			submodule daughter {
+				belongs-to parent { prefix "p"; }
+				include grandchild;
+
+				leaf d { type string; }
+			}
+			`,
+			"grandchild": `
+			submodule grandchild {
+				belongs-to parent { prefix "p"; }
+
+				leaf g { type string; }
+			}
+			`,
+		},
+		wantLeaves: map[string][]string{
+			"parent": {"p", "s", "d", "g"},
+		},
 	}}
 
 	for _, tt := range tests {
 		ms := NewModules()
+		mergedSubmodule = map[string]bool{}
+
 		ParseOptions.IgnoreSubmoduleCircularDependencies = tt.inIgnoreCircDeps
 		for n, m := range tt.inModules {
 			if err := ms.Parse(m, n); err != nil {
@@ -544,7 +678,35 @@ func TestFullModuleProcess(t *testing.T) {
 		}
 
 		if errs := ms.Process(); len(errs) > 0 {
-			t.Errorf("%s: error processing modules, got: %v, want: nil", tt.name, errs)
+			if !tt.wantErr {
+				t.Errorf("%s: error processing modules, got: %v, want: nil", tt.name, errs)
+			}
+			continue
+		}
+
+		if tt.wantErr {
+			t.Errorf("%s: did not get expected errors", tt.name)
+			continue
+		}
+
+		for m, l := range tt.wantLeaves {
+			mod, errs := ms.GetModule(m)
+			if len(errs) > 0 {
+				t.Errorf("%s: cannot retrieve expected module %s, got: %v, want: nil", tt.name, m, errs)
+				continue
+			}
+
+			var leaves []string
+			for _, n := range mod.Dir {
+				leaves = append(leaves, n.Name)
+			}
+
+			// Sort the two slices to ensure that we are comparing like with like.
+			sort.Strings(l)
+			sort.Strings(leaves)
+			if !reflect.DeepEqual(l, leaves) {
+				t.Errorf("%s: did not get expected leaves in %s, got: %v, want: %v", tt.name, m, leaves, l)
+			}
 		}
 	}
 }

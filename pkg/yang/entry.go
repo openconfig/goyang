@@ -525,16 +525,27 @@ func ToEntry(n Node) (e *Entry) {
 				// The key of the map used is a synthesised value which is formed by
 				// concatenating the name of this node and the included submodule,
 				// separated by a ":".
-				key := n.NName() + ":" + a.Module.NName()
+				key := a.Module.Name + ":" + n.NName()
 				merged := mergedSubmodule[key]
 				switch {
 				case !merged && a.Module.NName() != n.NName():
+					parentkey := a.Module.Name + ":" + a.Module.BelongsTo.Name
+					if mergedSubmodule[parentkey] {
+						// Don't try and re-import submodules that have already been imported
+						// into the top-level module. Note that this ensures that we get to the
+						// top the tree (whichever the actual module for the chain of
+						// submodules is). The tracking of the immediate parent is achieved
+						// through 'key', which ensures that we do not end up in loops
+						// walking through a sub-cycle of the include graph.
+						continue
+					}
 					mergedSubmodule[key] = true
+					mergedSubmodule[parentkey] = true
 					e.merge(a.Module.Prefix, ToEntry(a.Module))
 				case ParseOptions.IgnoreSubmoduleCircularDependencies:
 					continue
 				default:
-					e.addError(fmt.Errorf("%s: has a circular dependency, importing %s", a.Module.Name, n.NName()))
+					e.addError(fmt.Errorf("%s: has a circular dependency, importing %s", n.NName(), a.Module.NName()))
 				}
 			}
 		case "leaf":

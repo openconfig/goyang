@@ -45,7 +45,7 @@ func trimPrefix(n Node, name string) string {
 
 // FindGrouping finds the grouping named name in one of the parent node's
 // grouping fields, seen provides a list of the modules previously seen
-// by FindGrouping during traversal.  If no parent has the named grouping, 
+// by FindGrouping during traversal.  If no parent has the named grouping,
 // nil is returned. Imported and included modules are also checked.
 func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 	name = trimPrefix(n, name)
@@ -84,16 +84,10 @@ func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 		if v.IsValid() {
 			for _, i := range v.Interface().([]*Include) {
 				if seen[i.Module.Name] {
-					switch ParseOptions.IgnoreSubmoduleCircularDependencies {
-					case true:
-						continue
-					default:
-						// We have an undetected circular dependency that has occurred.
-						// This should not be possible to hit, since ToEntry should have
-						// converted the entries successfully, however, we return nil to
-						// avoid infinitely looping and causing a panic.
-						return nil
-					}
+					// Prevent infinite loops in the case that we have already looked at
+					// this submodule. This occurs where submodules have include statements
+					// in them, or there is a circular dependency.
+					continue
 				}
 				seen[i.Module.Name] = true
 				if g := FindGrouping(i.Module, name, seen); g != nil {
