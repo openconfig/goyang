@@ -24,4 +24,7 @@ type Options struct {
 	IgnoreSubmoduleCircularDependencies bool
 }
 
+// ParseOptions sets the options for the current YANG module parsing. It can be
+// directly set by the caller to influence how goyang will behave in the presence
+// of certain exceptional cases.
 var ParseOptions = Options{}

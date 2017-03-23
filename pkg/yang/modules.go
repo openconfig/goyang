@@ -209,7 +209,7 @@ func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
 			switch {
 			case m == found:
 			case found != nil:
-				return nil, fmt.Errorf("namespace %s matches two or more modules (%s, %s)\n",
+				return nil, fmt.Errorf("namespace %s matches two or more modules (%s, %s)",
 					ns, found.Name, m.Name)
 			default:
 				found = m
