@@ -664,6 +664,45 @@ func TestFullModuleProcess(t *testing.T) {
 		wantLeaves: map[string][]string{
 			"parent": {"p", "s", "d", "g"},
 		},
+	}, {
+		name: "parent to son and daughter, not a circdep",
+		inModules: map[string]string{
+			"parent": `
+			module parent {
+				prefix "p";
+				namespace "urn:p";
+
+				include son;
+				include daughter;
+
+				uses son-group;
+			}
+			`,
+			"son": `
+			submodule son {
+				belongs-to parent { prefix "p"; }
+				include daughter;
+
+				grouping son-group {
+					uses daughter-group;
+				}
+			}
+			`,
+			"daughter": `
+			submodule daughter {
+				belongs-to parent { prefix "p"; }
+
+				grouping daughter-group {
+					leaf s { type string; }
+				}
+
+				leaf d { type string; }
+			}
+			`,
+		},
+		wantLeaves: map[string][]string{
+			"parent": {"s", "d"},
+		},
 	}}
 
 	for _, tt := range tests {
