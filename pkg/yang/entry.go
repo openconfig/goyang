@@ -525,12 +525,18 @@ func ToEntry(n Node) (e *Entry) {
 				// The key of the map used is a synthesised value which is formed by
 				// concatenating the name of this node and the included submodule,
 				// separated by a ":".
-				key := a.Module.Name + ":" + n.NName()
-				merged := mergedSubmodule[key]
+				srcToIncluded := a.Module.Name + ":" + n.NName()
+				includedToSrc := n.NName() + ":" + a.Module.Name
+
 				switch {
-				case !merged && a.Module.NName() != n.NName():
-					parentkey := a.Module.Name + ":" + a.Module.BelongsTo.Name
-					if mergedSubmodule[parentkey] {
+				case mergedSubmodule[srcToIncluded]:
+					// We have already merged this module, so don't try and do it
+					// again.
+					continue
+				case !mergedSubmodule[includedToSrc] && a.Module.NName() != n.NName():
+					// We have not merged A->B, and B != B hence go ahead and merge.
+					includedToParent := a.Module.Name + ":" + a.Module.BelongsTo.Name
+					if mergedSubmodule[includedToParent] {
 						// Don't try and re-import submodules that have already been imported
 						// into the top-level module. Note that this ensures that we get to the
 						// top the tree (whichever the actual module for the chain of
@@ -539,8 +545,8 @@ func ToEntry(n Node) (e *Entry) {
 						// walking through a sub-cycle of the include graph.
 						continue
 					}
-					mergedSubmodule[key] = true
-					mergedSubmodule[parentkey] = true
+					mergedSubmodule[srcToIncluded] = true
+					mergedSubmodule[includedToParent] = true
 					e.merge(a.Module.Prefix, ToEntry(a.Module))
 				case ParseOptions.IgnoreSubmoduleCircularDependencies:
 					continue
