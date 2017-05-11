@@ -796,6 +796,38 @@ func (e *Entry) Find(name string) *Entry {
 	return e
 }
 
+// FindRelative finds the Entry relative to e given a relative
+// path. nil is returned if no matching entry was found.
+// TODO: support prefixes.
+func (e *Entry) FindRelative(relpath string) *Entry {
+	if e == nil || relpath == "" || relpath[0] == '/' {
+		return nil
+	}
+	parts := strings.Split(relpath, "/")
+	for _, part := range parts {
+		if e == nil {
+			return nil
+		} else if part == "." {
+			continue
+		} else if part == ".." {
+			e = e.Parent
+			continue
+		}
+
+		_, part = getPrefix(part)
+		if part == "." {
+			continue
+		}
+
+		// unsupported: e.g., "prefix:.." or "prefix:"
+		if part == "" || part == ".." {
+			return nil
+		}
+		e = e.Dir[part]
+	}
+	return e
+}
+
 // Path returns the path to e. A nil Entry returns "".
 func (e *Entry) Path() string {
 	if e == nil {
