@@ -76,7 +76,37 @@ func (w *iw) Write(buf []byte) (int, error) {
 	if !w.partial {
 		lines = append([][]byte{[]byte{}}, lines...)
 	}
-	buf = bytes.Join(lines, w.prefix)
-	w.partial = buf[len(buf)-1] != '\n'
-	return w.w.Write(buf)
+	joined := bytes.Join(lines, w.prefix)
+	w.partial = joined[len(joined)-1] != '\n'
+
+	n, err := w.w.Write(joined)
+	if err != nil {
+		return actualWrittenSize(n, len(w.prefix), lines), err
+	}
+
+	return len(buf), nil
+}
+
+func actualWrittenSize(underlay, prefix int, lines [][]byte) int {
+	actual := 0
+	remain := underlay
+	for _, line := range lines {
+		if len(line) == 0 {
+			continue
+		}
+
+		addition := remain - prefix
+		if addition <= 0 {
+			return actual
+		}
+
+		if addition <= len(line) {
+			return actual + addition
+		}
+
+		actual += len(line)
+		remain -= prefix + len(line)
+	}
+
+	return actual
 }

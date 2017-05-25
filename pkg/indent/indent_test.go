@@ -16,6 +16,7 @@ package indent
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 )
 
@@ -87,4 +88,59 @@ Test:
 			}
 		}
 	}
+}
+
+func TestWrittenSize(t *testing.T) {
+	for x, tt := range tests {
+		var b bytes.Buffer
+		w := NewWriter(&b, tt.prefix)
+		data := []byte(tt.in)
+		if n, _ := w.Write(data); n != len(data) {
+			t.Errorf("#%d: got %d, want %d", x, n, len(data))
+		}
+	}
+}
+
+func TestWrittenSizeWithError(t *testing.T) {
+	table := []struct {
+		prefix   string
+		input    string
+		underlay int
+		expected int
+	}{
+		{"--", "two\nlines\n", 0, 0},
+		{"--", "two\nlines\n", 1, 0},   // -
+		{"--", "two\nlines\n", 2, 0},   // -
+		{"--", "two\nlines\n", 3, 1},   // t
+		{"--", "two\nlines\n", 4, 2},   // w
+		{"--", "two\nlines\n", 5, 3},   // o
+		{"--", "two\nlines\n", 6, 4},   // \n
+		{"--", "two\nlines\n", 7, 4},   // -
+		{"--", "two\nlines\n", 8, 4},   // -
+		{"--", "two\nlines\n", 9, 5},   // l
+		{"--", "two\nlines\n", 10, 6},  // i
+		{"--", "two\nlines\n", 11, 7},  // n
+		{"--", "two\nlines\n", 12, 8},  // e
+		{"--", "two\nlines\n", 13, 9},  // s
+		{"--", "two\nlines\n", 14, 10}, // \n
+		{"--", "two\nlines\n", 15, 10}, // -
+		{"--", "two\nlines\n", 16, 10}, // -
+	}
+
+	for _, d := range table {
+		uw := errorWriter{d.underlay}
+		w := NewWriter(uw, d.prefix)
+		data := []byte(d.input)
+		if n, _ := w.Write(data); n != d.expected {
+			t.Errorf("underlay: %d, got %d, want %d, err: ", d.underlay, n, d.expected)
+		}
+	}
+}
+
+type errorWriter struct {
+	ret int
+}
+
+func (w errorWriter) Write(buf []byte) (int, error) {
+	return w.ret, errors.New("error")
 }
