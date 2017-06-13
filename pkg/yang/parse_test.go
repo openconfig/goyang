@@ -20,9 +20,9 @@ import (
 )
 
 func (s1 *Statement) equal(s2 *Statement) bool {
-	if s1.keyword != s2.keyword ||
+	if s1.Keyword != s2.Keyword ||
 		s1.hasArgument != s2.hasArgument ||
-		s1.argument != s2.argument ||
+		s1.Argument != s2.Argument ||
 		len(s1.statements) != len(s2.statements) {
 		return false
 	}
@@ -38,8 +38,8 @@ func (s1 *Statement) equal(s2 *Statement) bool {
 // SA returns a statment with an argument and optional substatements.
 func SA(k, a string, ss ...*Statement) *Statement {
 	return &Statement{
-		keyword:     k,
-		argument:    a,
+		Keyword:     k,
+		Argument:    a,
 		hasArgument: true,
 		statements:  ss,
 	}
@@ -48,7 +48,7 @@ func SA(k, a string, ss ...*Statement) *Statement {
 // S returns a statment with no argument and optional substatements.
 func S(k string, ss ...*Statement) *Statement {
 	return &Statement{
-		keyword:    k,
+		Keyword:    k,
 		statements: ss,
 	}
 }
@@ -105,7 +105,7 @@ foo "\\ \S \n";
 pattern "\\ \S \n";
 `,
 			out: []*Statement{
-				SA("pattern", `\\ \S 
+        SA("pattern", `\\ \S 
 `),
 			},
 		},

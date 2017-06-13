@@ -248,20 +248,20 @@ func (e *EnumType) ValueMap() map[int64]string {
 type YangType struct {
 	Name             string
 	Kind             TypeKind    // Ynone if not a base type
-	Base             *Type       `json:"-"` // Base type for non-builtin types
-	IdentityBase     *Identity   // Base statement for a type using identityref
-	Root             *YangType   `json:"-"` // root of this type that is the same
-	Bit              *EnumType   // bit position, "status" is lost
-	Enum             *EnumType   // enum name to value, "status" is lost
-	Units            string      // units to be used for this type
-	Default          string      // default value, if any
-	FractionDigits   int         // decimal64 fixed point precision
-	Length           YangRange   // this should be processed by section 12
-	OptionalInstance bool        // !require-instances which defaults to true
-	Path             string      // the path in a leafref
-	Pattern          []string    // limiting XSD-TYPES expressions on strings
-	Range            YangRange   // range for integers
-	Type             []*YangType `json:"-"` // for unions
+	Base             *Type       `json:"-"`          // Base type for non-builtin types
+	IdentityBase     *Identity   `json:",omitempty"` // Base statement for a type using identityref
+	Root             *YangType   `json:"-"`          // root of this type that is the same
+	Bit              *EnumType   `json:",omitempty"` // bit position, "status" is lost
+	Enum             *EnumType   `json:",omitempty"` // enum name to value, "status" is lost
+	Units            string      `json:",omitempty"` // units to be used for this type
+	Default          string      `json:",omitempty"` // default value, if any
+	FractionDigits   int         `json:",omitempty"` // decimal64 fixed point precision
+	Length           YangRange   `json:",omitempty"` // this should be processed by section 12
+	OptionalInstance bool        `json:",omitempty"` // !require-instances which defaults to true
+	Path             string      `json:",omitempty"` // the path in a leafref
+	Pattern          []string    `json:",omitempty"` // limiting XSD-TYPES expressions on strings
+	Range            YangRange   `json:",omitempty"` // range for integers
+	Type             []*YangType `json:",omitempty"` // for unions
 }
 
 // BaseTypedefs is a map of all base types to the Typedef structure manufactured
