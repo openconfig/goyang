@@ -45,6 +45,7 @@ func TestMarshalJSON(t *testing.T) {
 				Source: &Statement{
 					Keyword:  "prefix",
 					Argument: "ModulePrefix",
+          HasArgument: true,
 				},
 			},
 			Type: &YangType{
@@ -63,6 +64,7 @@ func TestMarshalJSON(t *testing.T) {
     "Name": "ModulePrefix",
     "Source": {
       "Keyword": "prefix",
+      "HasArgument": true,
       "Argument": "ModulePrefix"
     }
   },
@@ -86,6 +88,7 @@ func TestMarshalJSON(t *testing.T) {
 				Source: &Statement{
 					Keyword:  "prefix",
 					Argument: "ModulePrefix",
+          HasArgument: true,
 				},
 			},
 			Dir: map[string]*Entry{
@@ -101,6 +104,7 @@ func TestMarshalJSON(t *testing.T) {
 						Source: &Statement{
 							Keyword:  "prefix",
 							Argument: "ModulePrefix",
+              HasArgument: true,
 						},
 					},
 					Type: &YangType{
@@ -126,6 +130,7 @@ func TestMarshalJSON(t *testing.T) {
     "Name": "ModulePrefix",
     "Source": {
       "Keyword": "prefix",
+      "HasArgument": true,
       "Argument": "ModulePrefix"
     }
   },
@@ -138,6 +143,7 @@ func TestMarshalJSON(t *testing.T) {
         "Name": "ModulePrefix",
         "Source": {
           "Keyword": "prefix",
+          "HasArgument": true,
           "Argument": "ModulePrefix"
         }
       },
@@ -199,6 +205,7 @@ func TestMarshalJSON(t *testing.T) {
 			Exts: []*Statement{{
 				Keyword:  "some-extension:ext",
 				Argument: "ext-value",
+        HasArgument: true,
 			}},
 		},
 		want: `{
@@ -225,6 +232,7 @@ func TestMarshalJSON(t *testing.T) {
   "Exts": [
     {
       "Keyword": "some-extension:ext",
+      "HasArgument": true,
       "Argument": "ext-value"
     }
   ],
@@ -322,6 +330,7 @@ func TestParseAndMarshal(t *testing.T) {
     "Name": "t",
     "Source": {
       "Keyword": "prefix",
+      "HasArgument": true,
       "Argument": "t"
     }
   },
@@ -334,6 +343,7 @@ func TestParseAndMarshal(t *testing.T) {
         "Name": "t",
         "Source": {
           "Keyword": "prefix",
+          "HasArgument": true,
           "Argument": "t"
         }
       },
@@ -346,6 +356,7 @@ func TestParseAndMarshal(t *testing.T) {
             "Name": "t",
             "Source": {
               "Keyword": "prefix",
+              "HasArgument": true,
               "Argument": "t"
             }
           },
@@ -504,6 +515,7 @@ func TestParseAndMarshal(t *testing.T) {
     "Name": "t",
     "Source": {
       "Keyword": "prefix",
+      "HasArgument": true,
       "Argument": "t"
     }
   },
@@ -519,6 +531,7 @@ func TestParseAndMarshal(t *testing.T) {
       "Exts": [
         {
           "Keyword": "ext:foobar",
+          "HasArgument": true,
           "Argument": "marked"
         }
       ]
@@ -533,6 +546,7 @@ func TestParseAndMarshal(t *testing.T) {
     "Name": "e",
     "Source": {
       "Keyword": "prefix",
+      "HasArgument": true,
       "Argument": "e"
     }
   }

@@ -49,7 +49,7 @@ type parser struct {
 // sub-statement (i.e., a Statement is a tree).
 type Statement struct {
 	Keyword     string
-	hasArgument bool
+	HasArgument bool
 	Argument    string
 	statements  []*Statement
 
@@ -78,7 +78,7 @@ func (s *Statement) Exts() []*Statement    { return nil }
 
 // Arg returns the optional argument to s.  It returns false if s has no
 // argument.
-func (s *Statement) Arg() (string, bool) { return s.Argument, s.hasArgument }
+func (s *Statement) Arg() (string, bool) { return s.Argument, s.HasArgument }
 
 // Keyword returns the keyword of s.
 //func (s *Statement) Keyword() string { return s.Keyword }
@@ -123,7 +123,7 @@ func (s *Statement) Write(w io.Writer, indent string) error {
 	}
 
 	parts := []string{fmt.Sprintf("%s%s", indent, s.Keyword)}
-	if s.hasArgument {
+	if s.HasArgument {
 		args := strings.Split(s.Argument, "\n")
 		if len(args) == 1 {
 			parts = append(parts, fmt.Sprintf(" %q", s.Argument))
@@ -298,7 +298,7 @@ func (p *parser) nextStatement() *Statement {
 	p.lex.inPattern = false
 	switch t.Code() {
 	case tString, tIdentifier:
-		s.hasArgument = true
+		s.HasArgument = true
 		s.Argument = t.Text
 		t = p.next()
 	}

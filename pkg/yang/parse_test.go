@@ -21,7 +21,7 @@ import (
 
 func (s1 *Statement) equal(s2 *Statement) bool {
 	if s1.Keyword != s2.Keyword ||
-		s1.hasArgument != s2.hasArgument ||
+		s1.HasArgument != s2.HasArgument ||
 		s1.Argument != s2.Argument ||
 		len(s1.statements) != len(s2.statements) {
 		return false
@@ -40,7 +40,7 @@ func SA(k, a string, ss ...*Statement) *Statement {
 	return &Statement{
 		Keyword:     k,
 		Argument:    a,
-		hasArgument: true,
+		HasArgument: true,
 		statements:  ss,
 	}
 }
@@ -105,7 +105,7 @@ foo "\\ \S \n";
 pattern "\\ \S \n";
 `,
 			out: []*Statement{
-        SA("pattern", `\\ \S 
+				SA("pattern", `\\ \S 
 `),
 			},
 		},
