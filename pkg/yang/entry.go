@@ -66,37 +66,37 @@ func (t TriState) String() string {
 // AST.  Directory entries have a non-nil Dir entry.  Leaf nodes have a nil
 // Dir entry.  If Errors is not nil then the only other valid field is Node.
 type Entry struct {
-	Parent      *Entry
-	Node        Node      // the base node this Entry was derived from.
+	Parent      *Entry    `json:"-"`
+	Node        Node      `json:"-"` // the base node this Entry was derived from.
 	Name        string    // our name, same as the key in our parent Dirs
-	Description string    // description from node, if any
-	Default     string    // default from node, if any
-	Errors      []error   // list of errors encounterd on this node
+	Description string    `json:",omitempty"` // description from node, if any
+	Default     string    `json:",omitempty"` // default from node, if any
+	Errors      []error   `json:"-"`          // list of errors encounterd on this node
 	Kind        EntryKind // kind of Entry
 	Config      TriState  // config state of this entry, if known
-	Prefix      *Value    // prefix to use from this point down
+	Prefix      *Value    `json:",omitempty"` // prefix to use from this point down
 
 	// Fields associated with directory nodes
-	Dir map[string]*Entry
-	Key string // Optional key name for lists (i.e., maps)
+	Dir map[string]*Entry `json:",omitempty"`
+	Key string            `json:",omitempty"` // Optional key name for lists (i.e., maps)
 
 	// Fields associated with leaf nodes
-	Type *YangType
-	Exts []*Statement // extensions found
+	Type *YangType    `json:",omitempty"`
+	Exts []*Statement `json:",omitempty"` // extensions found
 
 	// Fields associated with list nodes (both lists and leaf-lists)
-	ListAttr *ListAttr
+	ListAttr *ListAttr `json:",omitempty"`
 
-	RPC *RPCEntry // set if we are an RPC
+	RPC *RPCEntry `json:",omitempty"` // set if we are an RPC
 
 	// Identities that are defined in this context, this is set if the Entry
 	// is a module only.
-	Identities []*Identity
+	Identities []*Identity `json:",omitempty"`
 
-	Augments []*Entry // Augments associated with this entry
+	Augments []*Entry `json:"-"` // Augments associated with this entry
 
 	// Extra maps all the unsupported fields to their values
-	Extra map[string][]interface{}
+	Extra map[string][]interface{} `json:"-"`
 }
 
 // An RPCEntry contains information related to an RPC Node.

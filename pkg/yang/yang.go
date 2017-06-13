@@ -27,11 +27,11 @@ import "fmt"
 // A Value is just a string that can have extensions.
 type Value struct {
 	Name       string       `yang:"Name,nomerge"`
-	Source     *Statement   `yang:"Statement,nomerge"`
-	Parent     Node         `yang:"Parent,nomerge"`
-	Extensions []*Statement `yang:"Ext"`
+	Source     *Statement   `yang:"Statement,nomerge" json:",omitempty"`
+	Parent     Node         `yang:"Parent,nomerge" json:"-"`
+	Extensions []*Statement `yang:"Ext" json:",omitempty"`
 
-	Description *Value `yang:"description"`
+	Description *Value `yang:"description" json:",omitempty"`
 }
 
 func (Value) Kind() string             { return "string" }
@@ -765,15 +765,15 @@ func (s *Augment) Exts() []*Statement    { return s.Extensions }
 // An Identity is defined in: http://tools.ietf.org/html/rfc6020#section-7.16
 type Identity struct {
 	Name       string       `yang:"Name,nomerge"`
-	Source     *Statement   `yang:"Statement,nomerge"`
-	Parent     Node         `yang:"Parent,nomerge"`
-	Extensions []*Statement `yang:"Ext"`
+	Source     *Statement   `yang:"Statement,nomerge" json:"-"`
+	Parent     Node         `yang:"Parent,nomerge" json:"-"`
+	Extensions []*Statement `yang:"Ext" json:"-"`
 
-	Base        *Value `yang:"base"`
-	Description *Value `yang:"description"`
-	Reference   *Value `yang:"reference"`
-	Status      *Value `yang:"status"`
-	Values      []*Identity
+	Base        *Value      `yang:"base" json:"-"`
+	Description *Value      `yang:"description" json:"-"`
+	Reference   *Value      `yang:"reference" json:"-"`
+	Status      *Value      `yang:"status" json:"-"`
+	Values      []*Identity `json:",omitempty"`
 }
 
 func (Identity) Kind() string             { return "identity" }

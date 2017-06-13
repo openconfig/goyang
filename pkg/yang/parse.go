@@ -48,9 +48,9 @@ type parser struct {
 // A Statement is a generic YANG statement.  A Statement may have optional
 // sub-statement (i.e., a Statement is a tree).
 type Statement struct {
-	keyword     string
-	hasArgument bool
-	argument    string
+	Keyword     string
+	HasArgument bool
+	Argument    string
 	statements  []*Statement
 
 	file string
@@ -61,7 +61,7 @@ type Statement struct {
 // FakeStatement returns a statement filled in with keyword, file, line and col.
 func FakeStatement(keyword, file string, line, col int) *Statement {
 	return &Statement{
-		keyword: keyword,
+		Keyword: keyword,
 		file:    file,
 		line:    line,
 		col:     col,
@@ -70,18 +70,18 @@ func FakeStatement(keyword, file string, line, col int) *Statement {
 
 // Make Statement statisfy Node
 
-func (s *Statement) NName() string         { return s.argument }
-func (s *Statement) Kind() string          { return s.keyword }
+func (s *Statement) NName() string         { return s.Argument }
+func (s *Statement) Kind() string          { return s.Keyword }
 func (s *Statement) Statement() *Statement { return s }
 func (s *Statement) ParentNode() Node      { return nil }
 func (s *Statement) Exts() []*Statement    { return nil }
 
 // Arg returns the optional argument to s.  It returns false if s has no
 // argument.
-func (s *Statement) Arg() (string, bool) { return s.argument, s.hasArgument }
+func (s *Statement) Arg() (string, bool) { return s.Argument, s.HasArgument }
 
 // Keyword returns the keyword of s.
-func (s *Statement) Keyword() string { return s.keyword }
+//func (s *Statement) Keyword() string { return s.Keyword }
 
 // SubStatements returns a slice of Statements found in s.
 func (s *Statement) SubStatements() []*Statement { return s.statements }
@@ -112,7 +112,7 @@ func (s *Statement) Location() string {
 // level.  Write is intended to display the contents of Statement, but
 // not necessarily reproduce the input of Statement.
 func (s *Statement) Write(w io.Writer, indent string) error {
-	if s.keyword == "" {
+	if s.Keyword == "" {
 		// We are just a collection of statements at the top level.
 		for _, s := range s.statements {
 			if err := s.Write(w, indent); err != nil {
@@ -122,14 +122,14 @@ func (s *Statement) Write(w io.Writer, indent string) error {
 		return nil
 	}
 
-	parts := []string{fmt.Sprintf("%s%s", indent, s.keyword)}
-	if s.hasArgument {
-		args := strings.Split(s.argument, "\n")
+	parts := []string{fmt.Sprintf("%s%s", indent, s.Keyword)}
+	if s.HasArgument {
+		args := strings.Split(s.Argument, "\n")
 		if len(args) == 1 {
-			parts = append(parts, fmt.Sprintf(" %q", s.argument))
+			parts = append(parts, fmt.Sprintf(" %q", s.Argument))
 		} else {
 			parts = append(parts, ` "`, args[0], "\n")
-			i := fmt.Sprintf("%*s", len(s.keyword)+1, "")
+			i := fmt.Sprintf("%*s", len(s.Keyword)+1, "")
 			for x, p := range args[1:] {
 				s := fmt.Sprintf("%q", p)
 				s = s[1 : len(s)-1]
@@ -284,7 +284,7 @@ func (p *parser) nextStatement() *Statement {
 	}
 
 	s := &Statement{
-		keyword: t.Text,
+		Keyword: t.Text,
 		file:    t.File,
 		line:    t.Line,
 		col:     t.Col,
@@ -298,8 +298,8 @@ func (p *parser) nextStatement() *Statement {
 	p.lex.inPattern = false
 	switch t.Code() {
 	case tString, tIdentifier:
-		s.hasArgument = true
-		s.argument = t.Text
+		s.HasArgument = true
+		s.Argument = t.Text
 		t = p.next()
 	}
 	switch t.Code() {

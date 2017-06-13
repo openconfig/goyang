@@ -98,18 +98,18 @@ func build(s *Statement, p reflect.Value) (v reflect.Value, err error) {
 			addTypedefs(t)
 		}
 	}()
-	kind := s.keyword
-	if k := aliases[s.keyword]; k != "" {
+	kind := s.Keyword
+	if k := aliases[s.Keyword]; k != "" {
 		kind = k
 	}
 	t := nameMap[kind]
 	if t == nil {
 		// It is not an error if this is an extension.
 		// TODO(borman): what do we do with them?
-		if strings.Index(s.keyword, ":") > 0 {
+		if strings.Index(s.Keyword, ":") > 0 {
 			return nilValue, nil
 		}
-		return nilValue, fmt.Errorf("%s: unknown statement: %s", s.Location(), s.keyword)
+		return nilValue, fmt.Errorf("%s: unknown statement: %s", s.Location(), s.Keyword)
 	}
 	y := typeMap[t]
 	found := map[string]bool{}
@@ -147,9 +147,9 @@ func build(s *Statement, p reflect.Value) (v reflect.Value, err error) {
 	// Now handle the substatements
 
 	for _, ss := range s.statements {
-		found[ss.keyword] = true
-		fn := y.funcs[ss.keyword]
-		parts := strings.Split(ss.keyword, ":")
+		found[ss.Keyword] = true
+		fn := y.funcs[ss.Keyword]
+		parts := strings.Split(ss.Keyword, ":")
 		switch {
 		case fn != nil:
 			// Normal case, the keyword is known.
@@ -164,32 +164,32 @@ func build(s *Statement, p reflect.Value) (v reflect.Value, err error) {
 			}
 			y.addext(ss, v, p)
 		default:
-			return nilValue, fmt.Errorf("%s: unknown %s field: %s", ss.Location(), s.keyword, ss.keyword)
+			return nilValue, fmt.Errorf("%s: unknown %s field: %s", ss.Location(), s.Keyword, ss.Keyword)
 		}
 	}
 
 	// Make sure all of our required field are there.
 	for _, r := range y.required {
 		if !found[r] {
-			return nilValue, fmt.Errorf("%s: missing required %s field: %s", s.Location(), s.keyword, r)
+			return nilValue, fmt.Errorf("%s: missing required %s field: %s", s.Location(), s.Keyword, r)
 		}
 	}
 
 	// Make sure required fields based on our keyword are there (module vs submodule)
-	for _, r := range y.sRequired[s.keyword] {
+	for _, r := range y.sRequired[s.Keyword] {
 		if !found[r] {
-			return nilValue, fmt.Errorf("%s: missing required %s field: %s", s.Location(), s.keyword, r)
+			return nilValue, fmt.Errorf("%s: missing required %s field: %s", s.Location(), s.Keyword, r)
 		}
 	}
 
 	// Make sure we don't have any field set that is required by a different keyword.
 	for n, or := range y.sRequired {
-		if n == s.keyword {
+		if n == s.Keyword {
 			continue
 		}
 		for _, r := range or {
 			if found[r] {
-				return nilValue, fmt.Errorf("%s: unknown %s field: %s", s.Location(), s.keyword, r)
+				return nilValue, fmt.Errorf("%s: unknown %s field: %s", s.Location(), s.Keyword, r)
 			}
 		}
 	}
@@ -358,10 +358,10 @@ func initTypes(at reflect.Type) {
 				}
 				fv := v.Elem().Field(i)
 				if fv.String() != "" {
-					return errors.New(s.keyword + ": already set")
+					return errors.New(s.Keyword + ": already set")
 				}
 
-				v.Elem().Field(i).SetString(s.argument)
+				v.Elem().Field(i).SetString(s.Argument)
 				return nil
 			}
 
@@ -391,7 +391,7 @@ func initTypes(at reflect.Type) {
 				}
 				fv := v.Elem().Field(i)
 				if !fv.IsNil() {
-					return errors.New(s.keyword + ": already set")
+					return errors.New(s.Keyword + ": already set")
 				}
 
 				// Use build to build the value for this field.
