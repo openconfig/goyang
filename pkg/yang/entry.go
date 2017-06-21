@@ -168,6 +168,7 @@ type EntryKind int
 const (
 	LeafEntry = EntryKind(iota)
 	DirectoryEntry
+	AnyDataEntry
 	AnyXMLEntry
 	CaseEntry
 	ChoiceEntry
@@ -180,6 +181,7 @@ const (
 var EntryKindToName = map[EntryKind]string{
 	LeafEntry:         "Leaf",
 	DirectoryEntry:    "Directory",
+	AnyDataEntry:      "AnyData",
 	AnyXMLEntry:       "AnyXML",
 	CaseEntry:         "Case",
 	ChoiceEntry:       "Choice",
@@ -442,6 +444,8 @@ func ToEntry(n Node) (e *Entry) {
 		}
 	case *Case:
 		e.Kind = CaseEntry
+	case *AnyData:
+		e.Kind = AnyDataEntry
 	case *AnyXML:
 		e.Kind = AnyXMLEntry
 	case *Input:
@@ -485,6 +489,10 @@ func ToEntry(n Node) (e *Entry) {
 				ne := ToEntry(a)
 				ne.Parent = e
 				e.Augments = append(e.Augments, ne)
+			}
+		case "anydata":
+			for _, a := range fv.Interface().([]*AnyData) {
+				e.add(a.Name, ToEntry(a))
 			}
 		case "anyxml":
 			for _, a := range fv.Interface().([]*AnyXML) {

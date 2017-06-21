@@ -749,3 +749,81 @@ func TestFullModuleProcess(t *testing.T) {
 		}
 	}
 }
+
+func TestAnyDataAnyXML(t *testing.T) {
+	tests := []struct {
+		name          string
+		inModule      string
+		wantNodeKind  string
+		wantEntryKind EntryKind
+	}{
+		{
+			name:          "test anyxml",
+			wantNodeKind:  "anyxml",
+			wantEntryKind: AnyXMLEntry,
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  container c {
+    anyxml data {
+      description "anyxml";
+    }
+  }
+}`,
+		},
+		{
+			name:          "test anydata",
+			wantNodeKind:  "anydata",
+			wantEntryKind: AnyDataEntry,
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  container c {
+    anydata data {
+      description "anydata";
+    }
+  }
+}`,
+		},
+	}
+	for _, tt := range tests {
+		ms := NewModules()
+		if err := ms.Parse(tt.inModule, "test"); err != nil {
+			t.Errorf("%s: error parsing module 'test', got: %v, want: nil", tt.name, err)
+		}
+
+		if errs := ms.Process(); len(errs) > 0 {
+			t.Errorf("%s: got module parsing errors", tt.name)
+			for i, err := range errs {
+				t.Errorf("%s: error #%d: %v", tt.name, i, err)
+			}
+			continue
+		}
+
+		mod, ok := ms.Modules["test"]
+		if !ok {
+			t.Errorf("%s: did not find `test` module", tt.name)
+			continue
+		}
+		e := ToEntry(mod)
+		c := e.Dir["c"]
+		if c == nil {
+			t.Errorf("%s: did not find container c", tt.name)
+			continue
+		}
+		data := c.Dir["data"]
+		if data == nil {
+			t.Errorf("%s: did not find leaf c/data", tt.name)
+			continue
+		}
+		if got := data.Node.Kind(); got != tt.wantNodeKind {
+			t.Errorf("%s: want Node.Kind(): %q, got: %q", tt.name, tt.wantNodeKind, got)
+		}
+		if got := data.Kind; got != tt.wantEntryKind {
+			t.Errorf("%s: want Kind: %v, got: %v", tt.name, tt.wantEntryKind, got)
+		}
+		if got := data.Description; got != tt.wantNodeKind {
+			t.Errorf("%s: want data.Description: %q, got: %q", tt.name, tt.wantNodeKind, got)
+		}
+	}
+}
