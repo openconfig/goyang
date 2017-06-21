@@ -484,6 +484,10 @@ func ToEntry(n Node) (e *Entry) {
 			if v := fv.Interface().(*Value); v != nil {
 				e.Prefix = v
 			}
+		case "action":
+			for _, r := range fv.Interface().([]*Action) {
+				e.add(r.Name, ToEntry(r))
+			}
 		case "augment":
 			for _, a := range fv.Interface().([]*Augment) {
 				ne := ToEntry(a)
