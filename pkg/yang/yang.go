@@ -105,6 +105,7 @@ type Module struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
+	Anydata      []*AnyData      `yang:"anydata"`
 	Anyxml       []*AnyXML       `yang:"anyxml"`
 	Augment      []*Augment      `yang:"augment"`
 	BelongsTo    *BelongsTo      `yang:"belongs-to,required=submodule,nomerge"`
@@ -335,6 +336,7 @@ type Container struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
+	Anydata     []*AnyData   `yang:"anydata"`
 	Anyxml      []*AnyXML    `yang:"anyxml"`
 	Choice      []*Choice    `yang:"choice"`
 	Config      *Value       `yang:"config"`
@@ -442,6 +444,7 @@ type List struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
+	Anydata     []*AnyData   `yang:"anydata"`
 	Anyxml      []*AnyXML    `yang:"anyxml"`
 	Choice      []*Choice    `yang:"choice"`
 	Config      *Value       `yang:"config"`
@@ -480,6 +483,7 @@ type Choice struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
+	Anydata     []*AnyData   `yang:"anydata"`
 	Anyxml      []*AnyXML    `yang:"anyxml"`
 	Case        []*Case      `yang:"case"`
 	Config      *Value       `yang:"config"`
@@ -509,6 +513,7 @@ type Case struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
+	Anydata     []*AnyData   `yang:"anydata"`
 	Anyxml      []*AnyXML    `yang:"anyxml"`
 	Choice      []*Choice    `yang:"choice"`
 	Container   []*Container `yang:"container"`
@@ -552,6 +557,32 @@ func (s *AnyXML) NName() string         { return s.Name }
 func (s *AnyXML) Statement() *Statement { return s.Source }
 func (s *AnyXML) Exts() []*Statement    { return s.Extensions }
 
+// An AnyData is defined in: http://tools.ietf.org/html/rfc7950#section-7.10
+//
+// AnyData are only expected in YANG 1.1 modules (those with a
+// "yang-version 1.1;" statement in the module).
+type AnyData struct {
+	Name       string       `yang:"Name,nomerge"`
+	Source     *Statement   `yang:"Statement,nomerge"`
+	Parent     Node         `yang:"Parent,nomerge"`
+	Extensions []*Statement `yang:"Ext"`
+
+	Config      *Value   `yang:"config"`
+	Description *Value   `yang:"description"`
+	IfFeature   []*Value `yang:"if-feature"`
+	Mandatory   *Value   `yang:"mandatory"`
+	Must        []*Must  `yang:"must"`
+	Reference   *Value   `yang:"reference"`
+	Status      *Value   `yang:"status"`
+	When        *Value   `yang:"when"`
+}
+
+func (AnyData) Kind() string             { return "anydata" }
+func (s *AnyData) ParentNode() Node      { return s.Parent }
+func (s *AnyData) NName() string         { return s.Name }
+func (s *AnyData) Statement() *Statement { return s.Source }
+func (s *AnyData) Exts() []*Statement    { return s.Extensions }
+
 // A Grouping is defined in: http://tools.ietf.org/html/rfc6020#section-7.11
 type Grouping struct {
 	Name       string       `yang:"Name,nomerge"`
@@ -559,6 +590,7 @@ type Grouping struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
+	Anydata     []*AnyData   `yang:"anydata"`
 	Anyxml      []*AnyXML    `yang:"anyxml"`
 	Choice      []*Choice    `yang:"choice"`
 	Container   []*Container `yang:"container"`
@@ -659,6 +691,7 @@ type Input struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
+	Anydata   []*AnyData   `yang:"anydata"`
 	Anyxml    []*AnyXML    `yang:"anyxml"`
 	Choice    []*Choice    `yang:"choice"`
 	Container []*Container `yang:"container"`
@@ -685,6 +718,7 @@ type Output struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
+	Anydata   []*AnyData   `yang:"anydata"`
 	Anyxml    []*AnyXML    `yang:"anyxml"`
 	Choice    []*Choice    `yang:"choice"`
 	Container []*Container `yang:"container"`
@@ -711,6 +745,7 @@ type Notification struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
+	Anydata     []*AnyData   `yang:"anydata"`
 	Anyxml      []*AnyXML    `yang:"anyxml"`
 	Choice      []*Choice    `yang:"choice"`
 	Container   []*Container `yang:"container"`
@@ -741,6 +776,7 @@ type Augment struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
+	Anydata     []*AnyData   `yang:"anydata"`
 	Anyxml      []*AnyXML    `yang:"anyxml"`
 	Case        []*Case      `yang:"case"`
 	Choice      []*Choice    `yang:"choice"`
