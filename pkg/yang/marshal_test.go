@@ -43,15 +43,18 @@ func TestMarshalJSON(t *testing.T) {
 			Prefix: &Value{
 				Name: "ModulePrefix",
 				Source: &Statement{
-					Keyword:  "prefix",
-					Argument: "ModulePrefix",
-          HasArgument: true,
+					Keyword:     "prefix",
+					Argument:    "ModulePrefix",
+					HasArgument: true,
 				},
 			},
 			Type: &YangType{
 				Name:    "string",
 				Kind:    Ystring,
 				Default: "string-value",
+			},
+			Annotation: map[string]interface{}{
+				"fish": struct{ Side string }{"chips"},
 			},
 		},
 		want: `{
@@ -72,6 +75,11 @@ func TestMarshalJSON(t *testing.T) {
     "Name": "string",
     "Kind": 18,
     "Default": "string-value"
+  },
+  "Annotation": {
+    "fish": {
+      "Side": "chips"
+    }
   }
 }`,
 	}, {
@@ -86,9 +94,9 @@ func TestMarshalJSON(t *testing.T) {
 			Prefix: &Value{
 				Name: "ModulePrefix",
 				Source: &Statement{
-					Keyword:  "prefix",
-					Argument: "ModulePrefix",
-          HasArgument: true,
+					Keyword:     "prefix",
+					Argument:    "ModulePrefix",
+					HasArgument: true,
 				},
 			},
 			Dir: map[string]*Entry{
@@ -102,9 +110,9 @@ func TestMarshalJSON(t *testing.T) {
 					Prefix: &Value{
 						Name: "ModulePrefix",
 						Source: &Statement{
-							Keyword:  "prefix",
-							Argument: "ModulePrefix",
-              HasArgument: true,
+							Keyword:     "prefix",
+							Argument:    "ModulePrefix",
+							HasArgument: true,
 						},
 					},
 					Type: &YangType{
@@ -203,9 +211,9 @@ func TestMarshalJSON(t *testing.T) {
 				Name: "ID_ONE",
 			}},
 			Exts: []*Statement{{
-				Keyword:  "some-extension:ext",
-				Argument: "ext-value",
-        HasArgument: true,
+				Keyword:     "some-extension:ext",
+				Argument:    "ext-value",
+				HasArgument: true,
 			}},
 		},
 		want: `{
@@ -494,7 +502,7 @@ func TestParseAndMarshal(t *testing.T) {
 									}`,
 		}, {
 			name: "test.yang",
-			content:`module test {
+			content: `module test {
 											prefix "t";
 											namespace "urn:t";
 
@@ -505,7 +513,7 @@ func TestParseAndMarshal(t *testing.T) {
 												ext:foobar "marked";
 											}
 										}`,
-			}},
+		}},
 		want: map[string]string{
 			"test": `{
   "Name": "test",

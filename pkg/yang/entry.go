@@ -97,6 +97,11 @@ type Entry struct {
 
 	// Extra maps all the unsupported fields to their values
 	Extra map[string][]interface{} `json:"-"`
+
+	// Annotation stores annotated values, and is not populated by this
+	// library but rather can be used by calling code where additional
+	// information should be stored alongside the Entry.
+	Annotation map[string]interface{} `json:",omitempty"`
 }
 
 // An RPCEntry contains information related to an RPC Node.
