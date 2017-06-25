@@ -330,6 +330,7 @@ func (s *Type) Statement() *Statement { return s.Source }
 func (s *Type) Exts() []*Statement    { return s.Extensions }
 
 // A Container is defined in: http://tools.ietf.org/html/rfc6020#section-7.5
+// and http://tools.ietf.org/html/rfc7950#section-7.5 ("action" sub-statement)
 type Container struct {
 	Name       string       `yang:"Name,nomerge"`
 	Source     *Statement   `yang:"Statement,nomerge"`
@@ -337,6 +338,7 @@ type Container struct {
 	Extensions []*Statement `yang:"Ext"`
 
 	Anydata     []*AnyData   `yang:"anydata"`
+	Action      []*Action    `yang:"action"`
 	Anyxml      []*AnyXML    `yang:"anyxml"`
 	Choice      []*Choice    `yang:"choice"`
 	Config      *Value       `yang:"config"`
@@ -438,6 +440,7 @@ func (s *LeafList) Statement() *Statement { return s.Source }
 func (s *LeafList) Exts() []*Statement    { return s.Extensions }
 
 // A List is defined in: http://tools.ietf.org/html/rfc6020#section-7.8
+// and http://tools.ietf.org/html/rfc7950#section-7.8 ("action" sub-statement)
 type List struct {
 	Name       string       `yang:"Name,nomerge"`
 	Source     *Statement   `yang:"Statement,nomerge"`
@@ -445,6 +448,7 @@ type List struct {
 	Extensions []*Statement `yang:"Ext"`
 
 	Anydata     []*AnyData   `yang:"anydata"`
+	Action      []*Action    `yang:"action"`
 	Anyxml      []*AnyXML    `yang:"anyxml"`
 	Choice      []*Choice    `yang:"choice"`
 	Config      *Value       `yang:"config"`
@@ -584,6 +588,7 @@ func (s *AnyData) Statement() *Statement { return s.Source }
 func (s *AnyData) Exts() []*Statement    { return s.Extensions }
 
 // A Grouping is defined in: http://tools.ietf.org/html/rfc6020#section-7.11
+// and http://tools.ietf.org/html/rfc7950#section-7.12 ("action" sub-statement)
 type Grouping struct {
 	Name       string       `yang:"Name,nomerge"`
 	Source     *Statement   `yang:"Statement,nomerge"`
@@ -591,6 +596,7 @@ type Grouping struct {
 	Extensions []*Statement `yang:"Ext"`
 
 	Anydata     []*AnyData   `yang:"anydata"`
+	Action      []*Action    `yang:"action"`
 	Anyxml      []*AnyXML    `yang:"anyxml"`
 	Choice      []*Choice    `yang:"choice"`
 	Container   []*Container `yang:"container"`
@@ -770,6 +776,7 @@ func (s *Notification) Groupings() []*Grouping { return s.Grouping }
 func (s *Notification) Typedefs() []*Typedef   { return s.Typedef }
 
 // An Augment is defined in: http://tools.ietf.org/html/rfc6020#section-7.15
+// and http://tools.ietf.org/html/rfc7950#section-7.17 ("action" sub-statement)
 type Augment struct {
 	Name       string       `yang:"Name,nomerge"`
 	Source     *Statement   `yang:"Statement,nomerge"`
@@ -777,6 +784,7 @@ type Augment struct {
 	Extensions []*Statement `yang:"Ext"`
 
 	Anydata     []*AnyData   `yang:"anydata"`
+	Action      []*Action    `yang:"action"`
 	Anyxml      []*AnyXML    `yang:"anyxml"`
 	Case        []*Case      `yang:"case"`
 	Choice      []*Choice    `yang:"choice"`
@@ -1050,3 +1058,34 @@ func (s *Pattern) ParentNode() Node      { return s.Parent }
 func (s *Pattern) NName() string         { return s.Name }
 func (s *Pattern) Statement() *Statement { return s.Source }
 func (s *Pattern) Exts() []*Statement    { return s.Extensions }
+
+// An Action is defined in http://tools.ietf.org/html/rfc7950#section-7.15
+//
+// Action define an RPC operation connected to a specific container or list data
+// node in the schema. In the schema tree, Action differ from RPC only in where
+// in the tree they are found. RPC nodes are only found as sub-statements of a
+// Module, while Action are found only as sub-statements of Container, List,
+// Grouping and Augment nodes.
+type Action struct {
+	Name       string       `yang:"Name,nomerge"`
+	Source     *Statement   `yang:"Statement,nomerge"`
+	Parent     Node         `yang:"Parent,nomerge"`
+	Extensions []*Statement `yang:"Ext"`
+
+	Description *Value      `yang:"description"`
+	Grouping    []*Grouping `yang:"grouping"`
+	IfFeature   []*Value    `yang:"if-feature"`
+	Input       *Input      `yang:"input"`
+	Output      *Output     `yang:"output"`
+	Reference   *Value      `yang:"reference"`
+	Status      *Value      `yang:"status"`
+	Typedef     []*Typedef  `yang:"typedef"`
+}
+
+func (Action) Kind() string              { return "action" }
+func (s *Action) ParentNode() Node       { return s.Parent }
+func (s *Action) NName() string          { return s.Name }
+func (s *Action) Statement() *Statement  { return s.Source }
+func (s *Action) Exts() []*Statement     { return s.Extensions }
+func (s *Action) Groupings() []*Grouping { return s.Grouping }
+func (s *Action) Typedefs() []*Typedef   { return s.Typedef }

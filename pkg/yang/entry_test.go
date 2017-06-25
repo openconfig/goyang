@@ -827,3 +827,188 @@ func TestAnyDataAnyXML(t *testing.T) {
 		}
 	}
 }
+
+func getEntry(root *Entry, path []string) *Entry {
+	for _, elem := range path {
+		if root = root.Dir[elem]; root == nil {
+			break
+		}
+	}
+	return root
+}
+
+func TestActionRPC(t *testing.T) {
+	tests := []struct {
+		name          string
+		inModule      string
+		operationPath []string
+		wantNodeKind  string
+		wantError     string
+	}{
+		{
+			name:          "test action in container",
+			wantNodeKind:  "action",
+			operationPath: []string{"c", "operation"},
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  container c {
+    action operation {
+      description "action";
+      input { leaf string { type string; } }
+      output { leaf string { type string; } }
+    }
+  }
+}`,
+		},
+
+		{
+			name:          "test action in list",
+			wantNodeKind:  "action",
+			operationPath: []string{"list", "operation"},
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  list list {
+    action operation {
+      description "action";
+      input { leaf string { type string; } }
+      output { leaf string { type string; } }
+    }
+  }
+}`,
+		},
+
+		{
+			name:          "test action in container via grouping",
+			wantNodeKind:  "action",
+			operationPath: []string{"c", "operation"},
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  grouping g {
+    action operation {
+      description "action";
+      input { leaf string { type string; } }
+      output { leaf string { type string; } }
+    }
+  }
+  container c { uses g; }
+}`,
+		},
+
+		{
+			name:          "test action in list via grouping",
+			wantNodeKind:  "action",
+			operationPath: []string{"list", "operation"},
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  grouping g {
+    action operation {
+      description "action";
+      input { leaf string { type string; } }
+      output { leaf string { type string; } }
+    }
+  }
+  list list { uses g; }
+}`,
+		},
+
+		{
+			name:          "test rpc",
+			wantNodeKind:  "rpc",
+			operationPath: []string{"operation"},
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  rpc operation {
+    description "rpc";
+    input {
+      leaf string { type string; }
+    }
+    output {
+      leaf string { type string; }
+    }
+  }
+}`,
+		},
+
+		// test cases with errors (in module parsing)
+		{
+			name:      "rpc not module child",
+			wantError: "test:6:5: unknown container field: rpc",
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  container c {
+    // error: "rpc" is not a valid sub-statement to "container"
+    rpc operation;
+  }
+}`,
+		},
+
+		{
+			name:      "action not valid leaf child",
+			wantError: "test:6:5: unknown leaf field: action",
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  leaf l {
+    // error: "operation" is not a valid sub-statement to "leaf"
+    action operation;
+  }
+}`,
+		},
+
+		{
+			name:      "action not valid leaf-list child",
+			wantError: "test:6:5: unknown leaf-list field: action",
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  leaf-list leaf-list {
+    // error: "operation" is not a valid sub-statement to "leaf-list"
+    action operation;
+  }
+}`,
+		},
+	}
+	for _, tt := range tests {
+		ms := NewModules()
+		if err := ms.Parse(tt.inModule, "test"); err != nil {
+			if got := err.Error(); got != tt.wantError {
+				t.Errorf("%s: error parsing module 'test', got error: %q, want: %q", tt.name, got, tt.wantError)
+			}
+			continue
+		}
+
+		if errs := ms.Process(); len(errs) > 0 {
+			t.Errorf("%s: got %d module parsing errors", tt.name, len(errs))
+			for i, err := range errs {
+				t.Errorf("%s: error #%d: %v", tt.name, i, err)
+			}
+			continue
+		}
+
+		mod := ms.Modules["test"]
+		e := ToEntry(mod)
+		if e = getEntry(e, tt.operationPath); e == nil {
+			t.Errorf("%s: want child entry at: %v, got: nil", tt.name, tt.operationPath)
+			continue
+		}
+		if got := e.Node.Kind(); got != tt.wantNodeKind {
+			t.Errorf("%s: got `operation` node kind: %q, want: %q", tt.name, got, tt.wantNodeKind)
+		} else if got := e.Description; got != tt.wantNodeKind {
+			t.Errorf("%s: got `operation` Description: %q, want: %q", tt.name, got, tt.wantNodeKind)
+		}
+		// confirm the child RPCEntry was populated for the entry.
+		if e.RPC == nil {
+			t.Errorf("%s: entry at %v has nil RPC child, want: non-nil. Entry: %#v", tt.name, tt.operationPath, e)
+		} else if e.RPC.Input == nil {
+			t.Errorf("%s: RPCEntry has nil Input, want: non-nil. Entry: %#v", tt.name, e.RPC)
+		} else if e.RPC.Output == nil {
+			t.Errorf("%s: RPCEntry has nil Output, want: non-nil. Entry: %#v", tt.name, e.RPC)
+		}
+	}
+}
