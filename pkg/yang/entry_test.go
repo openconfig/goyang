@@ -1082,6 +1082,7 @@ func TestEntryFind(t *testing.T) {
 
 					leaf ctx { type string; }
 					leaf other { type string; }
+					leaf conflict { type string; }
 				}`,
 			"foo.yang": `
 				module foo {
@@ -1091,6 +1092,8 @@ func TestEntryFind(t *testing.T) {
 					container bar {
 						leaf baz { type string; }
 					}
+
+					leaf conflict { type string; }
 				}`,
 			"bar.yang": `
 				module bar {
@@ -1100,6 +1103,8 @@ func TestEntryFind(t *testing.T) {
 					container fish {
 						leaf chips { type string; }
 					}
+
+					leaf conflict { type string; }
 				}`,
 		},
 		inBaseEntryPath: "/test/ctx",
@@ -1113,6 +1118,11 @@ func TestEntryFind(t *testing.T) {
 			"/foo:bar/baz": "/foo/bar/baz",
 			// With mismatched prefixes.
 			"/baz:fish/baz:chips": "/bar/fish/chips",
+			// With conflicting node names
+			"/conflict":     "/test/conflict",
+			"/foo:conflict": "/foo/conflict",
+			"/baz:conflict": "/bar/conflict",
+			"/t:conflict":   "/test/conflict",
 		},
 	}}
 
