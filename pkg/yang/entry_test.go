@@ -1012,3 +1012,143 @@ func TestActionRPC(t *testing.T) {
 		}
 	}
 }
+
+// addTreeE takes an input Entry and appends it to a directory, keyed by path, to the Entry.
+// If the Entry has children, they are appended to the directory recursively. Used in test
+// cases where a path is to be referred to.
+func addTreeE(e *Entry, dir map[string]*Entry) {
+	for _, ch := range e.Dir {
+		dir[ch.Path()] = ch
+		if ch.Dir != nil {
+			addTreeE(ch, dir)
+		}
+	}
+}
+
+func TestEntryFind(t *testing.T) {
+	tests := []struct {
+		name            string
+		inModules       map[string]string
+		inBaseEntryPath string
+		wantEntryPath   map[string]string // keyed on path to find, with path expected as value.
+		wantError       string
+	}{{
+		name: "intra module find",
+		inModules: map[string]string{
+			"test.yang": `
+				module test {
+					prefix "t";
+					namespace "urn:t";
+
+					leaf a { type string; }
+					leaf b { type string; }
+
+					container c { leaf d { type string; } }
+				}
+			`,
+		},
+		inBaseEntryPath: "/test/a",
+		wantEntryPath: map[string]string{
+			// Absolute path with no prefixes.
+			"/b": "/test/b",
+			// Relative path with no prefixes.
+			"../b": "/test/b",
+			// Absolute path with prefixes.
+			"/t:b": "/test/b",
+			// Relative path with prefixes.
+			"../t:b": "/test/b",
+			// Find within a directory.
+			"/c/d": "/test/c/d",
+			// Find within a directory specified relatively.
+			"../c/d": "/test/c/d",
+			// Find within a relative directory with prefixes.
+			"../t:c/t:d": "/test/c/d",
+			"../t:c/d":   "/test/c/d",
+			"../c/t:d":   "/test/c/d",
+			// Find within an absolute directory with prefixes.
+			"/t:c/d": "/test/c/d",
+			"/c/t:d": "/test/c/d",
+		},
+	}, {
+		name: "inter-module find",
+		inModules: map[string]string{
+			"test.yang": `
+				module test {
+					prefix "t";
+					namespace "urn:t";
+
+					import foo { prefix foo; }
+					import bar { prefix baz; }
+
+					leaf ctx { type string; }
+					leaf other { type string; }
+				}`,
+			"foo.yang": `
+				module foo {
+					prefix "foo"; // matches the import above
+					namespace "urn:foo";
+
+					container bar {
+						leaf baz { type string; }
+					}
+				}`,
+			"bar.yang": `
+				module bar {
+					prefix "bar"; // does not match import in test
+					namespace "urn:b";
+
+					container fish {
+						leaf chips { type string; }
+					}
+				}`,
+		},
+		inBaseEntryPath: "/test/ctx",
+		wantEntryPath: map[string]string{
+			// Check we can still do intra module lookups
+			"../other":         "/test/other",
+			"/other":           "/test/other",
+			"/foo:bar/foo:baz": "/foo/bar/baz",
+			// Technically partially prefixed paths to remote modules are
+			// not legal - check whether we can resolve them.
+			"/foo:bar/baz": "/foo/bar/baz",
+			// With mismatched prefixes.
+			"/baz:fish/baz:chips": "/bar/fish/chips",
+		},
+	}}
+
+	for _, tt := range tests {
+		ms := NewModules()
+		var errs []error
+		for n, m := range tt.inModules {
+			if err := ms.Parse(m, n); err != nil {
+				errs = append(errs, err)
+			}
+		}
+
+		if len(errs) > 0 {
+			t.Errorf("%s: ms.Parse(), got unexpected error parsing input modules: %v", tt.name, errs)
+			continue
+		}
+
+		if errs := ms.Process(); len(errs) > 0 {
+			t.Errorf("%s: ms.Process(), got unexpected error processing entries: %v", tt.name, errs)
+			continue
+		}
+
+		dir := map[string]*Entry{}
+		for _, m := range ms.Modules {
+			addTreeE(ToEntry(m), dir)
+		}
+
+		if _, ok := dir[tt.inBaseEntryPath]; !ok {
+			t.Errorf("%s: could not find entry %s within the dir: %s", tt.name, tt.inBaseEntryPath, dir)
+		}
+
+		for path, want := range tt.wantEntryPath {
+			got := dir[tt.inBaseEntryPath].Find(path)
+			if got.Path() != want {
+				t.Errorf("%s: (entry %s).Find(%s), did not find path, got: %v, want: %v, errors: %v", tt.name, dir[tt.inBaseEntryPath].Path(), path, got, want, dir[tt.inBaseEntryPath].Errors)
+			}
+		}
+	}
+}
