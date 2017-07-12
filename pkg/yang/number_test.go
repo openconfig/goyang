@@ -14,7 +14,155 @@
 
 package yang
 
-import "testing"
+import (
+	"testing"
+)
+
+func errToStr(e error) string {
+	if e == nil {
+		return ""
+	}
+	return e.Error()
+}
+
+func TestNumberParse(t *testing.T) {
+	tests := []struct {
+		desc      string
+		numString string
+		want      Number
+		wantErr   string
+	}{{
+		desc:      "+ve int",
+		numString: "123",
+		want:      Number{Kind: Positive, Value: 123},
+	}, {
+		desc:      "-ve int",
+		numString: "-123",
+		want:      Number{Kind: Negative, Value: 123},
+	}, {
+		desc:      "+ve float",
+		numString: "123.123",
+		want:      Number{Kind: Positive, Value: 0, DecimalValue: Int64(123123), FractionDigits: Uint8(3)},
+	}, {
+		desc:      "-ve float",
+		numString: "-123.123",
+		want:      Number{Kind: Negative, Value: 0, DecimalValue: Int64(-123123), FractionDigits: Uint8(3)},
+	}, {
+		desc:      "bad string",
+		numString: "abc",
+		want:      Number{},
+		wantErr:   `abc is not a valid decimal number: strconv.ParseInt: parsing "abc": invalid syntax`,
+	}, {
+		desc:      "overflow ParseInt",
+		numString: "123456789123456789123456789",
+		want:      Number{},
+		wantErr:   `123456789123456789123456789 is not a valid decimal number: strconv.ParseInt: parsing "123456789123456789123456789": value out of range`,
+	}, {
+		desc:      "+ve range edge",
+		numString: "922337203685477580.7",
+		want:      Number{Kind: Positive, Value: 0, DecimalValue: Int64(9223372036854775807), FractionDigits: Uint8(1)},
+	}, {
+		desc:      "-ve range edge",
+		numString: "-922337203685477580.8",
+		want:      Number{Kind: Negative, Value: 0, DecimalValue: Int64(-9223372036854775808), FractionDigits: Uint8(1)},
+	}, {
+		desc:      "overflow range +ve, frac digits 1",
+		numString: "922337203685477580.8",
+		want:      Number{},
+		wantErr:   `922337203685477580.8 is not a valid decimal number: strconv.ParseInt: parsing "9223372036854775808": value out of range`,
+	}, {
+		desc:      "overflow range -ve, frac digits 1",
+		numString: "-922337203685477580.9",
+		want:      Number{},
+		wantErr:   `-922337203685477580.9 is not a valid decimal number: strconv.ParseInt: parsing "-9223372036854775809": value out of range`,
+	}, {
+		desc:      "overflow range +ve, frac digits 18",
+		numString: "9.223372036854775808",
+		want:      Number{},
+		wantErr:   `9.223372036854775808 is not a valid decimal number: strconv.ParseInt: parsing "9223372036854775808": value out of range`,
+	}, {
+		desc:      "overflow range -ve, frac digits 18",
+		numString: "-9.223372036854775809",
+		want:      Number{},
+		wantErr:   `-9.223372036854775809 is not a valid decimal number: strconv.ParseInt: parsing "-9223372036854775809": value out of range`,
+	}, {
+		desc:      "overflow range, frac digits 19",
+		numString: "9.2233720368547758090",
+		want:      Number{},
+		wantErr:   `9.2233720368547758090 is not a valid decimal number: strconv.ParseInt: parsing "92233720368547758090": value out of range`,
+	}}
+
+	for _, tt := range tests {
+		n, err := ParseNumber(tt.numString)
+		if got, want := errToStr(err), tt.wantErr; got != want {
+			t.Errorf("%s: got error: %v, want error: %v", tt.desc, got, want)
+		}
+		if got, want := n, tt.want; tt.wantErr == "" && !got.Equal(want) {
+			t.Errorf("%s: got: %v, want: %v", tt.desc, got, want)
+		}
+
+	}
+}
+
+func TestNumberFromFloat(t *testing.T) {
+	tests := []struct {
+		desc string
+		num  float64
+		want Number
+	}{{
+		desc: "+ve integer",
+		num:  123,
+		want: Number{Kind: Positive, Value: 0, DecimalValue: Int64(123), FractionDigits: Uint8(0)},
+	}, {
+		desc: "-ve integer",
+		num:  -123,
+		want: Number{Kind: Negative, Value: 0, DecimalValue: Int64(-123), FractionDigits: Uint8(0)},
+	}, {
+		desc: "+ve float",
+		num:  123.123,
+		want: Number{Kind: Positive, Value: 0, DecimalValue: Int64(123123), FractionDigits: Uint8(3)},
+	}, {
+		desc: "-ve float",
+		num:  -123.123,
+		want: Number{Kind: Negative, Value: 0, DecimalValue: Int64(-123123), FractionDigits: Uint8(3)},
+	}, {
+		desc: "+ve overflow",
+		num:  MaxFloat64 + 1,
+		want: maxNumber,
+	}, {
+		desc: "-ve overflow",
+		num:  -MaxFloat64 - 1,
+		want: minNumber,
+	}}
+
+	for _, tt := range tests {
+		n := FromFloat(tt.num)
+		if got, want := n, tt.want; !got.Equal(want) {
+			t.Errorf("%s: got: %s, want: %s", tt.desc, got.DebugString(), want.DebugString())
+		}
+
+	}
+}
+
+func TestNumberIsDecimal(t *testing.T) {
+	for x, tt := range []struct {
+		n  Number
+		ok bool
+	}{
+		{FromInt(42), false},
+		{FromInt(-41), false},
+		{minNumber, false},
+		{maxNumber, false},
+		{FromFloat(42.42), true},
+		{FromFloat(-42.42), true},
+		{Number{Kind: Positive, Value: 42, DecimalValue: Int64(42)}, true},
+	} {
+		ok := tt.n.IsDecimal()
+		if ok != tt.ok {
+			t.Errorf("#%d: got %v, want %v", x, ok, tt.ok)
+		}
+	}
+}
 
 func TestNumberLess(t *testing.T) {
 	for x, tt := range []struct {
@@ -40,8 +188,69 @@ func TestNumberLess(t *testing.T) {
 		{FromInt(-42), maxNumber, true},
 		{FromInt(0), maxNumber, true},
 		{FromInt(42), maxNumber, true},
+		{FromFloat(42.42), FromFloat(42.42), false},
+		{FromFloat(41.42), FromFloat(42.42), true},
+		{FromFloat(42.42), FromFloat(41.42), false},
+		{FromFloat(-10.42), FromFloat(10.42), true},
+		{FromFloat(-10.42), FromFloat(1.42), true},
+		{FromFloat(-10.42), FromFloat(-1.42), true},
+		{FromFloat(2.42), FromFloat(-1.42), false},
+		{minNumber, FromFloat(42.42), true},
+		{minNumber, FromFloat(0.42), true},
+		{minNumber, FromFloat(-42.42), true},
+		{maxNumber, FromFloat(42.42), false},
+		{maxNumber, FromFloat(0.42), false},
+		{FromFloat(-42.42), maxNumber, true},
+		{FromFloat(0.42), maxNumber, true},
+		{FromFloat(42.42), maxNumber, true},
 	} {
 		ok := tt.n1.Less(tt.n2)
+		if ok != tt.ok {
+			t.Errorf("#%d: got %v, want %v", x, ok, tt.ok)
+		}
+	}
+}
+
+func TestNumberEqual(t *testing.T) {
+	for x, tt := range []struct {
+		n1, n2 Number
+		ok     bool
+	}{
+		{FromInt(42), FromInt(42), true},
+		{FromInt(41), FromInt(42), false},
+		{FromInt(42), FromInt(41), false},
+		{FromInt(-10), FromInt(-10), true},
+		{FromInt(-10), FromInt(1), false},
+		{FromInt(0), FromInt(0), true},
+		{minNumber, minNumber, true},
+		{minNumber, maxNumber, false},
+		{minNumber, FromInt(42), false},
+		{minNumber, FromInt(0), false},
+		{minNumber, FromInt(-42), false},
+		{maxNumber, maxNumber, true},
+		{maxNumber, minNumber, false},
+		{maxNumber, FromInt(42), false},
+		{maxNumber, FromInt(0), false},
+		{FromInt(-42), maxNumber, false},
+		{FromInt(0), maxNumber, false},
+		{FromInt(42), maxNumber, false},
+		{FromFloat(42.42), FromFloat(42.42), true},
+		{FromFloat(41.42), FromFloat(42.42), false},
+		{FromFloat(-10.42), FromFloat(10.42), false},
+		{FromFloat(-10.42), FromFloat(-10.42), true},
+		{FromFloat(-10.42), FromFloat(1.42), false},
+		{FromFloat(-10.42), FromFloat(-1.42), false},
+		{FromFloat(2.42), FromFloat(-1.42), false},
+		{minNumber, FromFloat(42.42), false},
+		{minNumber, FromFloat(0.42), false},
+		{minNumber, FromFloat(-42.42), false},
+		{maxNumber, FromFloat(42.42), false},
+		{maxNumber, FromFloat(0.42), false},
+		{FromFloat(-42.42), maxNumber, false},
+		{FromFloat(0.42), maxNumber, false},
+		{FromFloat(42.42), maxNumber, false},
+	} {
+		ok := tt.n1.Equal(tt.n2)
 		if ok != tt.ok {
 			t.Errorf("#%d: got %v, want %v", x, ok, tt.ok)
 		}
@@ -54,10 +263,10 @@ func TestNumberAdd(t *testing.T) {
 		add uint64
 		out Number
 	}{
-		{Number{Positive, 0}, 1, Number{Positive, 1}},
-		{Number{Negative, 1}, 1, Number{Positive, 0}},
-		{Number{Positive, 5}, 12, Number{Positive, 17}},
-		{Number{Negative, 3}, 10, Number{Positive, 7}},
+		{Number{Positive, 0, nil, nil}, 1, Number{Positive, 1, nil, nil}},
+		{Number{Negative, 1, nil, nil}, 1, Number{Positive, 0, nil, nil}},
+		{Number{Positive, 5, nil, nil}, 12, Number{Positive, 17, nil, nil}},
+		{Number{Negative, 3, nil, nil}, 10, Number{Positive, 7, nil, nil}},
 	} {
 		out := tt.in.add(tt.add)
 		if !out.Equal(tt.out) {
