@@ -1162,3 +1162,125 @@ func TestEntryFind(t *testing.T) {
 		}
 	}
 }
+
+func TestEntryTypes(t *testing.T) {
+	leafSchema := &Entry{Name: "leaf-schema", Kind: LeafEntry, Type: &YangType{Kind: Ystring}}
+
+	containerSchema := &Entry{
+		Name: "container-schema",
+		Kind: DirectoryEntry,
+		Dir: map[string]*Entry{
+			"config": {
+				Dir: map[string]*Entry{
+					"leaf1": {
+						Kind: LeafEntry,
+						Name: "Leaf1Name",
+						Type: &YangType{Kind: Ystring},
+					},
+				},
+			},
+		},
+	}
+
+	leafListSchema := &Entry{
+		Kind:     LeafEntry,
+		ListAttr: &ListAttr{MinElements: &Value{Name: "0"}},
+		Type:     &YangType{Kind: Ystring},
+		Name:     "leaf-list-schema",
+	}
+
+	listSchema := &Entry{
+		Name:     "list-schema",
+		Kind:     DirectoryEntry,
+		ListAttr: &ListAttr{MinElements: &Value{Name: "0"}},
+		Dir: map[string]*Entry{
+			"leaf-name": {
+				Kind: LeafEntry,
+				Name: "LeafName",
+				Type: &YangType{Kind: Ystring},
+			},
+		},
+	}
+
+	choiceSchema := &Entry{
+		Kind: ChoiceEntry,
+		Name: "Choice1Name",
+		Dir: map[string]*Entry{
+			"case1": {
+				Kind: CaseEntry,
+				Name: "case1",
+				Dir: map[string]*Entry{
+					"case1-leaf1": &Entry{
+						Kind: LeafEntry,
+						Name: "Case1Leaf1",
+						Type: &YangType{Kind: Ystring},
+					},
+				},
+			},
+		},
+	}
+
+	type SchemaType string
+	const (
+		Leaf      SchemaType = "Leaf"
+		Container SchemaType = "Container"
+		LeafList  SchemaType = "LeafList"
+		List      SchemaType = "List"
+		Choice    SchemaType = "Choice"
+		Case      SchemaType = "Case"
+	)
+
+	tests := []struct {
+		desc     string
+		schema   *Entry
+		wantType SchemaType
+	}{
+		{
+			desc:     "leaf",
+			schema:   leafSchema,
+			wantType: Leaf,
+		},
+		{
+			desc:     "container",
+			schema:   containerSchema,
+			wantType: Container,
+		},
+		{
+			desc:     "leaf-list",
+			schema:   leafListSchema,
+			wantType: LeafList,
+		},
+		{
+			desc:     "list",
+			schema:   listSchema,
+			wantType: List,
+		},
+		{
+			desc:     "choice",
+			schema:   choiceSchema,
+			wantType: Choice,
+		},
+		{
+			desc:     "case",
+			schema:   choiceSchema.Dir["case1"],
+			wantType: Case,
+		},
+	}
+
+	for _, tt := range tests {
+		gotm := map[SchemaType]bool{
+			Leaf:      tt.schema.IsLeaf(),
+			Container: tt.schema.IsContainer(),
+			LeafList:  tt.schema.IsLeafList(),
+			List:      tt.schema.IsList(),
+			Choice:    tt.schema.IsChoice(),
+			Case:      tt.schema.IsCase(),
+		}
+
+		for stype, got := range gotm {
+			if want := (stype == tt.wantType); got != want {
+				t.Errorf("%s: got Is%v? %t, want Is%v? %t", tt.desc, stype, got, stype, want)
+			}
+		}
+	}
+}
