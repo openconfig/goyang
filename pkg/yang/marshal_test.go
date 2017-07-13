@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/kylelemons/godebug/pretty"
+	"google3/third_party/golang/godebug/pretty/pretty"
 )
 
 func TestMarshalJSON(t *testing.T) {
@@ -166,11 +166,13 @@ func TestMarshalJSON(t *testing.T) {
               {
                 "Min": {
                   "Kind": 0,
-                  "Value": 10
+                  "Value": 10,
+                  "FractionDigits": 0
                 },
                 "Max": {
                   "Kind": 0,
-                  "Value": 20
+                  "Value": 20,
+                  "FractionDigits": 0
                 }
               }
             ],
@@ -380,11 +382,13 @@ func TestParseAndMarshal(t *testing.T) {
                   {
                     "Min": {
                       "Kind": 0,
-                      "Value": 10
+                      "Value": 10,
+                      "FractionDigits": 0
                     },
                     "Max": {
                       "Kind": 0,
-                      "Value": 10
+                      "Value": 10,
+                      "FractionDigits": 0
                     }
                   }
                 ]
@@ -419,11 +423,13 @@ func TestParseAndMarshal(t *testing.T) {
               {
                 "Min": {
                   "Kind": 2,
-                  "Value": 0
+                  "Value": 0,
+                  "FractionDigits": 0
                 },
                 "Max": {
                   "Kind": 3,
-                  "Value": 0
+                  "Value": 0,
+                  "FractionDigits": 0
                 }
               }
             ]

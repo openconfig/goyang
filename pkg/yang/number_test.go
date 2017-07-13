@@ -42,11 +42,11 @@ func TestNumberParse(t *testing.T) {
 	}, {
 		desc:      "+ve float",
 		numString: "123.123",
-		want:      Number{Kind: Positive, Value: 0, DecimalValue: Int64(123123), FractionDigits: Uint8(3)},
+		want:      Number{Kind: Positive, Value: 123123, FractionDigits: 3},
 	}, {
 		desc:      "-ve float",
 		numString: "-123.123",
-		want:      Number{Kind: Negative, Value: 0, DecimalValue: Int64(-123123), FractionDigits: Uint8(3)},
+		want:      Number{Kind: Negative, Value: 123123, FractionDigits: 3},
 	}, {
 		desc:      "bad string",
 		numString: "abc",
@@ -60,11 +60,11 @@ func TestNumberParse(t *testing.T) {
 	}, {
 		desc:      "+ve range edge",
 		numString: "922337203685477580.7",
-		want:      Number{Kind: Positive, Value: 0, DecimalValue: Int64(9223372036854775807), FractionDigits: Uint8(1)},
+		want:      Number{Kind: Positive, Value: 9223372036854775807, FractionDigits: 1},
 	}, {
 		desc:      "-ve range edge",
 		numString: "-922337203685477580.8",
-		want:      Number{Kind: Negative, Value: 0, DecimalValue: Int64(-9223372036854775808), FractionDigits: Uint8(1)},
+		want:      Number{Kind: Negative, Value: 9223372036854775808, FractionDigits: 1},
 	}, {
 		desc:      "overflow range +ve, frac digits 1",
 		numString: "922337203685477580.8",
@@ -112,26 +112,34 @@ func TestNumberFromFloat(t *testing.T) {
 	}{{
 		desc: "+ve integer",
 		num:  123,
-		want: Number{Kind: Positive, Value: 0, DecimalValue: Int64(123), FractionDigits: Uint8(0)},
+		want: Number{Kind: Positive, Value: 123},
 	}, {
 		desc: "-ve integer",
 		num:  -123,
-		want: Number{Kind: Negative, Value: 0, DecimalValue: Int64(-123), FractionDigits: Uint8(0)},
+		want: Number{Kind: Negative, Value: 123},
 	}, {
 		desc: "+ve float",
 		num:  123.123,
-		want: Number{Kind: Positive, Value: 0, DecimalValue: Int64(123123), FractionDigits: Uint8(3)},
+		want: Number{Kind: Positive, Value: 123123, FractionDigits: 3},
 	}, {
 		desc: "-ve float",
 		num:  -123.123,
-		want: Number{Kind: Negative, Value: 0, DecimalValue: Int64(-123123), FractionDigits: Uint8(3)},
+		want: Number{Kind: Negative, Value: 123123, FractionDigits: 3},
+	}, {
+		desc: "+ve max",
+		num:  float64(MaxInt64),
+		want: Number{Kind: Positive, Value: 9223372036854775808},
+	}, {
+		desc: "-ve max",
+		num:  float64(MinInt64),
+		want: Number{Kind: Negative, Value: 9223372036854775808},
 	}, {
 		desc: "+ve overflow",
-		num:  MaxFloat64 + 1,
+		num:  999e99,
 		want: maxNumber,
 	}, {
 		desc: "-ve overflow",
-		num:  -MaxFloat64 - 1,
+		num:  -999e99,
 		want: minNumber,
 	}}
 
@@ -155,7 +163,7 @@ func TestNumberIsDecimal(t *testing.T) {
 		{maxNumber, false},
 		{FromFloat(42.42), true},
 		{FromFloat(-42.42), true},
-		{Number{Kind: Positive, Value: 42, DecimalValue: Int64(42)}, true},
+		{Number{Kind: Positive, Value: 42}, false},
 	} {
 		ok := tt.n.IsDecimal()
 		if ok != tt.ok {
@@ -191,6 +199,8 @@ func TestNumberLess(t *testing.T) {
 		{FromFloat(42.42), FromFloat(42.42), false},
 		{FromFloat(41.42), FromFloat(42.42), true},
 		{FromFloat(42.42), FromFloat(41.42), false},
+		{FromFloat(42.42), FromFloat(42.421), true},
+		{FromFloat(41.421), FromFloat(42.42), true},
 		{FromFloat(-10.42), FromFloat(10.42), true},
 		{FromFloat(-10.42), FromFloat(1.42), true},
 		{FromFloat(-10.42), FromFloat(-1.42), true},
@@ -203,6 +213,12 @@ func TestNumberLess(t *testing.T) {
 		{FromFloat(-42.42), maxNumber, true},
 		{FromFloat(0.42), maxNumber, true},
 		{FromFloat(42.42), maxNumber, true},
+		{FromInt(42), FromFloat(42), false},
+		{FromInt(41), FromFloat(42), true},
+		{FromInt(42), FromFloat(42.42), true},
+		{FromInt(-42), FromFloat(-42), false},
+		{FromInt(-42), FromFloat(-41), true},
+		{FromInt(-42), FromFloat(-42.42), false},
 	} {
 		ok := tt.n1.Less(tt.n2)
 		if ok != tt.ok {
@@ -263,10 +279,10 @@ func TestNumberAdd(t *testing.T) {
 		add uint64
 		out Number
 	}{
-		{Number{Positive, 0, nil, nil}, 1, Number{Positive, 1, nil, nil}},
-		{Number{Negative, 1, nil, nil}, 1, Number{Positive, 0, nil, nil}},
-		{Number{Positive, 5, nil, nil}, 12, Number{Positive, 17, nil, nil}},
-		{Number{Negative, 3, nil, nil}, 10, Number{Positive, 7, nil, nil}},
+		{Number{Positive, 0, 0}, 1, Number{Positive, 1, 0}},
+		{Number{Negative, 1, 0}, 1, Number{Positive, 0, 0}},
+		{Number{Positive, 5, 0}, 12, Number{Positive, 17, 0}},
+		{Number{Negative, 3, 0}, 10, Number{Positive, 7, 0}},
 	} {
 		out := tt.in.add(tt.add)
 		if !out.Equal(tt.out) {

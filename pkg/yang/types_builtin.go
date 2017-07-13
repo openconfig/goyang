@@ -451,14 +451,13 @@ var (
 )
 
 const (
-	MaxInt64                = 1<<63 - 1        // maximum value of a signed int64
-	MinInt64                = -1 << 63         // minimum value of a signed int64
-	AbsMinInt64             = 1 << 63          // the absolute value of MinInt64
-	MaxEnum                 = 1<<31 - 1        // maximum value of an enum
-	MinEnum                 = -1 << 31         // minimum value of an enum
-	MaxBitfieldSize         = 1 << 32          // maximum number of bits in a bitfield
-	MaxFractionDigits uint8 = 18               // maximum fractional digits per Section 9.3.4
-	MaxFloat64              = float64(1 << 48) // maximum absolute float64 that can be converted to decimal
+	MaxInt64                = 1<<63 - 1 // maximum value of a signed int64
+	MinInt64                = -1 << 63  // minimum value of a signed int64
+	AbsMinInt64             = 1 << 63   // the absolute value of MinInt64
+	MaxEnum                 = 1<<31 - 1 // maximum value of an enum
+	MinEnum                 = -1 << 31  // minimum value of an enum
+	MaxBitfieldSize         = 1 << 32   // maximum number of bits in a bitfield
+	MaxFractionDigits uint8 = 18        // maximum fractional digits per Section 9.3.4
 )
 
 type NumberKind int
@@ -473,18 +472,12 @@ const (
 // A Number is either an integer the range of [-(1<<64) - 1, (1<<64)-1], or a
 // YANG decimal conforming to https://tools.ietf.org/html/rfc6020#section-9.3.4.
 type Number struct {
-	// Kind is the kind of number (+/-ve, min/max). Applies to both integer and
-	// decimal numbers.
+	// Kind is the kind of number (+/-ve, min/max).
 	Kind NumberKind
-	// Value is the absolute value of the number, if it is an integer.
+	// Absolute value of the number.
 	Value uint64
-	// DecimalValue is the signed value of the number if it is a decimal, or nil
-	// if it is not.
-	// Decimals are represented as int64 where FractionDigits indicates the
-	// number of fractional digits.
-	DecimalValue *int64 `json:",omitempty"`
-	// Number of fractional digits in DecimalValue, if DecimalValue is non-nil.
-	FractionDigits *uint8 `json:",omitempty"`
+	// Number of fractional digits.
+	FractionDigits uint8
 }
 
 var maxNumber = Number{Kind: MaxNumber}
@@ -492,7 +485,7 @@ var minNumber = Number{Kind: MinNumber}
 
 // IsDecimal reports whether n is a decimal number.
 func (n Number) IsDecimal() bool {
-	return n.DecimalValue != nil
+	return n.FractionDigits != 0
 }
 
 // FromInt creates a Number from an int64.
@@ -509,24 +502,27 @@ func FromUint(i uint64) Number {
 }
 
 // FromFloat creates a Number from a float64. Input values with absolute value
-// larger than MaxFloat64 are converted into maxNumber or minNumber.
+// larger than MaxInt64/MinInt64 are converted into maxNumber/minNumber.
 func FromFloat(f float64) Number {
-	if f > MaxFloat64 {
+	if f > float64(MaxInt64) {
 		return maxNumber
 	}
-	if f < -MaxFloat64 {
+	if f < float64(MinInt64) {
 		return minNumber
 	}
 	var fracDig uint8
 	for ; Frac(f) != 0.0 && fracDig <= MaxFractionDigits; fracDig++ {
 		f *= 10.0
 	}
-	v := int64(f)
-
-	n := Number{Kind: Positive, DecimalValue: Int64(v), FractionDigits: Uint8(fracDig)}
-	if v < 0 {
-		n.Kind = Negative
+	v := uint64(f)
+	kind := Positive
+	if f < 0 {
+		kind = Negative
+		v = -v
 	}
+
+	n := Number{Kind: kind, Value: v, FractionDigits: fracDig}
+
 	return n
 }
 
@@ -559,46 +555,46 @@ func ParseNumber(s string) (n Number, err error) {
 		return n, nil
 	}
 
-	n.DecimalValue, n.FractionDigits, err = DecimalValueFromString(s, -1)
-	return n, err
+	return DecimalValueFromString(s, -1)
 }
 
-// DecimalValueFromString returns an int64 representation of numStr and uint8
-// representation of the number of its fractional digits.
+// DecimalValueFromString returns a decimal Number representation of inStr.
 // If fracDigRequired is >= 0, the number is represented with fracDigRequired
 // fractional digits, regardless of the precision of numStr, otherwise the
 // precision of numStr is used to set the number of fractional digits.
-// numStr must conform to Section 9.3.
-func DecimalValueFromString(numStr string, fracDigRequired int) (n *int64, fracDig *uint8, err error) {
+// numStr must conform to Section 9.3.4.
+func DecimalValueFromString(numStr string, fracDigRequired int) (n Number, err error) {
 	s := numStr
-	decCount := strings.Count(s, ".")
-	var fd int
-	switch decCount {
-	case 0:
-	case 1:
-		fd = len(s) - 1 - strings.Index(s, ".")
-		if fracDigRequired < 0 {
-			fracDigRequired = fd
-		}
-		if fd > fracDigRequired {
-			return nil, nil, fmt.Errorf("%s has too much precision, expect <= %d fractional digits", s, fracDigRequired)
-		}
-	default:
-		return nil, nil, fmt.Errorf("%s is not a valid decimal number", s)
+	dx := strings.Index(s, ".")
+	fracDig := 0
+	if dx > 0 {
+		fracDig = len(s) - 1 - dx
+		// remove first decimal, if dx > 1, will fail ParseInt below
+		s = s[:dx] + s[dx+1:]
+	}
+	if fracDigRequired < 0 {
+		fracDigRequired = fracDig
+	}
+	if fracDig > fracDigRequired {
+		return n, fmt.Errorf("%s has too much precision, expect <= %d fractional digits", s, fracDigRequired)
 	}
 
-	for i := 0; i < fracDigRequired-fd; i++ {
+	for i := 0; i < fracDigRequired-fracDig; i++ {
 		s += "0"
 	}
 
-	s = strings.Replace(s, ".", "", 1)
-
 	v, err := strconv.ParseInt(s, 0, 64)
 	if err != nil {
-		return nil, nil, fmt.Errorf("%s is not a valid decimal number: %s", numStr, err)
+		return n, fmt.Errorf("%s is not a valid decimal number: %s", numStr, err)
 	}
 
-	return Int64(v), Uint8(uint8(fd)), nil
+	kind := Positive
+	if v < 0 {
+		kind = Negative
+		v = -v
+	}
+
+	return Number{Kind: kind, Value: uint64(v), FractionDigits: uint8(fracDig)}, nil
 }
 
 // String returns n as a string in decimal.
@@ -612,30 +608,29 @@ func (n Number) String() string {
 	case MaxNumber:
 		return "max"
 	}
+
+	out += strconv.FormatUint(n.Value, 10)
+
 	if n.IsDecimal() {
-		t := strconv.FormatInt(*n.DecimalValue, 10)
-		fd := int(*n.FractionDigits)
+		fd := int(n.FractionDigits)
 		if fd > 0 {
-			return t[:len(t)-fd] + "." + t[len(t)-fd:]
+			out = out[:len(out)-fd] + "." + out[len(out)-fd:]
 		}
-		return t
 	}
-	return out + strconv.FormatUint(n.Value, 10)
+
+	return out
 }
 
 // DebugString returns n's internal represenatation as a string.
 func (n Number) DebugString() string {
-	if n.IsDecimal() {
-		return fmt.Sprintf("{%v, %d, %d, %d}", n.Kind, n.Value, *n.DecimalValue, *n.FractionDigits)
-	}
-	return fmt.Sprintf("{%v, %d, %p, %p}", n.Kind, n.Value, n.DecimalValue, n.FractionDigits)
+	return fmt.Sprintf("%v", n)
 }
 
 // Int returns n as an int64.  It returns an error if n overflows an int64 or
 // the number is decimal.
 func (n Number) Int() (int64, error) {
 	if n.IsDecimal() {
-		return 0, errors.New("cannot call Int() on floating point number")
+		return 0, errors.New("cannot call Int() on decimal number")
 	}
 	switch n.Kind {
 	case MinNumber:
@@ -703,20 +698,17 @@ func (n Number) Less(m Number) bool {
 		return false
 	}
 
-	if n.IsDecimal() != m.IsDecimal() {
-		panic(fmt.Sprintf("Less with decimal vs. integer (%v, %v) not supported", m, n))
-	}
+	// Normalize into a common representation dictated by the largest number of
+	// fraction digits in either number. Values can be compared directly in this
+	// representation.
+	maxfd := max(n.FractionDigits, m.FractionDigits)
+	nd, md := n.toDecimal(maxfd), m.toDecimal(maxfd)
 
-	if n.IsDecimal() {
-		return *n.DecimalValue < *m.DecimalValue
-	}
-
-	// Not decimal, compare int value fields.
 	switch n.Kind {
 	case Negative:
-		return n.Value > m.Value
+		return nd.Value > md.Value
 	case Positive:
-		return n.Value < m.Value
+		return nd.Value < md.Value
 	default:
 	}
 	panic("Less with unknown number type")
@@ -725,6 +717,15 @@ func (n Number) Less(m Number) bool {
 // Equal returns true if n is equal to m.
 func (n Number) Equal(m Number) bool {
 	return !n.Less(m) && !m.Less(n)
+}
+
+// toDecimal returns n represented internally with fracDigits fractional digits.
+func (n Number) toDecimal(fracDigits uint8) Number {
+	if fracDigits > MaxFractionDigits {
+		return Number{Kind: n.Kind, Value: 0, FractionDigits: MaxFractionDigits}
+	}
+
+	return Number{Kind: n.Kind, Value: n.Value * uint64(math.Pow10(int(fracDigits-n.FractionDigits))), FractionDigits: fracDigits}
 }
 
 // YRange is a single range of consecutive numbers, inclusive.
@@ -926,8 +927,9 @@ func Frac(f float64) float64 {
 	return f - math.Trunc(f)
 }
 
-// Int64 takes a int64 argument, f, and returns a pointer to it.
-func Int64(f int64) *int64 { return &f }
-
-// Uint8 takes a uint8 argument, f, and returns a pointer to it.
-func Uint8(f uint8) *uint8 { return &f }
+func max(a, b uint8) uint8 {
+	if a > b {
+		return a
+	}
+	return b
+}
