@@ -44,6 +44,10 @@ func TestNumberParse(t *testing.T) {
 		numString: "123.123",
 		want:      Number{Kind: Positive, Value: 123123, FractionDigits: 3},
 	}, {
+		desc:      "+ve float, no leading 0",
+		numString: ".123",
+		want:      Number{Kind: Positive, Value: 123, FractionDigits: 3},
+	}, {
 		desc:      "-ve float",
 		numString: "-123.123",
 		want:      Number{Kind: Negative, Value: 123123, FractionDigits: 3},
@@ -205,6 +209,8 @@ func TestNumberLess(t *testing.T) {
 		{FromFloat(-10.42), FromFloat(1.42), true},
 		{FromFloat(-10.42), FromFloat(-1.42), true},
 		{FromFloat(2.42), FromFloat(-1.42), false},
+		{FromFloat(1234567890), FromFloat(0.123456789), false},
+		{FromFloat(-1234567890), FromFloat(0.123456789), true},
 		{minNumber, FromFloat(42.42), true},
 		{minNumber, FromFloat(0.42), true},
 		{minNumber, FromFloat(-42.42), true},
@@ -219,6 +225,14 @@ func TestNumberLess(t *testing.T) {
 		{FromInt(-42), FromFloat(-42), false},
 		{FromInt(-42), FromFloat(-41), true},
 		{FromInt(-42), FromFloat(-42.42), false},
+		{Number{Kind: Positive, Value: 9223372036854775807, FractionDigits: 0},
+			Number{Kind: Positive, Value: 9223372036854775807, FractionDigits: 18}, false},
+		{Number{Kind: Negative, Value: 9223372036854775808, FractionDigits: 0},
+			Number{Kind: Positive, Value: 9223372036854775808, FractionDigits: 18}, true},
+		{Number{Kind: Positive, Value: 9223372036854775807, FractionDigits: 1},
+			Number{Kind: Positive, Value: 9223372036854775807, FractionDigits: 18}, false},
+		{Number{Kind: Negative, Value: 9223372036854775808, FractionDigits: 1},
+			Number{Kind: Positive, Value: 9223372036854775808, FractionDigits: 18}, true},
 	} {
 		ok := tt.n1.Less(tt.n2)
 		if ok != tt.ok {

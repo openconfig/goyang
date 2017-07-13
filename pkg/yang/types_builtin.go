@@ -564,10 +564,14 @@ func ParseNumber(s string) (n Number, err error) {
 // precision of numStr is used to set the number of fractional digits.
 // numStr must conform to Section 9.3.4.
 func DecimalValueFromString(numStr string, fracDigRequired int) (n Number, err error) {
+	if fracDigRequired > int(MaxFractionDigits) {
+		return n, fmt.Errorf("too many fraction digits %d > max of %d", fracDigRequired, MaxFractionDigits)
+	}
+
 	s := numStr
 	dx := strings.Index(s, ".")
 	fracDig := 0
-	if dx > 0 {
+	if dx >= 0 {
 		fracDig = len(s) - 1 - dx
 		// remove first decimal, if dx > 1, will fail ParseInt below
 		s = s[:dx] + s[dx+1:]
@@ -579,9 +583,7 @@ func DecimalValueFromString(numStr string, fracDigRequired int) (n Number, err e
 		return n, fmt.Errorf("%s has too much precision, expect <= %d fractional digits", s, fracDigRequired)
 	}
 
-	for i := 0; i < fracDigRequired-fracDig; i++ {
-		s += "0"
-	}
+	s += "000000000000000000"[:fracDigRequired-fracDig]
 
 	v, err := strconv.ParseInt(s, 0, 64)
 	if err != nil {
@@ -623,14 +625,15 @@ func (n Number) String() string {
 
 // DebugString returns n's internal represenatation as a string.
 func (n Number) DebugString() string {
-	return fmt.Sprintf("%v", n)
+	return fmt.Sprintf("{%v, %d, %d}", n.Kind, n.Value,  n.FractionDigits)
 }
 
 // Int returns n as an int64.  It returns an error if n overflows an int64 or
 // the number is decimal.
 func (n Number) Int() (int64, error) {
+	nv := n.Value
 	if n.IsDecimal() {
-		return 0, errors.New("cannot call Int() on decimal number")
+		nv = n.Value / uint64(math.Pow10(int(n.FractionDigits)))
 	}
 	switch n.Kind {
 	case MinNumber:
@@ -639,14 +642,14 @@ func (n Number) Int() (int64, error) {
 		return MaxInt64, nil
 	case Negative:
 		switch {
-		case n.Value == AbsMinInt64:
+		case nv == AbsMinInt64:
 			return MinInt64, nil
-		case n.Value < AbsMinInt64:
-			return -int64(n.Value), nil
+		case nv < AbsMinInt64:
+			return -int64(nv), nil
 		}
 	case Positive:
 		if n.Value <= MaxInt64 {
-			return int64(n.Value), nil
+			return int64(nv), nil
 		}
 		return 0, errors.New("signed integer overflow")
 	default:
@@ -698,20 +701,21 @@ func (n Number) Less(m Number) bool {
 		return false
 	}
 
-	// Normalize into a common representation dictated by the largest number of
-	// fraction digits in either number. Values can be compared directly in this
-	// representation.
-	maxfd := max(n.FractionDigits, m.FractionDigits)
-	nd, md := n.toDecimal(maxfd), m.toDecimal(maxfd)
-
-	switch n.Kind {
-	case Negative:
-		return nd.Value > md.Value
-	case Positive:
-		return nd.Value < md.Value
-	default:
+	nt, mt := n.Trunc(), m.Trunc()
+	nf, mf := n.Frac(), m.Frac()
+	
+	lt := nt < mt
+	if nt == mt {
+		if nf == mf {
+			return false
+		}
+		lt = nf < mf
 	}
-	panic("Less with unknown number type")
+
+	if n.Kind == Negative {
+		return !lt
+	}
+	return lt
 }
 
 // Equal returns true if n is equal to m.
@@ -719,13 +723,18 @@ func (n Number) Equal(m Number) bool {
 	return !n.Less(m) && !m.Less(n)
 }
 
-// toDecimal returns n represented internally with fracDigits fractional digits.
-func (n Number) toDecimal(fracDigits uint8) Number {
-	if fracDigits > MaxFractionDigits {
-		return Number{Kind: n.Kind, Value: 0, FractionDigits: MaxFractionDigits}
-	}
+// Trunc returns the whole part of abs(n) as a signed integer.
+func (n Number) Trunc() uint64 {
+	nv := n.Value
+	e := uint64(pow10(n.FractionDigits))
+	return nv / e
+}
 
-	return Number{Kind: n.Kind, Value: n.Value * uint64(math.Pow10(int(fracDigits-n.FractionDigits))), FractionDigits: fracDigits}
+// Frac returns the fractional part of abs(n) as a signed integer.
+func (n Number) Frac() uint64 {
+	nv := n.Value
+	e := uint64(pow10(n.FractionDigits))
+	return nv - n.Trunc()*e
 }
 
 // YRange is a single range of consecutive numbers, inclusive.
@@ -927,9 +936,11 @@ func Frac(f float64) float64 {
 	return f - math.Trunc(f)
 }
 
-func max(a, b uint8) uint8 {
-	if a > b {
-		return a
-	}
-	return b
+// pow10 returns 10^e without checking for overflow.
+func pow10(e uint8) uint64 {
+	var out uint64 = 1
+	for i := uint8(0); i < e; i++ {
+		out *= 10
+	} 
+	return out
 }
