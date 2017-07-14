@@ -699,7 +699,7 @@ func (n Number) Less(m Number) bool {
 	nt, mt := n.Trunc(), m.Trunc()
 	lt := nt < mt
 	if nt == mt {
-		nf, mf := n.Frac(), m.Frac()
+		nf, mf := n.normalizedFrac(m), m.normalizedFrac(n)
 		if nf == mf {
 			return false
 		}
@@ -724,11 +724,23 @@ func (n Number) Trunc() uint64 {
 	return nv / e
 }
 
-// Frac returns the fractional part of abs(n) as a signed integer.
-func (n Number) Frac() uint64 {
+// normalizedFrac returns the fractional part of abs(n) as a signed integer,
+// normalized to the same number of decimal places as other e.g.
+//   n, m := 1.1, 1.05
+//   n.normalizedFrac(m) == 10
+//   m.normalizedFrac(n) == 5
+func (n Number) normalizedFrac(other Number) uint64 {
+	m := uint64(1)
+	d := int(other.FractionDigits) - int(n.FractionDigits)
+	if d > 0 {
+		m = pow10(uint8(d))
+	}
+
 	nv := n.Value
 	e := pow10(n.FractionDigits)
-	return nv - n.Trunc()*e
+	nfrac := nv - n.Trunc()*e
+
+	return m * nfrac
 }
 
 // YRange is a single range of consecutive numbers, inclusive.
