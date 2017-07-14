@@ -15,9 +15,17 @@
 package yang
 
 import (
+	"fmt"
 	"testing"
 )
 
+// DebugString returns n's internal represenatation as a string.
+func (n Number) DebugString() string {
+	return fmt.Sprintf("{%v, %d, %d}", n.Kind, n.Value, n.FractionDigits)
+}
+
+// errToStr outputs e's error string if it is not-nil, or an empty string
+// otherwise.
 func errToStr(e error) string {
 	if e == nil {
 		return ""

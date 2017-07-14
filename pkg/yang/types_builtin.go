@@ -623,11 +623,6 @@ func (n Number) String() string {
 	return out
 }
 
-// DebugString returns n's internal represenatation as a string.
-func (n Number) DebugString() string {
-	return fmt.Sprintf("{%v, %d, %d}", n.Kind, n.Value,  n.FractionDigits)
-}
-
 // Int returns n as an int64.  It returns an error if n overflows an int64 or
 // the number is decimal.
 func (n Number) Int() (int64, error) {
@@ -702,10 +697,9 @@ func (n Number) Less(m Number) bool {
 	}
 
 	nt, mt := n.Trunc(), m.Trunc()
-	nf, mf := n.Frac(), m.Frac()
-	
 	lt := nt < mt
 	if nt == mt {
+		nf, mf := n.Frac(), m.Frac()
 		if nf == mf {
 			return false
 		}
@@ -726,14 +720,14 @@ func (n Number) Equal(m Number) bool {
 // Trunc returns the whole part of abs(n) as a signed integer.
 func (n Number) Trunc() uint64 {
 	nv := n.Value
-	e := uint64(pow10(n.FractionDigits))
+	e := pow10(n.FractionDigits)
 	return nv / e
 }
 
 // Frac returns the fractional part of abs(n) as a signed integer.
 func (n Number) Frac() uint64 {
 	nv := n.Value
-	e := uint64(pow10(n.FractionDigits))
+	e := pow10(n.FractionDigits)
 	return nv - n.Trunc()*e
 }
 
@@ -941,6 +935,6 @@ func pow10(e uint8) uint64 {
 	var out uint64 = 1
 	for i := uint8(0); i < e; i++ {
 		out *= 10
-	} 
+	}
 	return out
 }
