@@ -20,6 +20,7 @@ package yang
 import (
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -450,12 +451,13 @@ var (
 )
 
 const (
-	MaxInt64        = 1<<63 - 1 // maximum value of a signed int64
-	MinInt64        = -1 << 63  // minimum value of a signed int64
-	AbsMinInt64     = 1 << 63   // the absolute value of MinInt64
-	MaxEnum         = 1<<31 - 1 // maximum value of an enum
-	MinEnum         = -1 << 31  // minimum value of an enum
-	MaxBitfieldSize = 1 << 32   // maximum number of bits in a bitfield
+	MaxInt64                = 1<<63 - 1 // maximum value of a signed int64
+	MinInt64                = -1 << 63  // minimum value of a signed int64
+	AbsMinInt64             = 1 << 63   // the absolute value of MinInt64
+	MaxEnum                 = 1<<31 - 1 // maximum value of an enum
+	MinEnum                 = -1 << 31  // minimum value of an enum
+	MaxBitfieldSize         = 1 << 32   // maximum number of bits in a bitfield
+	MaxFractionDigits uint8 = 18        // maximum fractional digits per Section 9.3.4
 )
 
 type NumberKind int
@@ -467,28 +469,61 @@ const (
 	MaxNumber                    // Number is maximum value allowed for range
 )
 
-// A Number is in the range of [-(1<<64) - 1, (1<<64)-1].  This range
-// is the union of uint64 and int64.
-// to indicate
+// A Number is either an integer the range of [-(1<<64) - 1, (1<<64)-1], or a
+// YANG decimal conforming to https://tools.ietf.org/html/rfc6020#section-9.3.4.
 type Number struct {
-	Kind  NumberKind
+	// Kind is the kind of number (+/-ve, min/max).
+	Kind NumberKind
+	// Absolute value of the number.
 	Value uint64
+	// Number of fractional digits.
+	FractionDigits uint8
 }
 
 var maxNumber = Number{Kind: MaxNumber}
 var minNumber = Number{Kind: MinNumber}
+
+// IsDecimal reports whether n is a decimal number.
+func (n Number) IsDecimal() bool {
+	return n.FractionDigits != 0
+}
 
 // FromInt creates a Number from an int64.
 func FromInt(i int64) Number {
 	if i < 0 {
 		return Number{Kind: Negative, Value: uint64(-i)}
 	}
-	return Number{Value: uint64(i)}
+	return Number{Kind: Positive, Value: uint64(i)}
 }
 
 // FromUint creates a Number from a uint64.
 func FromUint(i uint64) Number {
-	return Number{Value: i}
+	return Number{Kind: Positive, Value: i}
+}
+
+// FromFloat creates a Number from a float64. Input values with absolute value
+// larger than MaxInt64/MinInt64 are converted into maxNumber/minNumber.
+func FromFloat(f float64) Number {
+	if f > float64(MaxInt64) {
+		return maxNumber
+	}
+	if f < float64(MinInt64) {
+		return minNumber
+	}
+	var fracDig uint8
+	for ; Frac(f) != 0.0 && fracDig <= MaxFractionDigits; fracDig++ {
+		f *= 10.0
+	}
+	v := uint64(f)
+	kind := Positive
+	if f < 0 {
+		kind = Negative
+		v = -v
+	}
+
+	n := Number{Kind: kind, Value: v, FractionDigits: fracDig}
+
+	return n
 }
 
 // ParseNumber returns s as a Number.  Numbers may be represented in decimal,
@@ -506,32 +541,95 @@ func ParseNumber(s string) (n Number, err error) {
 		return n, errors.New("sign with no value")
 	}
 
+	n.Kind = Positive
+	ns := s
 	switch s[0] {
 	case '+':
-		s = s[1:]
+		ns = s[1:]
 	case '-':
 		n.Kind = Negative
-		s = s[1:]
+		ns = s[1:]
 	}
-	n.Value, err = strconv.ParseUint(s, 0, 64)
-	return n, err
+	n.Value, err = strconv.ParseUint(ns, 0, 64)
+	if err == nil {
+		return n, nil
+	}
+
+	return DecimalValueFromString(s, -1)
+}
+
+// DecimalValueFromString returns a decimal Number representation of inStr.
+// If fracDigRequired is >= 0, the number is represented with fracDigRequired
+// fractional digits, regardless of the precision of numStr, otherwise the
+// precision of numStr is used to set the number of fractional digits.
+// numStr must conform to Section 9.3.4.
+func DecimalValueFromString(numStr string, fracDigRequired int) (n Number, err error) {
+	if fracDigRequired > int(MaxFractionDigits) {
+		return n, fmt.Errorf("too many fraction digits %d > max of %d", fracDigRequired, MaxFractionDigits)
+	}
+
+	s := numStr
+	dx := strings.Index(s, ".")
+	fracDig := 0
+	if dx >= 0 {
+		fracDig = len(s) - 1 - dx
+		// remove first decimal, if dx > 1, will fail ParseInt below
+		s = s[:dx] + s[dx+1:]
+	}
+	if fracDigRequired < 0 {
+		fracDigRequired = fracDig
+	}
+	if fracDig > fracDigRequired {
+		return n, fmt.Errorf("%s has too much precision, expect <= %d fractional digits", s, fracDigRequired)
+	}
+
+	s += "000000000000000000"[:fracDigRequired-fracDig]
+
+	v, err := strconv.ParseInt(s, 0, 64)
+	if err != nil {
+		return n, fmt.Errorf("%s is not a valid decimal number: %s", numStr, err)
+	}
+
+	kind := Positive
+	if v < 0 {
+		kind = Negative
+		v = -v
+	}
+
+	return Number{Kind: kind, Value: uint64(v), FractionDigits: uint8(fracDig)}, nil
 }
 
 // String returns n as a string in decimal.
 func (n Number) String() string {
+	out := ""
 	switch n.Kind {
 	case Negative:
-		return "-" + strconv.FormatUint(n.Value, 10)
+		out += "-"
 	case MinNumber:
 		return "min"
 	case MaxNumber:
 		return "max"
 	}
-	return strconv.FormatUint(n.Value, 10)
+
+	out += strconv.FormatUint(n.Value, 10)
+
+	if n.IsDecimal() {
+		fd := int(n.FractionDigits)
+		if fd > 0 {
+			out = out[:len(out)-fd] + "." + out[len(out)-fd:]
+		}
+	}
+
+	return out
 }
 
-// Int returns n as an int64.  It returns an error if n overflows an int64.
+// Int returns n as an int64.  It returns an error if n overflows an int64 or
+// the number is decimal.
 func (n Number) Int() (int64, error) {
+	nv := n.Value
+	if n.IsDecimal() {
+		nv = n.Value / uint64(math.Pow10(int(n.FractionDigits)))
+	}
 	switch n.Kind {
 	case MinNumber:
 		return MinInt64, nil
@@ -539,22 +637,27 @@ func (n Number) Int() (int64, error) {
 		return MaxInt64, nil
 	case Negative:
 		switch {
-		case n.Value == AbsMinInt64:
+		case nv == AbsMinInt64:
 			return MinInt64, nil
-		case n.Value < AbsMinInt64:
-			return -int64(n.Value), nil
+		case nv < AbsMinInt64:
+			return -int64(nv), nil
 		}
-	default:
+	case Positive:
 		if n.Value <= MaxInt64 {
-			return int64(n.Value), nil
+			return int64(nv), nil
 		}
+		return 0, errors.New("signed integer overflow")
+	default:
 	}
-	return 0, errors.New("signed integer overflow")
+	return 0, errors.New("unknown number type")
 }
 
 // add adds i to n without checking overflow.  We really only need to be
-// able to add 1 for our code.
+// able to add 1 for our code. panics if n is a decimal.
 func (n Number) add(i uint64) Number {
+	if n.IsDecimal() {
+		panic("cannot call add() on decimal number " + n.String())
+	}
 	switch n.Kind {
 	case MinNumber:
 		return n
@@ -567,13 +670,16 @@ func (n Number) add(i uint64) Number {
 		} else {
 			n.Value -= i
 		}
-	default:
+	case Positive:
 		n.Value += i
+	default:
+		panic("add to unknown number type")
 	}
 	return n
 }
 
-// Less returns true if n is less than m.
+// Less returns true if n is less than m. Panics if n and m are a mix of integer
+// and decimal.
 func (n Number) Less(m Number) bool {
 	switch {
 	case m.Kind == MinNumber:
@@ -588,17 +694,41 @@ func (n Number) Less(m Number) bool {
 		return true
 	case n.Kind != Negative && m.Kind == Negative:
 		return false
-	case n.Kind == Negative:
-		return n.Value > m.Value
-	default:
-		return n.Value < m.Value
 	}
+
+	nt, mt := n.Trunc(), m.Trunc()
+	lt := nt < mt
+	if nt == mt {
+		nf, mf := n.Frac(), m.Frac()
+		if nf == mf {
+			return false
+		}
+		lt = nf < mf
+	}
+
+	if n.Kind == Negative {
+		return !lt
+	}
+	return lt
 }
 
-// Equal returns true if m equals n.  It provides symmetry with the Less
-// method.
+// Equal returns true if n is equal to m.
 func (n Number) Equal(m Number) bool {
-	return n == m
+	return !n.Less(m) && !m.Less(n)
+}
+
+// Trunc returns the whole part of abs(n) as a signed integer.
+func (n Number) Trunc() uint64 {
+	nv := n.Value
+	e := pow10(n.FractionDigits)
+	return nv / e
+}
+
+// Frac returns the fractional part of abs(n) as a signed integer.
+func (n Number) Frac() uint64 {
+	nv := n.Value
+	e := pow10(n.FractionDigits)
+	return nv - n.Trunc()*e
 }
 
 // YRange is a single range of consecutive numbers, inclusive.
@@ -793,4 +923,18 @@ func (r YangRange) Contains(s YangRange) bool {
 		}
 	}
 	return true
+}
+
+// Frac returns the fractional part of f.
+func Frac(f float64) float64 {
+	return f - math.Trunc(f)
+}
+
+// pow10 returns 10^e without checking for overflow.
+func pow10(e uint8) uint64 {
+	var out uint64 = 1
+	for i := uint8(0); i < e; i++ {
+		out *= 10
+	}
+	return out
 }
