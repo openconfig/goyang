@@ -110,6 +110,13 @@ type RPCEntry struct {
 	Output *Entry
 }
 
+// A ListAttr is associated with an Entry that represents a List node
+type ListAttr struct {
+	MinElements *Value // leaf-list or list MUST have at least min-elements
+	MaxElements *Value // leaf-list or list has at most max-elements
+	OrderedBy   *Value // order of entries determined by "system" or "user"
+}
+
 // Modules returns the Modules structure that e is part of.  This is needed
 // when looking for rooted nodes not part of this Entry tree.
 func (e *Entry) Modules() *Modules {
@@ -119,11 +126,40 @@ func (e *Entry) Modules() *Modules {
 	return e.Node.(*Module).modules
 }
 
-// A ListAttr is associated with an Entry that represents a List node
-type ListAttr struct {
-	MinElements *Value // leaf-list or list MUST have at least min-elements
-	MaxElements *Value // leaf-list or list has at most max-elements
-	OrderedBy   *Value // order of entries determined by "system" or "user"
+// IsDir returns true if e is a directory.
+func (e *Entry) IsDir() bool {
+	return e.Dir != nil
+}
+
+// IsLeaf returns true if e is a leaf i.e. is not a container, list, leaf-list,
+// choice or case statement.
+func (e *Entry) IsLeaf() bool {
+	return !e.IsDir() && e.Kind == LeafEntry && e.ListAttr == nil
+}
+
+// IsLeafList returns true if e is a leaf-list.
+func (e *Entry) IsLeafList() bool {
+	return !e.IsDir() && e.Kind == LeafEntry && e.ListAttr != nil
+}
+
+// IsList returns true if e is a list.
+func (e *Entry) IsList() bool {
+	return e.IsDir() && e.ListAttr != nil
+}
+
+// IsContainer returns true if e is a container.
+func (e *Entry) IsContainer() bool {
+	return e.IsDir() && e.ListAttr == nil && e.Kind != ChoiceEntry && e.Kind != CaseEntry
+}
+
+// IsChoice returns true if the entry is a choice node within the schema.
+func (e *Entry) IsChoice() bool {
+	return e.Kind == ChoiceEntry
+}
+
+// IsCase returns true if the entry is a case node within the schema.
+func (e *Entry) IsCase() bool {
+	return e.Kind == CaseEntry
 }
 
 // Print prints e to w in human readable form.
