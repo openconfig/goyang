@@ -469,6 +469,8 @@ const (
 	MaxNumber                    // Number is maximum value allowed for range
 )
 
+const space18 = "000000000000000000" // used for prepending 0's
+
 // A Number is either an integer the range of [-(1<<64) - 1, (1<<64)-1], or a
 // YANG decimal conforming to https://tools.ietf.org/html/rfc6020#section-9.3.4.
 type Number struct {
@@ -583,9 +585,9 @@ func DecimalValueFromString(numStr string, fracDigRequired int) (n Number, err e
 		return n, fmt.Errorf("%s has too much precision, expect <= %d fractional digits", s, fracDigRequired)
 	}
 
-	s += "000000000000000000"[:fracDigRequired-fracDig]
+	s += space18[:fracDigRequired-fracDig]
 
-	v, err := strconv.ParseInt(s, 0, 64)
+	v, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
 		return n, fmt.Errorf("%s is not a valid decimal number: %s", numStr, err)
 	}
@@ -616,7 +618,13 @@ func (n Number) String() string {
 	if n.IsDecimal() {
 		fd := int(n.FractionDigits)
 		if fd > 0 {
-			out = out[:len(out)-fd] + "." + out[len(out)-fd:]
+			ofd := len(out) - fd
+			if ofd <= 0 {
+				// We want 0.1 not .1
+				out = space18[:ofd+1] + out
+				ofd = 1
+			}
+			out = out[:ofd] + "." + out[ofd:]
 		}
 	}
 
