@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"testing"
 
-	"google3/third_party/golang/godebug/pretty/pretty"
+	"github.com/kylelemons/godebug/pretty"
 )
 
 func TestMarshalJSON(t *testing.T) {

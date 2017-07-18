@@ -56,6 +56,18 @@ func TestNumberParse(t *testing.T) {
 		numString: ".123",
 		want:      Number{Kind: Positive, Value: 123, FractionDigits: 3},
 	}, {
+		desc:      "+ve float, leading 0",
+		numString: "0.123",
+		want:      Number{Kind: Positive, Value: 123, FractionDigits: 3},
+	}, {
+		desc:      "-ve float, small value",
+		numString: "-0.0123",
+		want:      Number{Kind: Negative, Value: 123, FractionDigits: 4},
+	}, {
+		desc:      "+ve float, small value",
+		numString: "0.0123",
+		want:      Number{Kind: Positive, Value: 123, FractionDigits: 4},
+	}, {
 		desc:      "-ve float",
 		numString: "-123.123",
 		want:      Number{Kind: Negative, Value: 123123, FractionDigits: 3},
@@ -112,7 +124,15 @@ func TestNumberParse(t *testing.T) {
 		if got, want := n, tt.want; tt.wantErr == "" && !got.Equal(want) {
 			t.Errorf("%s: got: %v, want: %v", tt.desc, got, want)
 		}
-
+		if err == nil {
+			want := tt.numString
+			if want[0] == '.' {
+				want = "0" + want
+			}
+			if got := n.String(); got != want {
+				t.Errorf("%s: got %q, want %q", tt.desc, got, want)
+			}
+		}
 	}
 }
 
