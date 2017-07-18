@@ -60,6 +60,14 @@ func TestNumberParse(t *testing.T) {
 		numString: "0.123",
 		want:      Number{Kind: Positive, Value: 123, FractionDigits: 3},
 	}, {
+		desc:      "-ve float, small value",
+		numString: "-0.0123",
+		want:      Number{Kind: Negative, Value: 123, FractionDigits: 4},
+	}, {
+		desc:      "+ve float, small value",
+		numString: "0.0123",
+		want:      Number{Kind: Positive, Value: 123, FractionDigits: 4},
+	}, {
 		desc:      "-ve float",
 		numString: "-123.123",
 		want:      Number{Kind: Negative, Value: 123123, FractionDigits: 3},

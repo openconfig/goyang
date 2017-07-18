@@ -603,10 +603,8 @@ func DecimalValueFromString(numStr string, fracDigRequired int) (n Number, err e
 
 // String returns n as a string in decimal.
 func (n Number) String() string {
-	out := ""
+	var out string
 	switch n.Kind {
-	case Negative:
-		out += "-"
 	case MinNumber:
 		return "min"
 	case MaxNumber:
@@ -621,11 +619,14 @@ func (n Number) String() string {
 			ofd := len(out) - fd
 			if ofd <= 0 {
 				// We want 0.1 not .1
-				out = space18[:ofd+1] + out
+				out = space18[:-ofd+1] + out
 				ofd = 1
 			}
 			out = out[:ofd] + "." + out[ofd:]
 		}
+	}
+	if n.Kind == Negative {
+		out = "-" + out
 	}
 
 	return out
