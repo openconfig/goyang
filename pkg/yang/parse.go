@@ -16,7 +16,7 @@ package yang
 
 // Thile file implements Parse, which  parses the input as generic YANG and
 // returns a slice of base Statements (which in turn may contain more
-// Statements, i.e., a slice of Statment trees.)
+// Statements, i.e., a slice of Statement trees.)
 //
 // TODO(borman): remove this TODO once ast.go is part of of this package.
 // See ast.go for the conversion of Statements into an AST tree of Nodes.

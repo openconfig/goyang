@@ -207,7 +207,7 @@ func build(s *Statement, p reflect.Value) (v reflect.Value, err error) {
 //	 func fn(ss *Statement, v, p reflect.Value) error
 //
 // Given s as a statement of type at, ss is a substatement of s (in a few
-// exeptional cases, ss is the Statement itself).  v must have the type at and
+// exceptional cases, ss is the Statement itself).  v must have the type at and
 // is the structure being filled in.  p is the parent Node, or nil.  p is only
 // used to set the Parent field of a Node.  For example, given the following
 // structure and variables:
@@ -326,7 +326,7 @@ func initTypes(at reflect.Type) {
 		}
 
 		// Create a function, fn, that will build the field from a
-		// Statement.  These functions are used when actaully making
+		// Statement.  These functions are used when actually making
 		// an AST from a Statement Tree.
 		var fn func(*Statement, reflect.Value, reflect.Value) error
 

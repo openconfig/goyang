@@ -301,7 +301,7 @@ var kind2proto = map[yang.TypeKind]string{
 	yang.Ybits:               "INLINE-bits",  // set of bits or flags
 	yang.Ybool:               "bool",         // true or false
 	yang.Ydecimal64:          "INLINE-d64",   // signed decimal number
-	yang.Yempty:              "bool",         // value is its presense
+	yang.Yempty:              "bool",         // value is its presence
 	yang.Yenum:               "INLINE-enum",  // enumerated strings
 	yang.Yidentityref:        "string",       // reference to abstract identity
 	yang.YinstanceIdentifier: "string",       // reference of a data tree node
@@ -654,7 +654,7 @@ func (pf *protofile) fixName(s string) string {
 	return cc
 }
 
-// flatten returns a slice of all directory entries in e and e's decendents.
+// flatten returns a slice of all directory entries in e and e's descendants.
 func flatten(e *yang.Entry) []*yang.Entry {
 	if e == nil || (len(e.Dir) == 0 && e.Type != nil) {
 		return nil

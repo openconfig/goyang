@@ -529,7 +529,7 @@ func FromFloat(f float64) Number {
 }
 
 // ParseNumber returns s as a Number.  Numbers may be represented in decimal,
-// octal, or hexidecimal using the standard prefix notations (e.g., 0 and 0x)
+// octal, or hexadecimal using the standard prefix notations (e.g., 0 and 0x)
 func ParseNumber(s string) (n Number, err error) {
 	s = strings.TrimSpace(s)
 	switch s {
