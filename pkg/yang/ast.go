@@ -224,27 +224,32 @@ func build(s *Statement, p reflect.Value) (v reflect.Value, err error) {
 //	var vInc = reflect.ValueOf(inc)
 //	var tInc = reflect.TypeOf(inc)
 //
-// Functions are created for each fields and named Name, Statement, Parent, Ext, and revision-date.
+// Functions are created for each fields and named Name, Statement, Parent, Ext,
+// and revision-date.
 //
-// The function built for RevisionDate will be called for any substatement, ds,
-// of s that has the keyword "revision-date" along with the value of vInc and its parent:
+// The function built for RevisionDate will be called for any substatement,
+// ds, of s that has the keyword "revision-date" along with the value of
+// vInc and its parent:
 //
 //	typeMap[tInc]["revision-date"](ss, vInc, parent)
 //
 // Normal fields are all processed this same way.
 //
-// The other 4 fields are special.  In the case of Name, Statement, and Parent, the function is passed s, rather than ss, as these fields are not filled in by substatements.
+// The other 4 fields are special.  In the case of Name, Statement, and Parent,
+// the function is passed s, rather than ss, as these fields are not filled in
+// by substatements.
 //
-// The Name command must set its field to the Statement's argument.
-// The Statement command must set its field to the Statement itself.
-// The Parent command must set its field with the Node of its parent (the parent parameter).
+// The Name command must set its field to the Statement's argument.  The
+// Statement command must set its field to the Statement itself.  The
+// Parent command must set its field with the Node of its parent (the
+// parent parameter).
 //
-// The Ext command is unique and must decode into a []*Statement.  This is a slice of all
-// statements that use unknown keywords with a prefix (in a valid .yang file these should be
-// the extensions).
+// The Ext command is unique and must decode into a []*Statement.  This is a
+// slice of all statements that use unknown keywords with a prefix (in a valid
+// .yang file these should be the extensions).
 //
-// The Field can have attributes delimited by a ','.  The only supported
-// attributes are:
+// The Field can have attributes delimited by a ','.  The only
+// supported attributes are:
 //
 //    nomerge:       Do not merge this field
 //    required:      This field must be populated
