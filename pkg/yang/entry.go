@@ -71,7 +71,7 @@ type Entry struct {
 	Name        string    // our name, same as the key in our parent Dirs
 	Description string    `json:",omitempty"` // description from node, if any
 	Default     string    `json:",omitempty"` // default from node, if any
-	Errors      []error   `json:"-"`          // list of errors encounterd on this node
+	Errors      []error   `json:"-"`          // list of errors encountered on this node
 	Kind        EntryKind // kind of Entry
 	Config      TriState  // config state of this entry, if known
 	Prefix      *Value    `json:",omitempty"` // prefix to use from this point down
@@ -316,7 +316,7 @@ func (e *Entry) checkErrors(f func(error)) {
 
 // GetErrors returns a sorted list of errors found in e.
 func (e *Entry) GetErrors() []error {
-	// the seen map is used to eliminate dupicate errors.
+	// the seen map is used to eliminate duplicate errors.
 	// Some entries will be processed more than once
 	// (groupings in particular) and as such may cause
 	// duplication of errors.

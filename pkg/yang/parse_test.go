@@ -35,7 +35,7 @@ func (s1 *Statement) equal(s2 *Statement) bool {
 	return true
 }
 
-// SA returns a statment with an argument and optional substatements.
+// SA returns a statement with an argument and optional substatements.
 func SA(k, a string, ss ...*Statement) *Statement {
 	return &Statement{
 		Keyword:     k,
@@ -45,7 +45,7 @@ func SA(k, a string, ss ...*Statement) *Statement {
 	}
 }
 
-// S returns a statment with no argument and optional substatements.
+// S returns a statement with no argument and optional substatements.
 func S(k string, ss ...*Statement) *Statement {
 	return &Statement{
 		Keyword:    k,

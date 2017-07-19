@@ -60,7 +60,7 @@ func doTypes(w io.Writer, entries []*yang.Entry) {
 // Types keeps track of all the YangTypes defined.
 type Types map[*yang.YangType]struct{}
 
-// AddEntry adds all types defined in e and its decendents to t.
+// AddEntry adds all types defined in e and its descendants to t.
 func (t Types) AddEntry(e *yang.Entry) {
 	if e == nil {
 		return

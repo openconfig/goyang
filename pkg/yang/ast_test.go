@@ -312,7 +312,7 @@ main_node the_node {
 			line: line(),
 			in: `
 main_node the_node {
-	// This test tests that the absense of a required field.
+	// This test tests that the absence of a required field.
 	// req_node requires the field named "req_field".
 	req_node value1 ;
 }

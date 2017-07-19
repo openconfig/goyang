@@ -1151,7 +1151,7 @@ func TestEntryFind(t *testing.T) {
 		}
 
 		if _, ok := dir[tt.inBaseEntryPath]; !ok {
-			t.Errorf("%s: could not find entry %s within the dir: %s", tt.name, tt.inBaseEntryPath, dir)
+			t.Errorf("%s: could not find entry %s within the dir: %v", tt.name, tt.inBaseEntryPath, dir)
 		}
 
 		for path, want := range tt.wantEntryPath {

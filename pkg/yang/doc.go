@@ -19,7 +19,7 @@
 //    keyword [argument] ;
 //    keyword [argument] { [statement [...]] }
 //
-// At the lowest level, package yang retuns a simple tree of statements via the
+// At the lowest level, package yang returns a simple tree of statements via the
 // Parse function.  The Parse function makes no attempt to determine the
 // validity of the source, other than checking for generic syntax errors.
 //

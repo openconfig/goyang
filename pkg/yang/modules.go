@@ -96,7 +96,7 @@ func (ms *Modules) GetModule(name string) (*Entry, []error) {
 
 // GetModule optionally reads in a set of YANG source files, named by sources,
 // and then returns the Entry for the module named module.  If sources is
-// missing, or the named module is not yet known, GetModule searchs for name
+// missing, or the named module is not yet known, GetModule searches for name
 // with the suffix ".yang".  GetModule either returns an Entry or returns
 // one or more errors.
 //

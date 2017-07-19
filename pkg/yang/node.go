@@ -85,9 +85,9 @@ func getPrefix(s string) (string, string) {
 //
 // If there is prefix, look in nodes ancestors.
 //
-// If prefix matches the module's prefix statment, look in nodes ancestors.
+// If prefix matches the module's prefix statement, look in nodes ancestors.
 //
-// If prefix matches the submodule's belongs-t statment, look in nodes
+// If prefix matches the submodule's belongs-t statement, look in nodes
 // ancestors.
 //
 // Finally, look in the module imported with prefix.
@@ -302,7 +302,7 @@ func PrintNode(w io.Writer, n Node) {
 	v := reflect.ValueOf(n).Elem()
 	t := v.Type()
 	nf := t.NumField()
-	fmt.Fprintf(w, "%s%s [%s]\n", n.NName(), n.Kind())
+	fmt.Fprintf(w, "%s [%s]\n", n.NName(), n.Kind())
 Loop:
 	for i := 0; i < nf; i++ {
 		ft := t.Field(i)
@@ -331,7 +331,7 @@ Loop:
 		case reflect.Ptr:
 			n = f.Interface().(Node)
 			if v, ok := n.(*Value); ok {
-				fmt.Fprintf(w, "%s%s = %s\n", ft.Name, v.Name)
+				fmt.Fprintf(w, "%s = %s\n", ft.Name, v.Name)
 			} else {
 				PrintNode(indent.NewWriter(w, "    "), n)
 			}
@@ -340,7 +340,7 @@ Loop:
 			for i := 0; i < sl; i++ {
 				n = f.Index(i).Interface().(Node)
 				if v, ok := n.(*Value); ok {
-					fmt.Fprintf(w, "%s%s[%d] = %s\n", ft.Name, i, v.Name)
+					fmt.Fprintf(w, "%s[%d] = %s\n", ft.Name, i, v.Name)
 				} else {
 					PrintNode(indent.NewWriter(w, "    "), n)
 				}
