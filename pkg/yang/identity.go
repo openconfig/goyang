@@ -83,6 +83,7 @@ func (mod *Module) findIdentityBase(baseStr string) (*resolvedIdentity, []error)
 
 	basePrefix, baseName := getPrefix(baseStr)
 	rootPrefix := mod.GetPrefix()
+	source := Source(mod)
 
 	switch basePrefix {
 	case "", rootPrefix:
@@ -91,16 +92,22 @@ func (mod *Module) findIdentityBase(baseStr string) (*resolvedIdentity, []error)
 		keyName := fmt.Sprintf("%s:%s", rootPrefix, baseName)
 		base, ok = identities.dict[keyName]
 		if !ok {
-			errs = append(errs, fmt.Errorf("can't resolve the local base %s as %s",
-				baseStr, keyName))
+			errs = append(errs, fmt.Errorf("%s: can't resolve the local base %s as %s", source, baseStr, keyName))
 		}
 		break
 	default:
+		// The identity we are looking for is prefix:basename.  If
+		// we already know prefix:basename then just use it.  If not,
+		// try again within the module identified by prefix.
+		if id, ok := identities.dict[baseStr]; ok {
+			base = id
+			break
+		}
 		// This is an identity which is defined within another module
 		extmod := FindModuleByPrefix(mod, basePrefix)
 		if extmod == nil {
 			errs = append(errs,
-				fmt.Errorf("can't find external module with prefix %s", basePrefix))
+				fmt.Errorf("%s: can't find external module with prefix %s", source, basePrefix))
 			break
 		}
 
@@ -112,7 +119,7 @@ func (mod *Module) findIdentityBase(baseStr string) (*resolvedIdentity, []error)
 				if id, ok := identities.dict[key]; ok {
 					base = id
 				} else {
-					errs = append(errs, fmt.Errorf("can't find base %s", baseStr))
+					errs = append(errs, fmt.Errorf("%s: can't find base %s", source, baseStr))
 				}
 				break
 			}
@@ -120,7 +127,7 @@ func (mod *Module) findIdentityBase(baseStr string) (*resolvedIdentity, []error)
 		// Error if we did not find the identity that had the name specified in
 		// the module it was expected to be in.
 		if base.isEmpty() {
-			errs = append(errs, fmt.Errorf("can't resolve remote base %s", baseStr))
+			errs = append(errs, fmt.Errorf("%s: can't resolve remote base %s", source, baseStr))
 		}
 	}
 	return &base, errs
@@ -140,6 +147,19 @@ func (ms *Modules) resolveIdentities() []error {
 		for _, i := range mod.Identities() {
 			keyName, r := newResolvedIdentity(mod, i)
 			identities.dict[keyName] = *r
+		}
+
+		// Hoist up all identities in our included submodules.
+		// We could just do a range on ms.SubModules, but that
+		// might process a submodule that no module included.
+		for _, in := range mod.Include {
+			if in.Module == nil {
+				continue
+			}
+			for _, i := range in.Module.Identities() {
+				keyName, r := newResolvedIdentity(in.Module, i)
+				identities.dict[keyName] = *r
+			}
 		}
 	}
 
