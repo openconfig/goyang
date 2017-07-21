@@ -91,7 +91,8 @@ func main() {
 
 	var traceP string
 	var help bool
-	getopt.ListVarLong(&yang.Path, "path", 0, "comma separated list of directories to add to search path", "DIR[,DIR...]")
+	var paths []string
+	getopt.ListVarLong(&paths, "path", 0, "comma separated list of directories to add to search path", "DIR[,DIR...]")
 	getopt.StringVarLong(&format, "format", 0, "format to display: "+strings.Join(formats, ", "), "FORMAT")
 	getopt.StringVarLong(&traceP, "trace", 0, "write trace into to TRACEFILE", "TRACEFILE")
 	getopt.BoolVarLong(&help, "help", '?', "display help")
@@ -115,6 +116,7 @@ func main() {
 	}); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		getopt.PrintUsage(os.Stderr)
+		os.Exit(1)
 	}
 
 	if traceP != "" {
@@ -144,6 +146,15 @@ Formats:
 			fmt.Fprintln(os.Stderr)
 		}
 		stop(0)
+	}
+
+	for _, path := range paths {
+		paths, err := yang.PathsWithModules(path)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			continue
+		}
+		yang.AddPath(paths...)
 	}
 
 	if format == "" {
