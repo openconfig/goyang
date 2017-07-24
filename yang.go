@@ -149,12 +149,12 @@ Formats:
 	}
 
 	for _, path := range paths {
-		paths, err := yang.PathsWithModules(path)
+		expanded, err := yang.PathsWithModules(path)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			continue
 		}
-		yang.AddPath(paths...)
+		yang.AddPath(expanded...)
 	}
 
 	if format == "" {
