@@ -1182,6 +1182,11 @@ func TestEntryTypes(t *testing.T) {
 		},
 	}
 
+	emptyContainerSchema := &Entry{
+		Name: "empty-container-schema",
+		Kind: DirectoryEntry,
+	}
+
 	leafListSchema := &Entry{
 		Kind:     LeafEntry,
 		ListAttr: &ListAttr{MinElements: &Value{Name: "0"}},
@@ -1243,6 +1248,11 @@ func TestEntryTypes(t *testing.T) {
 		{
 			desc:     "container",
 			schema:   containerSchema,
+			wantType: Container,
+		},
+		{
+			desc:     "empty container",
+			schema:   emptyContainerSchema,
 			wantType: Container,
 		},
 		{

@@ -149,7 +149,7 @@ func (e *Entry) IsList() bool {
 
 // IsContainer returns true if e is a container.
 func (e *Entry) IsContainer() bool {
-	return e.IsDir() && e.ListAttr == nil && e.Kind != ChoiceEntry && e.Kind != CaseEntry
+	return e.Kind == DirectoryEntry && e.ListAttr == nil
 }
 
 // IsChoice returns true if the entry is a choice node within the schema.
