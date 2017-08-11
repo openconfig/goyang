@@ -189,6 +189,26 @@ module bar {
 }
 `,
 	},
+	{
+		name: "baz.yang",
+		in: `
+module baz {
+  namespace "urn:baz";
+  prefix "baz";
+
+  import foo { prefix "f"; }
+
+  grouping baz-common {
+    leaf baz-common-leaf { type string; }
+  }
+
+  augment /f:foo-c {
+    uses baz-common;
+    leaf baz-direct-leaf { type string; }
+  }
+}
+`,
+	},
 }
 
 func TestUsesParent(t *testing.T) {
@@ -230,40 +250,54 @@ func TestPrefixes(t *testing.T) {
 func TestEntryNamespace(t *testing.T) {
 	ms := NewModules()
 	for _, tt := range parentTestModules {
-		_ = ms.Parse(tt.in, tt.name)
+		if err := ms.Parse(tt.in, tt.name); err != nil {
+			t.Fatalf("could not parse module %s: %v", tt.name, err)
+		}
+	}
+
+	if errs := ms.Process(); len(errs) > 0 {
+		t.Fatalf("could not process modules: %v", errs)
 	}
 
 	foo, _ := ms.GetModule("foo")
 	bar, _ := ms.GetModule("bar")
 
 	for _, tc := range []struct {
+		descr string
 		entry *Entry
 		ns    string
 	}{
-		// grouping used in foo always have foo's namespace, even if
-		// it was defined in bar as here.
 		{
+			descr: "grouping used in foo always have foo's namespace, even if it was defined in bar",
 			entry: foo.Dir["foo-c"].Dir["test1"],
 			ns:    "urn:foo",
 		},
-
-		// grouping defined and used in foo has foo's namespace
 		{
+			descr: "grouping defined and used in foo has foo's namespace",
 			entry: foo.Dir["foo-c"].Dir["zzz"],
 			ns:    "urn:foo",
 		},
-
-		// grouping defined and used in bar has bar's namespace
 		{
+			descr: "grouping defined and used in bar has bar's namespace",
 			entry: bar.Dir["bar-local"].Dir["test1"],
 			ns:    "urn:bar",
+		},
+		{
+			descr: "leaf within a used grouping in baz augmented into foo has baz's namespace",
+			entry: foo.Dir["foo-c"].Dir["baz-common-leaf"],
+			ns:    "urn:baz",
+		},
+		{
+			descr: "leaf directly defined within an augment to foo from baz has baz's namespace",
+			entry: foo.Dir["foo-c"].Dir["baz-direct-leaf"],
+			ns:    "urn:baz",
 		},
 	} {
 		nsValue := tc.entry.Namespace()
 		if nsValue == nil {
-			t.Errorf("want namespace %s, got nil", tc.ns)
+			t.Errorf("%s: want namespace %s, got nil", tc.descr, tc.ns)
 		} else if tc.ns != nsValue.Name {
-			t.Errorf("want namespace %s, got %s", tc.ns, nsValue.Name)
+			t.Errorf("%s: want namespace %s, got %s", tc.descr, tc.ns, nsValue.Name)
 		}
 	}
 }
