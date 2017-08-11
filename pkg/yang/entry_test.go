@@ -200,6 +200,9 @@ module baz {
 
   grouping baz-common {
     leaf baz-common-leaf { type string; }
+    container baz-dir {
+      leaf aardvark { type string; }
+    }
   }
 
   augment /f:foo-c {
@@ -290,6 +293,11 @@ func TestEntryNamespace(t *testing.T) {
 		{
 			descr: "leaf directly defined within an augment to foo from baz has baz's namespace",
 			entry: foo.Dir["foo-c"].Dir["baz-direct-leaf"],
+			ns:    "urn:baz",
+		},
+		{
+			descr: "children of a container within an augment to from baz have baz's namespace",
+			entry: foo.Dir["foo-c"].Dir["baz-dir"].Dir["aardvark"],
 			ns:    "urn:baz",
 		},
 	} {
