@@ -913,6 +913,24 @@ func (e *Entry) Namespace() *Value {
 	return new(Value)
 }
 
+// InstantiatingModule returns the YANG module which instanitated the Entry
+// within the schema tree - using the same rules described in the documentation
+// of the Namespace function. The namespace is resolved in the module name. This
+// approach to namespacing is used when serialising YANG-modelled data to JSON as
+// per RFC7951.
+func (e *Entry) InstantiatingModule() (string, error) {
+	n := e.Namespace()
+	if n == nil {
+		return "", fmt.Errorf("entry %s had nil namespace", e.Name)
+	}
+
+	ns, err := e.Modules().FindModuleByNamespace(n.Name)
+	if err != nil {
+		return "", fmt.Errorf("could not find module %s when retrieving namespace for %s", n.Name, e.Name)
+	}
+	return ns.Name, nil
+}
+
 // dup makes a deep duplicate of e.
 func (e *Entry) dup() *Entry {
 	// Warning: if we add any elements to Entry that should not be

@@ -266,39 +266,46 @@ func TestEntryNamespace(t *testing.T) {
 	bar, _ := ms.GetModule("bar")
 
 	for _, tc := range []struct {
-		descr string
-		entry *Entry
-		ns    string
+		descr   string
+		entry   *Entry
+		ns      string
+		wantMod string
 	}{
 		{
-			descr: "grouping used in foo always have foo's namespace, even if it was defined in bar",
-			entry: foo.Dir["foo-c"].Dir["test1"],
-			ns:    "urn:foo",
+			descr:   "grouping used in foo always have foo's namespace, even if it was defined in bar",
+			entry:   foo.Dir["foo-c"].Dir["test1"],
+			ns:      "urn:foo",
+			wantMod: "foo",
 		},
 		{
-			descr: "grouping defined and used in foo has foo's namespace",
-			entry: foo.Dir["foo-c"].Dir["zzz"],
-			ns:    "urn:foo",
+			descr:   "grouping defined and used in foo has foo's namespace",
+			entry:   foo.Dir["foo-c"].Dir["zzz"],
+			ns:      "urn:foo",
+			wantMod: "foo",
 		},
 		{
-			descr: "grouping defined and used in bar has bar's namespace",
-			entry: bar.Dir["bar-local"].Dir["test1"],
-			ns:    "urn:bar",
+			descr:   "grouping defined and used in bar has bar's namespace",
+			entry:   bar.Dir["bar-local"].Dir["test1"],
+			ns:      "urn:bar",
+			wantMod: "bar",
 		},
 		{
-			descr: "leaf within a used grouping in baz augmented into foo has baz's namespace",
-			entry: foo.Dir["foo-c"].Dir["baz-common-leaf"],
-			ns:    "urn:baz",
+			descr:   "leaf within a used grouping in baz augmented into foo has baz's namespace",
+			entry:   foo.Dir["foo-c"].Dir["baz-common-leaf"],
+			ns:      "urn:baz",
+			wantMod: "baz",
 		},
 		{
-			descr: "leaf directly defined within an augment to foo from baz has baz's namespace",
-			entry: foo.Dir["foo-c"].Dir["baz-direct-leaf"],
-			ns:    "urn:baz",
+			descr:   "leaf directly defined within an augment to foo from baz has baz's namespace",
+			entry:   foo.Dir["foo-c"].Dir["baz-direct-leaf"],
+			ns:      "urn:baz",
+			wantMod: "baz",
 		},
 		{
-			descr: "children of a container within an augment to from baz have baz's namespace",
-			entry: foo.Dir["foo-c"].Dir["baz-dir"].Dir["aardvark"],
-			ns:    "urn:baz",
+			descr:   "children of a container within an augment to from baz have baz's namespace",
+			entry:   foo.Dir["foo-c"].Dir["baz-dir"].Dir["aardvark"],
+			ns:      "urn:baz",
+			wantMod: "baz",
 		},
 	} {
 		nsValue := tc.entry.Namespace()
@@ -306,6 +313,16 @@ func TestEntryNamespace(t *testing.T) {
 			t.Errorf("%s: want namespace %s, got nil", tc.descr, tc.ns)
 		} else if tc.ns != nsValue.Name {
 			t.Errorf("%s: want namespace %s, got %s", tc.descr, tc.ns, nsValue.Name)
+		}
+
+		m, err := tc.entry.InstantiatingModule()
+		if err != nil {
+			t.Errorf("%s: %s.InstantiatingModule(): got unexpected error: %v", tc.descr, tc.entry.Path(), err)
+			continue
+		}
+
+		if m != tc.wantMod {
+			t.Errorf("%s: %s.InstantiatingModule(): did not get expected name, got: %v, want: %v", tc.descr, m, tc.wantMod)
 		}
 	}
 }
