@@ -102,6 +102,13 @@ type Entry struct {
 	// library but rather can be used by calling code where additional
 	// information should be stored alongside the Entry.
 	Annotation map[string]interface{} `json:",omitempty"`
+
+	// namespace stores the namespace of the Entry if it overrides the
+	// root namespace within the schema tree. This is the case where an
+	// entry is augmented into the tree, and it retains the namespace of
+	// the augmenting entity per RFC6020 Section 7.15.2. The namespace
+	// of the Entry should be accessed using the Namespace function.
+	namespace *Value
 }
 
 // An RPCEntry contains information related to an RPC Node.
@@ -600,7 +607,7 @@ func ToEntry(n Node) (e *Entry) {
 					}
 					mergedSubmodule[srcToIncluded] = true
 					mergedSubmodule[includedToParent] = true
-					e.merge(a.Module.Prefix, ToEntry(a.Module))
+					e.merge(a.Module.Prefix, nil, ToEntry(a.Module))
 				case ParseOptions.IgnoreSubmoduleCircularDependencies:
 					continue
 				default:
@@ -659,7 +666,7 @@ func ToEntry(n Node) (e *Entry) {
 			}
 		case "uses":
 			for _, a := range fv.Interface().([]*Uses) {
-				e.merge(nil, ToEntry(a))
+				e.merge(nil, nil, ToEntry(a))
 			}
 		case "type":
 			// We don't expect this to happen, so throw an error.
@@ -752,8 +759,11 @@ func (e *Entry) Augment(addErrors bool) (processed, skipped int) {
 			continue
 		}
 		// Augments do not have a prefix we merge in, just a node.
+		// We retain the namespace from the original context of the
+		// augment since the nodes have this namespace even though they
+		// are merged into another entry.
 		processed++
-		ae.merge(nil, a)
+		ae.merge(nil, a.Namespace(), a)
 	}
 	e.Augments = sa
 	return processed, skipped
@@ -887,6 +897,9 @@ func (e *Entry) Path() string {
 func (e *Entry) Namespace() *Value {
 	// Make e the root parent entry
 	for ; e.Parent != nil; e = e.Parent {
+		if e.namespace != nil {
+			return e.namespace
+		}
 	}
 
 	// Return the namespace of a valid root parent entry
@@ -898,6 +911,24 @@ func (e *Entry) Namespace() *Value {
 
 	// Otherwise return an empty namespace Value (rather than nil)
 	return new(Value)
+}
+
+// InstantiatingModule returns the YANG module which instanitated the Entry
+// within the schema tree - using the same rules described in the documentation
+// of the Namespace function. The namespace is resolved in the module name. This
+// approach to namespacing is used when serialising YANG-modelled data to JSON as
+// per RFC7951.
+func (e *Entry) InstantiatingModule() (string, error) {
+	n := e.Namespace()
+	if n == nil {
+		return "", fmt.Errorf("entry %s had nil namespace", e.Name)
+	}
+
+	ns, err := e.Modules().FindModuleByNamespace(n.Name)
+	if err != nil {
+		return "", fmt.Errorf("could not find module %s when retrieving namespace for %s", n.Name, e.Name)
+	}
+	return ns.Name, nil
 }
 
 // dup makes a deep duplicate of e.
@@ -925,12 +956,15 @@ func (e *Entry) dup() *Entry {
 // merge merges a duplicate of oe.Dir into e.Dir, setting the prefix of each
 // element to prefix, if not nil.  It is an error if e and oe contain common
 // elements.
-func (e *Entry) merge(prefix *Value, oe *Entry) {
+func (e *Entry) merge(prefix *Value, namespace *Value, oe *Entry) {
 	e.importErrors(oe)
 	for k, v := range oe.Dir {
 		v := v.dup()
 		if prefix != nil {
 			v.Prefix = prefix
+		}
+		if namespace != nil {
+			v.namespace = namespace
 		}
 		if se := e.Dir[k]; se != nil {
 			er := newError(oe.Node, `Duplicate node %q in %q from:
