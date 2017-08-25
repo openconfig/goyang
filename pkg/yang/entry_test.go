@@ -475,6 +475,10 @@ module defaults {
   }
 
   container defaults {
+    leaf mandatory-default {
+      type string-default;
+      mandatory true;
+    }
     leaf uint32-withdefault {
       type uint32;
       default 13;
@@ -522,6 +526,10 @@ module defaults {
 		},
 		{
 			path: []string{"defaults", "common-nodefault", "string"},
+			want: "",
+		},
+		{
+			path: []string{"defaults", "mandatory-default"},
 			want: "",
 		},
 	} {

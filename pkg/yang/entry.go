@@ -1079,7 +1079,11 @@ func (e *Entry) DefaultValue() string {
 	if len(e.Default) > 0 {
 		return e.Default
 	} else if typ := e.Type; typ != nil {
-		return typ.Default
+		if leaf, ok := e.Node.(*Leaf); ok {
+			if leaf.Mandatory == nil || leaf.Mandatory.Name == "false" {
+				return typ.Default
+			}
+		}
 	}
 	return ""
 }
