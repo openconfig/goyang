@@ -830,13 +830,23 @@ func (e *Entry) Find(name string) *Entry {
 		// the prefix that the module itself uses then we need to resolve
 		// the module into its local prefix to find it.
 		pfxMap := map[string]string{
-			// Seed the map with the local module.
-			e.Node.(*Module).Prefix.Name: e.Prefix.Name,
+			// Seed the map with the local module - we use GetPrefix just
+			// in case the module is a submodule.
+			e.Node.(*Module).GetPrefix(): e.Prefix.Name,
 		}
+
 		// Add a map between the prefix used in the import statement, and
 		// the prefix that is used in the module itself.
 		for _, i := range e.Node.(*Module).Import {
-			pfxMap[i.Prefix.Name] = i.Module.Prefix.Name
+			// Resolve the module using the current module set, since we may
+			// not have populated the Module for the entry yet.
+			m, ok := e.Node.(*Module).modules.Modules[i.Name]
+			if !ok {
+				e.addError(fmt.Errorf("cannot find a module with name %s when looking at imports in %s", i.Name, e.Path()))
+				return nil
+			}
+
+			pfxMap[i.Prefix.Name] = m.Prefix.Name
 		}
 
 		if prefix, _ := getPrefix(parts[0]); prefix != "" {
@@ -845,6 +855,7 @@ func (e *Entry) Find(name string) *Entry {
 				// This is an undefined prefix within our context, so
 				// we can't do anything about resolving it.
 				e.addError(fmt.Errorf("invalid module prefix %s within module %s, defined prefix map: %v", prefix, e.Name, pfxMap))
+				return nil
 			}
 			m, err := e.Modules().FindModuleByPrefix(pfx)
 			if err != nil {

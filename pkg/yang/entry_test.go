@@ -212,6 +212,22 @@ module baz {
 }
 `,
 	},
+	{
+		name: "baz-augment.yang",
+		in: `
+		submodule baz-augment {
+		  belongs-to baz {
+		    prefix "baz";
+		  }
+
+		  import foo { prefix "f"; }
+
+		  augment "/f:foo-c" {
+		    leaf baz-submod-leaf { type string; }
+		  }
+		}
+		`,
+	},
 }
 
 func TestUsesParent(t *testing.T) {
@@ -353,11 +369,11 @@ func TestIgnoreCircularDependencies(t *testing.T) {
 				}
 			`,
 			"subm-y": `
-        submodule subm-y {
-          belongs-to mod-a { prefix a; }
-          // Not circular.
-          include subm-x;
-        }
+			submodule subm-y {
+				belongs-to mod-a { prefix a; }
+				// Not circular.
+				include subm-x;
+			}
       `},
 	}, {
 		name: "circular dependency error identified",
@@ -561,46 +577,46 @@ func TestFullModuleProcess(t *testing.T) {
 		name: "circular import via child",
 		inModules: map[string]string{
 			"test": `
-      module test {
-      	prefix "t";
-      	namespace "urn:t";
+			      module test {
+				      	prefix "t";
+					namespace "urn:t";
 
-      	include test-router;
-      	include test-router-bgp;
-      	include test-router-isis;
+				      	include test-router;
+				   	include test-router-bgp;
+				      	include test-router-isis;
 
-      	container configure {
-      		uses test-router;
-      	}
-      }`,
+				   	container configure {
+						uses test-router;
+					}
+				}`,
 			"test-router": `
-      submodule test-router {
-      	belongs-to test { prefix "t"; }
+				submodule test-router {
+					belongs-to test { prefix "t"; }
 
-      	include test-router-bgp;
-      	include test-router-isis;
-      	include test-router-ldp;
+					include test-router-bgp;
+					include test-router-isis;
+					include test-router-ldp;
 
-      	grouping test-router {
-      		uses test-router-ldp;
-      	}
-      }`,
+					grouping test-router {
+						uses test-router-ldp;
+					}
+				}`,
 			"test-router-ldp": `
-      submodule test-router-ldp {
-      	belongs-to test { prefix "t"; }
+				submodule test-router-ldp {
+					belongs-to test { prefix "t"; }
 
-      	grouping test-router-ldp { }
-      }`,
+					grouping test-router-ldp { }
+				}`,
 			"test-router-isis": `
-      submodule test-router-isis {
-      	belongs-to test { prefix "t"; }
+				 submodule test-router-isis {
+					belongs-to test { prefix "t"; }
 
-      	include test-router;
-      }`,
+					include test-router;
+				}`,
 			"test-router-bgp": `
-      submodule test-router-bgp {
-      	belongs-to test { prefix "t"; }
-      }`,
+				submodule test-router-bgp {
+					belongs-to test { prefix "t"; }
+				}`,
 		},
 		inIgnoreCircDeps: true,
 	}, {
