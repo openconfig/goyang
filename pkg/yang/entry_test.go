@@ -1127,6 +1127,19 @@ func TestEntryFind(t *testing.T) {
 					leaf b { type string; }
 
 					container c { leaf d { type string; } }
+
+                    rpc rpc1 {
+                        input { leaf input1 { type string; } }
+                    }
+
+                    container e {
+                        action operation {
+                          description "action";
+                          input { leaf input1 { type string; } }
+                          output { leaf output1 { type string; } }
+                        }
+                    }
+
 				}
 			`,
 		},
@@ -1149,8 +1162,12 @@ func TestEntryFind(t *testing.T) {
 			"../t:c/d":   "/test/c/d",
 			"../c/t:d":   "/test/c/d",
 			// Find within an absolute directory with prefixes.
-			"/t:c/d": "/test/c/d",
-			"/c/t:d": "/test/c/d",
+			"/t:c/d":                "/test/c/d",
+			"/c/t:d":                "/test/c/d",
+			"../t:rpc1/input":       "/test/rpc1/input",
+			"/t:rpc1/input":         "/test/rpc1/input",
+			"/t:e/operation/input":  "/test/e/operation/input",
+			"/t:e/operation/output": "/test/e/operation/output",
 		},
 	}, {
 		name: "inter-module find",
@@ -1240,7 +1257,7 @@ func TestEntryFind(t *testing.T) {
 		for path, want := range tt.wantEntryPath {
 			got := dir[tt.inBaseEntryPath].Find(path)
 			if got.Path() != want {
-				t.Errorf("%s: (entry %s).Find(%s), did not find path, got: %v, want: %v, errors: %v", tt.name, dir[tt.inBaseEntryPath].Path(), path, got, want, dir[tt.inBaseEntryPath].Errors)
+				t.Errorf("%s: (entry %s).Find(%s), did not find path, got: %v, want: %v, errors: %v", tt.name, dir[tt.inBaseEntryPath].Path(), path, got.Path(), want, dir[tt.inBaseEntryPath].Errors)
 			}
 		}
 	}

@@ -647,7 +647,9 @@ func ToEntry(n Node) (e *Entry) {
 				if e.RPC == nil {
 					e.RPC = &RPCEntry{}
 				}
-				e.RPC.Input = ToEntry(i)
+				in := ToEntry(i)
+				in.Parent = e
+				e.RPC.Input = in
 				e.RPC.Input.Name = "input"
 				e.RPC.Input.Kind = InputEntry
 			}
@@ -656,7 +658,9 @@ func ToEntry(n Node) (e *Entry) {
 				if e.RPC == nil {
 					e.RPC = &RPCEntry{}
 				}
-				e.RPC.Output = ToEntry(o)
+				out := ToEntry(o)
+				out.Parent = e
+				e.RPC.Output = out
 				e.RPC.Output.Name = "output"
 				e.RPC.Output.Kind = OutputEntry
 			}
@@ -875,6 +879,13 @@ func (e *Entry) Find(name string) *Entry {
 		case part == ".":
 		case part == "..":
 			e = e.Parent
+		case e.RPC != nil:
+			switch part {
+			case "input":
+				e = e.RPC.Input
+			case "output":
+				e = e.RPC.Output
+			}
 		default:
 			_, part = getPrefix(part)
 			switch part {
