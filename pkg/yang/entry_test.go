@@ -338,7 +338,8 @@ func TestEntryNamespace(t *testing.T) {
 		}
 
 		if m != tc.wantMod {
-			t.Errorf("%s: %s.InstantiatingModule(): did not get expected name, got: %v, want: %v", tc.descr, m, tc.wantMod)
+			t.Errorf("%s: %s.InstantiatingModule(): did not get expected name, got: %v, want: %v",
+				tc.descr, tc.entry.Path(), m, tc.wantMod)
 		}
 	}
 }
