@@ -434,6 +434,7 @@ func ToEntry(n Node) (e *Entry) {
 		entryCache[n] = e
 		e.Config, err = configValue(s.Config)
 		e.addError(err)
+		e.Prefix = getRootPrefix(e)
 		return e
 	case *LeafList:
 		// Create the equivalent leaf element that we are a list of.
@@ -460,6 +461,7 @@ func ToEntry(n Node) (e *Entry) {
 			MaxElements: s.MaxElements,
 			OrderedBy:   s.OrderedBy,
 		}
+		e.Prefix = getRootPrefix(e)
 		return e
 	case *Uses:
 		g := FindGrouping(s, s.Name, map[string]bool{})
@@ -731,12 +733,18 @@ func ToEntry(n Node) (e *Entry) {
 	}
 	// If prefix isn't set, provide it based on our root node (module)
 	if e.Prefix == nil {
-		if m := RootNode(e.Node); m != nil {
-			e.Prefix = m.getPrefix()
-		}
+		e.Prefix = getRootPrefix(e)
 	}
 
 	return e
+}
+
+// getRootPrefix returns the prefix of e's root node (module)
+func getRootPrefix(e *Entry) *Value {
+	if m := RootNode(e.Node); m != nil {
+		return m.getPrefix()
+	}
+	return nil
 }
 
 // Augment processes augments in e, return the number of augments processed
