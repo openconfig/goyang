@@ -164,6 +164,7 @@ module foo {
   import bar { prefix "temp-bar"; }
   container foo-c {
     leaf zzz { type string; }
+    leaf-list foo-list { type string; }
     uses temp-bar:common;
   }
   uses temp-bar:common;
@@ -260,10 +261,26 @@ func TestPrefixes(t *testing.T) {
 	if efoo.Prefix.Name != "foo" {
 		t.Errorf(`want prefix "foo", got %q`, efoo.Prefix.Name)
 	}
-	used := efoo.Dir["foo-c"].Dir["test1"]
+
+	used := efoo.Dir["foo-c"].Dir["zzz"]
+	if used.Prefix == nil || used.Prefix.Name != "foo" {
+		t.Errorf(`want prefix named "foo", got %#v`, used.Prefix)
+	}
+
+	used = efoo.Dir["foo-c"].Dir["foo-list"]
+	if used.Prefix == nil || used.Prefix.Name != "foo" {
+		t.Errorf(`want prefix named "foo", got %#v`, used.Prefix)
+	}
+	used = efoo.Dir["foo-c"].Dir["test1"]
 	if used.Prefix.Name != "bar" {
 		t.Errorf(`want prefix "bar", got %q`, used.Prefix.Name)
 	}
+
+	used = efoo.Dir["foo-c"].Dir["test1"].Dir["str"]
+	if used.Prefix == nil || used.Prefix.Name != "bar" {
+		t.Errorf(`want prefix named "bar", got %#v`, used.Prefix)
+	}
+
 }
 
 func TestEntryNamespace(t *testing.T) {
@@ -338,7 +355,8 @@ func TestEntryNamespace(t *testing.T) {
 		}
 
 		if m != tc.wantMod {
-			t.Errorf("%s: %s.InstantiatingModule(): did not get expected name, got: %v, want: %v", tc.descr, m, tc.wantMod)
+			t.Errorf("%s: %s.InstantiatingModule(): did not get expected name, got: %v, want: %v",
+				tc.descr, tc.entry.Path(), m, tc.wantMod)
 		}
 	}
 }
