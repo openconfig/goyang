@@ -457,11 +457,6 @@ func lexQString(l *lexer) stateFn {
 				c = '\t'
 			case '"':
 			case '\\':
-				if l.inPattern {
-					// We are parsing a pattern, so
-					// leave \\ as \\.
-					text = append(text, '\\')
-				}
 			default:
 				// Strings are use both in descriptions and
 				// in patterns.  In strings only \n, \t, \"

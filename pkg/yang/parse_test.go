@@ -105,7 +105,7 @@ foo "\\ \S \n";
 pattern "\\ \S \n";
 `,
 			out: []*Statement{
-				SA("pattern", `\\ \S 
+				SA("pattern", `\ \S 
 `),
 			},
 		},
