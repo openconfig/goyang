@@ -210,7 +210,9 @@ type Import struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
+	Description  *Value `yang:"description"`
 	Prefix       *Value `yang:"prefix,required"`
+	Reference    *Value `yang:"reference"`
 	RevisionDate *Value `yang:"revision-date"`
 
 	// Module is the imported module.  The types and groupings are
