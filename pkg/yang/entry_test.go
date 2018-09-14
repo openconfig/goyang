@@ -1412,3 +1412,74 @@ func TestEntryTypes(t *testing.T) {
 		}
 	}
 }
+
+func TestSequenceNumber(t *testing.T) {
+	getdir := func(e *Entry, elements ...string) (*Entry, error) {
+		for _, elem := range elements {
+			next := e.Dir[elem]
+			if next == nil {
+				return nil, fmt.Errorf("%s missing directory %q", e.Path(), elem)
+			}
+			e = next
+		}
+		return e, nil
+	}
+
+	modtext := `
+module sequence {
+  namespace "urn:sequence";
+  prefix "sequence";
+
+  container sequence {
+    leaf seq1 {
+      type uint32;
+    }
+    leaf seq2 {
+      type uint32;
+    }
+    leaf seq3 {
+      type string-default;
+    }
+  }
+
+}
+`
+
+	ms := NewModules()
+	if err := ms.Parse(modtext, "sequence.yang"); err != nil {
+		t.Fatal(err)
+	}
+
+	for i, tc := range []struct {
+		want int64
+		path []string
+	}{
+		{
+			path: []string{"sequence", "seq1"},
+			want: 1,
+		},
+		{
+			path: []string{"sequence", "seq2"},
+			want: 2,
+		},
+		{
+			path: []string{"sequence", "seq3"},
+			want: 3,
+		},
+	} {
+		tname := strings.Join(tc.path, "/")
+
+		mod, err := ms.FindModuleByPrefix("sequence")
+		if err != nil {
+			t.Fatalf("[%d_%s] module not found: %v", i, tname, err)
+		}
+		defaults := ToEntry(mod)
+		dir, err := getdir(defaults, tc.path...)
+		if err != nil {
+			t.Fatalf("[%d_%s] could not retrieve path: %v", i, tname, err)
+		}
+		if got := dir.SequenceNum; tc.want != got {
+			t.Errorf("[%d_%s] want SequenceNum %q, got %q", i, tname, tc.want, got)
+		}
+	}
+}
