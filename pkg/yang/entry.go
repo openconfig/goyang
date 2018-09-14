@@ -353,7 +353,6 @@ func (e *Entry) add(key string, value *Entry) *Entry {
 		return e
 	}
 	e.Dir[key] = value
-	value.SequenceNum = int64(len(e.Dir))
 	return e
 }
 
