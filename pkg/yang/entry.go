@@ -81,7 +81,7 @@ type Entry struct {
 	Key string            `json:",omitempty"` // Optional key name for lists (i.e., maps)
 	// SequenceNum indicates order of the entry relative to the parent
 	// from the original yang module
-	SequenceNum int64     `json:",omitempty"`
+	SequenceNum int64     `json:"-"`
 
 	// Fields associated with leaf nodes
 	Type *YangType    `json:",omitempty"`
