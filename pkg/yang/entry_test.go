@@ -1413,7 +1413,7 @@ func TestEntryTypes(t *testing.T) {
 	}
 }
 
-func TestSequenceNumber(t *testing.T) {
+func TestOrderedChildren(t *testing.T) {
 	getdir := func(e *Entry, elements ...string) (*Entry, error) {
 		for _, elem := range elements {
 			next := e.Dir[elem]
@@ -1430,17 +1430,35 @@ module sequence {
   namespace "urn:sequence";
   prefix "sequence";
 
-  container sequence {
-    leaf seq1 {
-      type uint32;
-    }
-    leaf seq2 {
-      type uint32;
-    }
-    leaf seq3 {
-      type string-default;
-    }
-  }
+	grouping testGroup1 {
+		leaf foo2 { type string; }
+		leaf bar2 { type string; }
+	}
+
+	grouping testGroup2 {
+		leaf foo1 { type string; }
+		uses testGroup1;
+		leaf bar1 { type string; }
+	}
+
+	container sequence {
+		leaf seq1 {
+			type uint32;
+		}
+				uses testGroup2;
+		leaf seq2 {
+			type uint32;
+		}
+	}
+
+	augment "/sequence:sequence" {
+		leaf aug1 {
+			type string;
+		}
+		leaf aug2 {
+			type string;
+		}
+	}
 
 }
 `
@@ -1450,21 +1468,20 @@ module sequence {
 		t.Fatal(err)
 	}
 
+	errs := ms.Process()
+	if len(errs) > 0 {
+		t.Fatal(errs)
+	}
+
 	for i, tc := range []struct {
-		want int64
-		path []string
+		want    []string
+		wantAug []string
+		path    []string
 	}{
 		{
-			path: []string{"sequence", "seq1"},
-			want: 1,
-		},
-		{
-			path: []string{"sequence", "seq2"},
-			want: 2,
-		},
-		{
-			path: []string{"sequence", "seq3"},
-			want: 3,
+			want:    []string{"seq1", "foo1", "foo2", "bar2", "bar1", "seq2"},
+			wantAug: []string{"aug1", "aug2"},
+			path:    []string{"sequence"},
 		},
 	} {
 		tname := strings.Join(tc.path, "/")
@@ -1478,8 +1495,11 @@ module sequence {
 		if err != nil {
 			t.Fatalf("[%d_%s] could not retrieve path: %v", i, tname, err)
 		}
-		if got := dir.SequenceNum; tc.want != got {
-			t.Errorf("[%d_%s] want SequenceNum %q, got %q", i, tname, tc.want, got)
+		if got := dir.GetOrderedChildren(); !reflect.DeepEqual(tc.want, got) {
+			t.Errorf("[%d_%s] want list %+v, got %+v", i, tname, tc.want, got)
+		}
+		if got := dir.GetOrderedAugments(); !reflect.DeepEqual(tc.wantAug, got) {
+			t.Errorf("[%d_%s] want list %+v, got %+v", i, tname, tc.wantAug, got)
 		}
 	}
 }
