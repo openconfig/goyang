@@ -79,9 +79,6 @@ type Entry struct {
 	// Fields associated with directory nodes
 	Dir map[string]*Entry `json:",omitempty"`
 	Key string            `json:",omitempty"` // Optional key name for lists (i.e., maps)
-	// SequenceNum indicates order of the entry relative to the parent
-	// from the original yang module
-	SequenceNum int64     `json:"-"`
 
 	// Fields associated with leaf nodes
 	Type *YangType    `json:",omitempty"`
@@ -96,7 +93,8 @@ type Entry struct {
 	// is a module only.
 	Identities []*Identity `json:",omitempty"`
 
-	Augments []*Entry `json:"-"` // Augments associated with this entry
+	Augments    []*Entry `json:"-"` // Augments associated with this entry
+	AugmentedBy []*Entry `json:"-"` // Augments added to this entry from others
 
 	// Extra maps all the unsupported fields to their values
 	Extra map[string][]interface{} `json:"-"`
@@ -780,6 +778,7 @@ func (e *Entry) Augment(addErrors bool) (processed, skipped int) {
 		// are merged into another entry.
 		processed++
 		ae.merge(nil, a.Namespace(), a)
+		ae.AugmentedBy = append(ae.AugmentedBy, a)
 	}
 	e.Augments = sa
 	return processed, skipped
@@ -1120,4 +1119,41 @@ func (e *Entry) DefaultValue() string {
 		}
 	}
 	return ""
+}
+
+// getOrderedChildren lists a nodes child fields and recursively expands
+// imported groups in depth first order.
+func getOrderedChildren(e Node, seen map[string]bool) []string {
+	res := []string{}
+	for _, stmt := range e.Statement().SubStatements() {
+		// If it is a uses statement, and we can resolve the group recurse into it
+		if stmt.Kind() == (&Uses{}).Kind() {
+			if grp := FindGrouping(e, stmt.NName(), seen); grp != nil {
+				res = append(res, getOrderedChildren(grp, seen)...)
+				continue
+			}
+		}
+
+		res = append(res, stmt.NName())
+	}
+	return res
+}
+
+// GetOrderedChildren returns the order of child elements in this entry from
+// the original yang module. Fields from augments may not be retured in
+// deterministed order, but will always be last.
+func (e *Entry) GetOrderedChildren() []string {
+	seen := map[string]bool{}
+	return getOrderedChildren(e.Node, seen)
+}
+
+// GetOrderedAugments returns the order of augments on an entry.
+// TODO: is the order of these actually deterministic? Would depend on import order.
+func (e *Entry) GetOrderedAugments() []string {
+	seen := map[string]bool{}
+	res := []string{}
+	for _, aug := range e.AugmentedBy {
+		res = append(res, getOrderedChildren(aug.Node, seen)...)
+	}
+	return res
 }
