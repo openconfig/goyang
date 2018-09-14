@@ -79,6 +79,9 @@ type Entry struct {
 	// Fields associated with directory nodes
 	Dir map[string]*Entry `json:",omitempty"`
 	Key string            `json:",omitempty"` // Optional key name for lists (i.e., maps)
+	// SequenceNum indicates order of the entry relative to the parent
+	// from the original yang module
+	SequenceNum int64     `json:",omitempty"`
 
 	// Fields associated with leaf nodes
 	Type *YangType    `json:",omitempty"`
@@ -352,6 +355,7 @@ func (e *Entry) add(key string, value *Entry) *Entry {
 		return e
 	}
 	e.Dir[key] = value
+	value.SequenceNum = int64(len(e.Dir))
 	return e
 }
 
