@@ -1012,7 +1012,12 @@ func (e *Entry) FixChoice() {
 			if ce.Kind != CaseEntry {
 				ne := &Entry{
 					Parent: e,
-					Node:   ce.Node,
+					Node: &Case{
+						Parent:     ce.Node.ParentNode(),
+						Name:       ce.Node.NName(),
+						Source:     ce.Node.Statement(),
+						Extensions: ce.Node.Exts(),
+					},
 					Name:   ce.Name,
 					Kind:   CaseEntry,
 					Config: ce.Config,
