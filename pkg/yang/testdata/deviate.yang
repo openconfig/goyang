@@ -1,0 +1,65 @@
+module deviate {
+    prefix "d";
+    namespace "urn:d";
+
+    grouping substmts {
+        leaf config { type string; }
+        leaf default { type string; }
+        leaf mandatory { type string; }
+        leaf-list max-elements { type string; }
+        leaf-list min-elements { type string; }
+        leaf-list max-and-min-elements { type string; }
+        leaf type { type string; }
+        // TODO(robjs): unique requires a list target
+        leaf units { type uint16; }
+    }
+
+    container target {
+        container add {
+            uses substmts;
+        }
+    }
+
+    deviation /target/add/config {
+        deviate add {
+            config false;
+        }
+    }
+
+    deviation /target/add/default {
+        deviate add {
+            default "a default value";
+        }
+    }
+
+    deviation /target/add/mandatory {
+        deviate add {
+            mandatory true;
+        }
+    }
+
+    deviation /target/add/min-elements {
+        deviate add {
+            min-elements 42;
+        }
+    }
+
+    deviation /target/add/max-elements {
+        deviate add {
+            max-elements 42;
+        }
+    }
+
+    deviation /target/add/max-and-min-elements {
+        deviate add {
+            max-elements 42;
+            min-elements 42;
+        }
+    }
+
+    deviation /target/add/units {
+        deviate add {
+            units "fish per second";
+        }
+    }
+}

@@ -17,10 +17,14 @@ package yang
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/openconfig/gnmi/errdiff"
 )
 
 func TestNilEntry(t *testing.T) {
@@ -1410,5 +1414,396 @@ func TestEntryTypes(t *testing.T) {
 				t.Errorf("%s: got Is%v? %t, want Is%v? %t", tt.desc, stype, got, stype, want)
 			}
 		}
+	}
+}
+
+func mustReadFile(path string) string {
+	s, err := ioutil.ReadFile(path)
+	if err != nil {
+		panic(err)
+	}
+	return string(s)
+}
+
+func TestDeviation(t *testing.T) {
+	type deviationTest struct {
+		path  string
+		entry *Entry // entry is the entry that is wanted at a particular path, if a field is left as nil, it is not checked.
+	}
+	tests := []struct {
+		desc                    string
+		inFiles                 map[string]string
+		wants                   map[string][]deviationTest
+		wantParseErrSubstring   string
+		wantProcessErrSubstring string
+	}{{
+		desc:    "deviation with add",
+		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate.yang"))},
+		wants: map[string][]deviationTest{
+			"deviate": []deviationTest{{
+				path: "/target/add/config",
+				entry: &Entry{
+					Config: TSFalse,
+				},
+			}, {
+				path: "/target/add/mandatory",
+				entry: &Entry{
+					Mandatory: TSTrue,
+				},
+			}, {
+				path: "/target/add/min-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MinElements: &Value{Name: "42"},
+					},
+				},
+			}, {
+				path: "/target/add/max-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MaxElements: &Value{Name: "42"},
+					},
+				},
+			}, {
+				path: "/target/add/max-and-min-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MinElements: &Value{Name: "42"},
+						MaxElements: &Value{Name: "42"},
+					},
+				},
+			}, {
+				path: "/target/add/units",
+				entry: &Entry{
+					Units: "fish per second",
+				},
+			}},
+		},
+	}, {
+		desc: "error case - deviation add max-element to non-list",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a { type string; }
+
+					deviation /a {
+						deviate add {
+							max-elements 42;
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "tried to deviate max-elements on a non-list type",
+	}, {
+		desc: "error case - deviation add min elements to non-list",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a { type string; }
+
+					deviation /a {
+						deviate add {
+							min-elements 42;
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "tried to deviate min-elements on a non-list type",
+	}, {
+		desc:    "deviation - not supported",
+		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate-notsupported.yang"))},
+		wants: map[string][]deviationTest{
+			"deviate": []deviationTest{{
+				path: "/target",
+			}, {
+				path: "/target-list",
+			}, {
+				path: "/a-leaf",
+			}, {
+				path: "/a-leaflist",
+			}, {
+				path:  "survivor",
+				entry: &Entry{Name: "survivor"},
+			}},
+		},
+	}, {
+		desc: "deviation removing non-existent node",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					deviation /a/b/c {
+						deviate not-supported;
+					}
+				}
+			`,
+		},
+		wantProcessErrSubstring: "cannot find target node to deviate",
+	}, {
+		desc: "deviation not supported across modules",
+		inFiles: map[string]string{
+			"source": `
+				module source {
+					prefix "s";
+					namespace "urn:s";
+
+					leaf a { type string; }
+					leaf b { type string; }
+				}`,
+			"deviation": `
+					module deviation {
+						prefix "d";
+						namespace "urn:d";
+
+						import source { prefix s; }
+
+						deviation /s:a {
+							deviate not-supported;
+						}
+					}`,
+		},
+		wants: map[string][]deviationTest{
+			"source": []deviationTest{{
+				path: "/a",
+			}, {
+				path:  "/b",
+				entry: &Entry{},
+			}},
+		},
+	}, {
+		desc:    "deviation with replace",
+		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate-replace.yang"))},
+		wants: map[string][]deviationTest{
+			"deviate": []deviationTest{{
+				path: "/target/replace/config",
+				entry: &Entry{
+					Config: TSFalse,
+				},
+			}, {
+				path: "/target/replace/mandatory",
+				entry: &Entry{
+					Mandatory: TSTrue,
+				},
+			}, {
+				path: "/target/replace/min-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MinElements: &Value{Name: "42"},
+					},
+				},
+			}, {
+				path: "/target/replace/max-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MaxElements: &Value{Name: "42"},
+					},
+				},
+			}, {
+				path: "/target/replace/max-and-min-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MinElements: &Value{Name: "42"},
+						MaxElements: &Value{Name: "42"},
+					},
+				},
+			}, {
+				path: "/target/replace/units",
+				entry: &Entry{
+					Units: "fish per second",
+				},
+			}, {
+				path: "/target/replace/type",
+				entry: &Entry{
+					Type: &YangType{
+						Name: "uint16",
+						Kind: Yuint16,
+					},
+				},
+			}},
+		},
+	}, {
+		desc:    "deviation with delete",
+		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate-delete.yang"))},
+		wants: map[string][]deviationTest{
+			"deviate": []deviationTest{{
+				path: "/target/delete/config",
+				entry: &Entry{
+					Config: TSUnset,
+				},
+			}, {
+				path: "/target/delete/mandatory",
+				entry: &Entry{
+					Mandatory: TSUnset,
+				},
+			}, {
+				path: "/target/delete/min-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MinElements: nil,
+					},
+				},
+			}, {
+				path: "/target/delete/max-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MaxElements: nil,
+					},
+				},
+			}, {
+				path: "/target/delete/max-and-min-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MinElements: nil,
+						MaxElements: nil,
+					},
+				},
+			}, {
+				path: "/target/delete/units",
+				entry: &Entry{
+					Units: "",
+				},
+			}},
+		},
+	}, {
+		desc: "deviation using locally defined typedef",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					import source { prefix s; }
+
+					typedef rstr {
+						type string {
+							pattern "a.*";
+						}
+					}
+
+					deviation /s:a {
+						deviate replace {
+							type rstr;
+						}
+					}
+				}
+			`,
+			"source": `
+				module source {
+					prefix "s";
+					namespace "urn:s";
+
+					leaf a { type uint16; }
+				}
+			`,
+		},
+		wants: map[string][]deviationTest{
+			"source": []deviationTest{{
+				path: "/a",
+				entry: &Entry{
+					Type: &YangType{
+						Name:    "rstr",
+						Kind:    Ystring,
+						Pattern: []string{"a.*"},
+					},
+				},
+			}},
+		},
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			ms := NewModules()
+			mergedSubmodule = map[string]bool{}
+
+			for name, mod := range tt.inFiles {
+				if err := ms.Parse(mod, name); err != nil {
+					fmt.Printf("LIZARD %s\n", err)
+					if diff := errdiff.Substring(err, tt.wantParseErrSubstring); diff != "" {
+						t.Fatalf("error parsing module %s, %s", name, diff)
+					}
+				}
+			}
+
+			if errs := ms.Process(); len(errs) > 0 {
+				var match bool
+				for _, err := range errs {
+					if diff := errdiff.Substring(err, tt.wantProcessErrSubstring); diff == "" {
+						match = true
+						break
+					}
+				}
+				if !match {
+					t.Fatalf("got errs: %v, want: %v", errs, tt.wantProcessErrSubstring)
+				}
+			}
+
+			for mod, tcs := range tt.wants {
+				m, errs := ms.GetModule(mod)
+				if errs != nil {
+					t.Errorf("couldn't find module %s", mod)
+					continue
+				}
+
+				for idx, want := range tcs {
+					got := m.Find(want.path)
+					switch {
+					case got == nil && want.entry != nil:
+						t.Errorf("%d: expected entry %s does not exist", idx, want.path)
+						continue
+					case got != nil && want.entry == nil:
+						t.Errorf("%d: unexpected entry %s exists, got: %v", idx, want.path, got)
+						continue
+					case want.entry == nil:
+						continue
+					}
+
+					if got.Config != want.entry.Config {
+						t.Errorf("%d (%s): did not get expected config statement, got: %v, want: %v", idx, want.path, got.Config, want.entry.Config)
+					}
+
+					if got.Default != want.entry.Default {
+						t.Errorf("%d (%s): did not get expected default statement, got: %v, want: %v", idx, want.path, got.Default, want.entry.Default)
+					}
+
+					if got.Mandatory != want.entry.Mandatory {
+						t.Errorf("%d (%s): did not get expected mandatory statement, got: %v, want: %v", idx, want.path, got.Mandatory, want.entry.Mandatory)
+					}
+
+					if want.entry.ListAttr != nil {
+						if got.ListAttr == nil {
+							t.Errorf("%d (%s): listattr was nil for an entry expected to be a list at %s", idx, want.path, want.path)
+							continue
+						}
+						if want.entry.ListAttr.MinElements != nil {
+							if gotn, wantn := got.ListAttr.MinElements.Name, want.entry.ListAttr.MinElements.Name; gotn != wantn {
+								t.Errorf("%d (%s): min-elements, got: %v, want: %v", idx, want.path, gotn, wantn)
+							}
+						}
+					}
+
+					if want.entry.Type != nil {
+						if got.Type.Name != want.entry.Type.Name {
+							t.Errorf("%d (%s): type name, got: %s, want: %s", idx, want.path, got.Type.Name, want.entry.Type.Name)
+						}
+
+						if got.Type.Kind != want.entry.Type.Kind {
+							t.Errorf("%d (%s): type kind, got: %s, want: %s", idx, want.path, got.Type.Kind, want.entry.Type.Kind)
+						}
+					}
+
+					if got.Units != want.entry.Units {
+						t.Errorf("%d (%s): did not get expected units statement, got: %s, want: %s", idx, want.path, got.Units, want.entry.Units)
+					}
+				}
+			}
+		})
 	}
 }

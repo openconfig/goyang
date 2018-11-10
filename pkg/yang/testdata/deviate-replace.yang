@@ -1,0 +1,95 @@
+module deviate {
+    prefix "d";
+    namespace "urn:d";
+
+    grouping substmts {
+        leaf config {
+            type string;
+            config true;
+        }
+        leaf default {
+            type string;
+            default "fish";
+        }
+        leaf mandatory {
+            type string;
+            mandatory false;
+        }
+        leaf-list max-elements {
+            type string;
+            max-elements 1000;
+        }
+        leaf-list min-elements {
+            type string;
+            min-elements 1000;
+        }
+        leaf-list max-and-min-elements {
+            type string;
+            max-elements 1024;
+            min-elements 1;
+        }
+        leaf type {
+            type string;
+        }
+        // TODO(robjs): unique for deviation
+        leaf units {
+            type uint16;
+            units "nanofish per millenium";
+        }
+    }
+
+    container target {
+        container replace {
+            uses substmts;
+        }
+    }
+
+    deviation /target/replace/config {
+        deviate replace {
+            config false;
+        }
+    }
+
+    deviation /target/replace/default {
+        deviate replace {
+            default "a default value";
+        }
+    }
+
+    deviation /target/replace/mandatory {
+        deviate replace {
+            mandatory true;
+        }
+    }
+
+    deviation /target/replace/min-elements {
+        deviate replace {
+            min-elements 42;
+        }
+    }
+
+    deviation /target/replace/max-elements {
+        deviate replace {
+            max-elements 42;
+        }
+    }
+
+    deviation /target/replace/max-and-min-elements {
+        deviate replace {
+            max-elements 42;
+            min-elements 42;
+        }
+    }
+
+    deviation /target/replace/type {
+        deviate replace {
+            type uint16;
+        }
+    }
+
+    deviation /target/replace/units {
+        deviate replace {
+            units "fish per second";
+        }
+    }
+}
