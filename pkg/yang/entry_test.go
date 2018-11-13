@@ -1716,6 +1716,47 @@ func TestDeviation(t *testing.T) {
 				},
 			}},
 		},
+	}, {
+		desc: "complex deviation of multiple leaves",
+		inFiles: map[string]string{
+			"foo": `
+			module foo {
+				prefix "f";
+				namespace "urn:f";
+
+				container a { leaf b { type string; } }
+
+				typedef abc { type boolean; }
+				typedef abt { type uint32; }
+
+				deviation /a/b {
+					// typedef is not valid here.
+					//typedef abc {
+					//  type boolean;
+					//}
+					deviate replace { type abc; }
+				}
+
+				deviation /a/b {
+					// typedef is not valid here.
+					//typedef abt {
+					//  type uint16;
+					//}
+					deviate replace { type abt; }
+				}
+			}`,
+		},
+		wants: map[string][]deviationTest{
+			"foo": []deviationTest{{
+				path: "/a/b",
+				entry: &Entry{
+					Type: &YangType{
+						Name: "abt",
+						Kind: Yuint32,
+					},
+				},
+			}},
+		},
 	}}
 
 	for _, tt := range tests {
@@ -1725,7 +1766,6 @@ func TestDeviation(t *testing.T) {
 
 			for name, mod := range tt.inFiles {
 				if err := ms.Parse(mod, name); err != nil {
-					fmt.Printf("LIZARD %s\n", err)
 					if diff := errdiff.Substring(err, tt.wantParseErrSubstring); diff != "" {
 						t.Fatalf("error parsing module %s, %s", name, diff)
 					}

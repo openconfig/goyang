@@ -71,8 +71,8 @@ type Entry struct {
 	Name        string    // our name, same as the key in our parent Dirs
 	Description string    `json:",omitempty"` // description from node, if any
 	Default     string    `json:",omitempty"` // default from node, if any
-	Units       string    `json:",omitempty"`
-	Errors      []error   `json:"-"` // list of errors encountered on this node
+	Units       string    `json:",omitempty"` // units associated with the type, if any
+	Errors      []error   `json:"-"`          // list of errors encountered on this node
 	Kind        EntryKind // kind of Entry
 	Config      TriState  // config state of this entry, if known
 	Prefix      *Value    `json:",omitempty"` // prefix to use from this point down
@@ -394,19 +394,31 @@ const (
 	DeviationAdd
 	// DeviationReplace corresponds to the replace argument to the deviate stmt.
 	DeviationReplace
-	// DeviationDelete corresponds to thee delete argument to the deviation stmt.
+	// DeviationDelete corresponds to the delete argument to the deviate stmt.
 	DeviationDelete
 )
 
-func (d deviationType) String() string {
-	m := map[deviationType]string{
+var (
+	// fromDeviation maps from an enumerated deviation type to the YANG keyword.
+	fromDeviation = map[deviationType]string{
 		DeviationNotSupported: "not-supported",
 		DeviationAdd:          "add",
 		DeviationReplace:      "replace",
 		DeviationDelete:       "delete",
 		DeviationUnset:        "unknown",
 	}
-	return m[d]
+
+	// toDeviation maps from the YANG keyword to an enumerated deviation typee.
+	toDeviation = map[string]deviationType{
+		"not-supported": DeviationNotSupported,
+		"add":           DeviationAdd,
+		"replace":       DeviationReplace,
+		"delete":        DeviationDelete,
+	}
+)
+
+func (d deviationType) String() string {
+	return fromDeviation[d]
 }
 
 // DeviatedEntry stores a wrapped Entry that corresponds to a deviation.
@@ -777,26 +789,18 @@ func ToEntry(n Node) (e *Entry) {
 			if a := fv.Interface().([]*Deviate); a != nil {
 				for _, d := range a {
 					de := ToEntry(d)
-					var arg deviationType
-					switch d.Statement().Argument {
-					case "not-supported":
-						arg = DeviationNotSupported
-					case "add":
-						arg = DeviationAdd
-					case "replace":
-						arg = DeviationReplace
-					case "delete":
-						arg = DeviationDelete
+
+					dt, ok := toDeviation[d.Statement().Argument]
+					if !ok {
+						e.addError(fmt.Errorf("%s: unknown deviation type in %s:%s", Source(n), n.Kind(), n.NName()))
+						continue
 					}
 
 					if e.Deviate == nil {
 						e.Deviate = map[deviationType][]*Entry{}
 					}
 
-					if _, ok := e.Deviate[arg]; !ok {
-						e.Deviate[arg] = []*Entry{}
-					}
-					e.Deviate[arg] = append(e.Deviate[arg], de)
+					e.Deviate[dt] = append(e.Deviate[dt], de)
 				}
 			}
 		case "mandatory":
