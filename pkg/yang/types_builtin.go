@@ -33,29 +33,51 @@ import (
 type TypeKind uint
 
 const (
-	Ynone   = TypeKind(iota)
-	Yint8   // int in range [-128, 127]
-	Yint16  // int in range [-32768, 32767]
-	Yint32  // int in range [-2147483648, 2147483647]
-	Yint64  // int in range [-9223372036854775808, 9223372036854775807]
-	Yuint8  // int in range [0, 255]
-	Yuint16 // int in range [0, 65535]
-	Yuint32 // int in range [0, 4294967295]
-	Yuint64 // int in range [0, 18446744073709551615]
+	// Ynone represents the invalid (unset) type.
+	Ynone = TypeKind(iota)
+	// Yint8 is an int in the range [-128, 127].
+	Yint8
+	// Yint16 is an int in the range [-32768, 32767].
+	Yint16
+	// Yint32 is an int in the range [-2147483648, 2147483647].
+	Yint32
+	// Yint64 is an int in the range [-9223372036854775808, 9223372036854775807]
+	Yint64
+	// Yuint8 is an int in the range [0, 255]
+	Yuint8
+	// Yuint16 is an int in the range [0, 65535]
+	Yuint16
+	// Yuint32 is an int in the range [0, 4294967295]
+	Yuint32
+	// Yuint64 is an int in the range [0, 18446744073709551615]
+	Yuint64
 
-	Ybinary             // arbitrary data
-	Ybits               // set of bits or flags
-	Ybool               // true or false
-	Ydecimal64          // signed decimal number
-	Yempty              // no associated value
-	Yenum               // enumerated strings
-	Yidentityref        // reference to abstrace identity
-	YinstanceIdentifier // reference of a data tree node
-	Yleafref            // reference to a leaf instance
-	Ystring             // human readable string
-	Yunion              // choice of types
+	// Ybinary stores arbitrary data.
+	Ybinary
+	// Ybits is a named set of bits or flags.
+	Ybits
+	// Ybool is true or false.
+	Ybool
+	// Ydecimal64 is a signed decimal number.
+	Ydecimal64
+	// Yempty has no associated value.
+	Yempty
+	// Yenum stores enumerated strings.
+	Yenum
+	// Yidentityref stores an extensible enumeration.
+	Yidentityref
+	// YinstanceIdentifier stores a reference to a data tree node.
+	YinstanceIdentifier
+	// Yleafref stores a reference to a leaf instance.
+	Yleafref
+	// Ystring is a human readable string.
+	Ystring
+	// Yunion is a choice of types.
+	Yunion
 )
 
+// TypeKindFromName maps the string name used in a YANG file to the enumerated
+// TypeKind used in this library.
 var TypeKindFromName = map[string]TypeKind{
 	"none":                Ynone,
 	"int8":                Yint8,
@@ -79,6 +101,8 @@ var TypeKindFromName = map[string]TypeKind{
 	"union":               Yunion,
 }
 
+// TypeKindToName maps the enumerated type used in this library to the string
+// used in a YANG file.
 var TypeKindToName = map[TypeKind]string{
 	Ynone:               "none",
 	Yint8:               "int8",
@@ -451,22 +475,33 @@ var (
 )
 
 const (
-	MaxInt64                = 1<<63 - 1 // maximum value of a signed int64
-	MinInt64                = -1 << 63  // minimum value of a signed int64
-	AbsMinInt64             = 1 << 63   // the absolute value of MinInt64
-	MaxEnum                 = 1<<31 - 1 // maximum value of an enum
-	MinEnum                 = -1 << 31  // minimum value of an enum
-	MaxBitfieldSize         = 1 << 32   // maximum number of bits in a bitfield
-	MaxFractionDigits uint8 = 18        // maximum fractional digits per Section 9.3.4
+	// MaxInt64 corresponds to the maximum value of a signed int64.
+	MaxInt64 = 1<<63 - 1
+	// MinInt64 corresponds to the maximum value of a signed int64.
+	MinInt64 = -1 << 63
+	// AbsMinInt64 is the absolute value of MinInt64.
+	AbsMinInt64 = 1 << 63
+	// MaxEnum is the maximum value of an enumeration.
+	MaxEnum = 1<<31 - 1
+	// MinEnum is the minimum value of an enumeration.
+	MinEnum = -1 << 31
+	// MaxBitfieldSize is the maximum number of bits in a bitfield.
+	MaxBitfieldSize = 1 << 32
+	// MaxFractionDigits is the maximum number of fractional digits as per RFC6020 Section 9.3.4.
+	MaxFractionDigits uint8 = 18
 )
 
 type NumberKind int
 
 const (
-	Positive  = NumberKind(iota) // Number is non-negative
-	Negative                     // Number is negative
-	MinNumber                    // Number is minimum value allowed for range
-	MaxNumber                    // Number is maximum value allowed for range
+	// Positive indicates that a Number is non-negative.
+	Positive = NumberKind(iota)
+	// Negative indicates that a Number is negative.
+	Negative
+	// MinNumber indicates that the Number is the minimum value allowed for the range.
+	MinNumber
+	// MaxNumber indicates that the Number is the maximum value allowed for the range.
+	MaxNumber
 )
 
 const space18 = "000000000000000000" // used for prepending 0's
