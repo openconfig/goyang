@@ -1417,6 +1417,210 @@ func TestEntryTypes(t *testing.T) {
 	}
 }
 
+func TestFixChoice(t *testing.T) {
+	choiceEntry := &Entry{
+		Name: "choiceEntry",
+		Kind: ChoiceEntry,
+		Dir: map[string]*Entry{
+			"unnamedAnyDataCase": {
+				Name: "unnamedAnyDataCase",
+				Kind: AnyDataEntry,
+				Node: &AnyData{
+					Parent: &Container{
+						Name: "AnyDataParentNode",
+					},
+					Name: "unnamedAnyDataCase",
+					Source: &Statement{
+						Keyword:     "anyData-keyword",
+						HasArgument: true,
+						Argument:    "anyData-argument",
+						statements:  nil,
+					},
+					Extensions: []*Statement{
+						&Statement{
+							Keyword:     "anyData-extension",
+							HasArgument: true,
+							Argument:    "anyData-extension-arg",
+							statements:  nil,
+						},
+					},
+				},
+			},
+			"unnamedAnyXMLCase": {
+				Name: "unnamedAnyXMLCase",
+				Kind: AnyXMLEntry,
+				Node: &AnyXML{
+					Parent: &Container{
+						Name: "AnyXMLParentNode",
+					},
+					Name: "unnamedAnyXMLCase",
+					Source: &Statement{
+						Keyword:     "anyXML-keyword",
+						HasArgument: true,
+						Argument:    "anyXML-argument",
+						statements:  nil,
+					},
+					Extensions: []*Statement{
+						&Statement{
+							Keyword:     "anyXML-extension",
+							HasArgument: true,
+							Argument:    "anyXML-extension-arg",
+							statements:  nil,
+						},
+					},
+				},
+			},
+			"unnamedContainerCase": {
+				Name: "unnamedContainerCase",
+				Kind: DirectoryEntry,
+				Node: &Container{
+					Parent: &Container{
+						Name: "AnyContainerNode",
+					},
+					Name: "unnamedContainerCase",
+					Source: &Statement{
+						Keyword:     "container-keyword",
+						HasArgument: true,
+						Argument:    "container-argument",
+						statements:  nil,
+					},
+					Extensions: []*Statement{
+						&Statement{
+							Keyword:     "container-extension",
+							HasArgument: true,
+							Argument:    "container-extension-arg",
+							statements:  nil,
+						},
+					},
+				},
+			},
+			"unnamedLeafCase": {
+				Name: "unnamedLeafCase",
+				Kind: LeafEntry,
+				Node: &Leaf{
+					Parent: &Container{
+						Name: "leafParentNode",
+					},
+					Name: "unnamedLeafCase",
+					Source: &Statement{
+						Keyword:     "leaf-keyword",
+						HasArgument: true,
+						Argument:    "leaf-argument",
+						statements:  nil,
+					},
+					Extensions: []*Statement{
+						&Statement{
+							Keyword:     "leaf-extension",
+							HasArgument: true,
+							Argument:    "leaf-extension-arg",
+							statements:  nil,
+						},
+					},
+				},
+			},
+			"unnamedLeaf-ListCase": {
+				Name: "unnamedLeaf-ListCase",
+				Kind: LeafEntry,
+				Node: &LeafList{
+					Parent: &Container{
+						Name: "LeafListNode",
+					},
+					Name: "unnamedLeaf-ListCase",
+					Source: &Statement{
+						Keyword:     "leaflist-keyword",
+						HasArgument: true,
+						Argument:    "leaflist-argument",
+						statements:  nil,
+					},
+					Extensions: []*Statement{
+						&Statement{
+							Keyword:     "leaflist-extension",
+							HasArgument: true,
+							Argument:    "leaflist-extension-arg",
+							statements:  nil,
+						},
+					},
+				},
+			},
+			"unnamedListCase": {
+				Name: "unnamedListCase",
+				Kind: DirectoryEntry,
+				Node: &List{
+					Parent: &Container{
+						Name: "ListNode",
+					},
+					Name: "unnamedListCase",
+					Source: &Statement{
+						Keyword:     "list-keyword",
+						HasArgument: true,
+						Argument:    "list-argument",
+						statements:  nil,
+					},
+					Extensions: []*Statement{
+						&Statement{
+							Keyword:     "list-extension",
+							HasArgument: true,
+							Argument:    "list-extension-arg",
+							statements:  nil,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	choiceEntry.FixChoice()
+
+	for _, e := range []string{"AnyData", "AnyXML", "Container",
+		"Leaf", "Leaf-List", "List"} {
+		entryName := "unnamed" + e + "Case"
+		t.Run(entryName, func(t *testing.T) {
+
+			insertedCase := choiceEntry.Dir[entryName]
+			originalCase := insertedCase.Dir[entryName]
+
+			insertedNode := insertedCase.Node
+			if insertedNode.Kind() != "case" {
+				t.Errorf("Got inserted node type %s, expected case",
+					insertedNode.Kind())
+			}
+
+			originalNode := originalCase.Node
+			if originalNode.Kind() != strings.ToLower(e) {
+				t.Errorf("Got original node type %s, expected %s",
+					originalNode.Kind(), strings.ToLower(e))
+			}
+
+			if insertedNode.ParentNode() != originalNode.ParentNode() {
+				t.Errorf("Got inserted node's parent node %v, expected %v",
+					insertedNode.ParentNode(), originalNode.ParentNode())
+			}
+
+			if insertedNode.NName() != originalNode.NName() {
+				t.Errorf("Got inserted node's name %s, expected %s",
+					insertedNode.NName(), originalNode.NName())
+			}
+
+			if insertedNode.Statement() != originalNode.Statement() {
+				t.Errorf("Got inserted node's statement %v, expected %s",
+					insertedNode.Statement(), originalNode.Statement())
+			}
+
+			if len(insertedNode.Exts()) != len(originalNode.Exts()) {
+				t.Errorf("Got inserted node extensions slice len %d, expected %v",
+					len(insertedNode.Exts()), len(originalNode.Exts()))
+			}
+
+			for i, e := range insertedNode.Exts() {
+				if e != originalNode.Exts()[i] {
+					t.Errorf("Got inserted node's extension %v at index %d, expected %v",
+						e, i, originalNode.Exts()[i])
+				}
+			}
+		})
+	}
+}
+
 func mustReadFile(path string) string {
 	s, err := ioutil.ReadFile(path)
 	if err != nil {
