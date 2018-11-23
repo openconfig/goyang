@@ -22,7 +22,7 @@ progress.
 ### Getting started
 
 To build goyang, ensure you have go language tools installed
-(available at [golang.org](golang.org/dl)) and that the `GOPATH`
+(available at [golang.org](https://golang.org/dl)) and that the `GOPATH`
 environment variable is set to your Go workspace.
 
 1. `go get github.com/openconfig/goyang`
