@@ -385,11 +385,15 @@ func (ms *Modules) Process() []error {
 	// rather we can just walk all modules and submodules *after* entries
 	// are resolved. This means we do not need to concern ourselves that
 	// an entry does not exist.
-	for _, m := range ms.Modules {
-		errs = append(errs, ToEntry(m).ApplyDeviate()...)
-	}
-	for _, m := range ms.SubModules {
-		errs = append(errs, ToEntry(m).ApplyDeviate()...)
+	dvP := map[string]bool{} // cache the modules we've handled since we have both modname and modname@revision-date
+	for _, devmods := range []map[string]*Module{ms.Modules, ms.SubModules} {
+		for _, m := range devmods {
+			e := ToEntry(m)
+			if !dvP[e.Name] {
+				errs = append(errs, e.ApplyDeviate()...)
+				dvP[e.Name] = true
+			}
+		}
 	}
 
 	return errorSort(errs)

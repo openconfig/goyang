@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package yang_test
+package yang
 
 import (
 	"strings"
 	"testing"
-
-	"github.com/openconfig/goyang/pkg/yang"
 )
 
 var testdataFindModulesText = map[string]string{
@@ -31,8 +29,8 @@ var testdataFindModulesText = map[string]string{
 	"dup-ns-two":  `module dup-ns-two { prefix ns-two; namespace urn:duplicate; }`,
 }
 
-func testModulesForTestdataModulesText(t *testing.T) *yang.Modules {
-	ms := yang.NewModules()
+func testModulesForTestdataModulesText(t *testing.T) *Modules {
+	ms := NewModules()
 	for name, modtext := range testdataFindModulesText {
 		if err := ms.Parse(modtext, name+".yang"); err != nil {
 			t.Fatalf("error importing testdataFindModulesText[%q]: %v", name, err)
@@ -47,7 +45,7 @@ func testModulesForTestdataModulesText(t *testing.T) *yang.Modules {
 	return ms
 }
 
-func testModulesFindByCommonHandler(t *testing.T, i int, got, want *yang.Module, wantError string, err error) {
+func testModulesFindByCommonHandler(t *testing.T, i int, got, want *Module, wantError string, err error) {
 	if err != nil {
 		if wantError != "" {
 			if !strings.Contains(err.Error(), wantError) {
@@ -69,7 +67,7 @@ func TestModulesFindByPrefix(t *testing.T) {
 
 	for i, tc := range []struct {
 		prefix    string
-		want      *yang.Module
+		want      *Module
 		wantError string
 	}{
 		{
@@ -103,7 +101,7 @@ func TestModulesFindByNamespace(t *testing.T) {
 
 	for i, tc := range []struct {
 		namespace string
-		want      *yang.Module
+		want      *Module
 		wantError string
 	}{
 		{
@@ -129,5 +127,58 @@ func TestModulesFindByNamespace(t *testing.T) {
 	} {
 		got, err := ms.FindModuleByNamespace(tc.namespace)
 		testModulesFindByCommonHandler(t, i, got, tc.want, tc.wantError, err)
+	}
+}
+
+func TestModulesTotalProcess(t *testing.T) {
+	tests := []struct {
+		desc    string
+		inMods  map[string]string
+		wantErr bool
+	}{{
+		desc: "import with deviation",
+		inMods: map[string]string{
+			"dev": `
+				module dev {
+					prefix d;
+					namespace "urn:d";
+					import sys { prefix sys; }
+
+					revision 01-01-01 { description "the start of time"; }
+
+					deviation /sys:sys/sys:hostname {
+						deviate not-supported;
+					}
+				}`,
+			"sys": `
+				module sys {
+					prefix s;
+					namespace "urn:s";
+
+					revision 01-01-01 { description "the start of time"; }
+
+					container sys { leaf hostname { type string; } }
+				}`,
+		},
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			ms := NewModules()
+
+			for n, m := range tt.inMods {
+				if err := ms.Parse(m, n); err != nil {
+					t.Fatalf("cannot parse module %s, err: %v", n, err)
+				}
+			}
+
+			errs := ms.Process()
+			switch {
+			case len(errs) == 0 && tt.wantErr:
+				t.Fatalf("did not get expected errors, got: %v, wantErr: %v", errs, tt.wantErr)
+			case len(errs) != 0 && !tt.wantErr:
+				t.Fatalf("got unexpected errors, got: %v, wantErr: %v", errs, tt.wantErr)
+			}
+		})
 	}
 }
