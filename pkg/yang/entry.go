@@ -705,7 +705,14 @@ func ToEntry(n Node) (e *Entry) {
 			// seems fine to ignore them for now, we are
 			// just interested in the tree structure.
 			for _, r := range fv.Interface().([]*RPC) {
-				e.add(r.Name, ToEntry(r))
+				switch rpc := ToEntry(r); {
+				case rpc.RPC == nil:
+					// When "rpc" has no "input" or "output" children
+					rpc.RPC = &RPCEntry{}
+					fallthrough
+				default:
+					e.add(r.Name, rpc)
+				}
 			}
 
 		case "input":

@@ -949,6 +949,8 @@ func TestActionRPC(t *testing.T) {
 		operationPath []string
 		wantNodeKind  string
 		wantError     string
+		noInput       bool
+		noOutput      bool
 	}{
 		{
 			name:          "test action in container",
@@ -1039,6 +1041,55 @@ func TestActionRPC(t *testing.T) {
 }`,
 		},
 
+		{
+			name:          "minimal rpc",
+			wantNodeKind:  "rpc",
+			operationPath: []string{"operation"},
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  rpc operation {
+    description "rpc";
+  }
+}`,
+			noInput:  true,
+			noOutput: true,
+		},
+
+		{
+			name:          "input-only rpc",
+			wantNodeKind:  "rpc",
+			operationPath: []string{"operation"},
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  rpc operation {
+    description "rpc";
+    input {
+      leaf string { type string; }
+    }
+  }
+}`,
+			noOutput: true,
+		},
+
+		{
+			name:          "output-only rpc",
+			wantNodeKind:  "rpc",
+			operationPath: []string{"operation"},
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  rpc operation {
+    description "rpc";
+    output {
+      leaf string { type string; }
+    }
+  }
+}`,
+			noInput: true,
+		},
+
 		// test cases with errors (in module parsing)
 		{
 			name:      "rpc not module child",
@@ -1110,9 +1161,9 @@ func TestActionRPC(t *testing.T) {
 		// confirm the child RPCEntry was populated for the entry.
 		if e.RPC == nil {
 			t.Errorf("%s: entry at %v has nil RPC child, want: non-nil. Entry: %#v", tt.name, tt.operationPath, e)
-		} else if e.RPC.Input == nil {
+		} else if !tt.noInput && e.RPC.Input == nil {
 			t.Errorf("%s: RPCEntry has nil Input, want: non-nil. Entry: %#v", tt.name, e.RPC)
-		} else if e.RPC.Output == nil {
+		} else if !tt.noOutput && e.RPC.Output == nil {
 			t.Errorf("%s: RPCEntry has nil Output, want: non-nil. Entry: %#v", tt.name, e.RPC)
 		}
 	}
