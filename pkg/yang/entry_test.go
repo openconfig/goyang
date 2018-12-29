@@ -365,6 +365,489 @@ func TestEntryNamespace(t *testing.T) {
 	}
 }
 
+var testWhenModules = []struct {
+	name string
+	in   string
+}{
+	{
+		name: "when.yang",
+		in: `
+module when {
+  namespace "urn:when";
+  prefix "when";
+
+  leaf condition { type string; }
+
+  container alpha {
+    when "../condition = 'alpha'";
+  }
+
+  leaf beta {
+    when "../condition = 'beta'";
+    type string;
+  }
+
+  leaf-list gamma {
+    when "../condition = 'gamma'";
+    type string;
+  }
+
+  list delta {
+    when "../condition = 'delta'";
+  }
+
+  choice epsilon {
+    when "../condition = 'epsilon'";
+
+    case zeta {
+      when "../condition = 'zeta'";
+    }
+  }
+
+  anyxml eta {
+    when "../condition = 'eta'";   
+  }
+
+  anydata theta {
+    when "../condition = 'theta'";
+  }
+
+  uses iota {
+    when "../condition = 'iota'";
+  }
+
+  grouping iota {
+  }
+
+  augment "../alpha" {
+    when "../condition = 'kappa'";
+  }
+}
+`,
+	},
+}
+
+func TestGetWhenXPath(t *testing.T) {
+	ms := NewModules()
+	for _, tt := range testWhenModules {
+		if err := ms.Parse(tt.in, tt.name); err != nil {
+			t.Fatalf("could not parse module %s: %v", tt.name, err)
+		}
+	}
+
+	if errs := ms.Process(); len(errs) > 0 {
+		t.Fatalf("could not process modules: %v", errs)
+	}
+
+	when, _ := ms.GetModule("when")
+
+	testcases := []struct {
+		descr         string
+		childName     string
+		isCase        bool
+		choiceName    string
+		isAugment     bool
+		augmentTarget string
+	}{
+		{
+			descr:     "extract when statement from *Container",
+			childName: "alpha",
+		}, {
+			descr:     "extract when statement from *Leaf",
+			childName: "beta",
+		}, {
+			descr:     "extract when statement from *LeafList",
+			childName: "gamma",
+		}, {
+			descr:     "extract when statement from *List",
+			childName: "delta",
+		}, {
+			descr:     "extract when statement from *Choice",
+			childName: "epsilon",
+		}, {
+			descr:      "extract when statement from *Case",
+			childName:  "zeta",
+			isCase:     true,
+			choiceName: "epsilon",
+		}, {
+			descr:     "extract when statement from *AnyXML",
+			childName: "eta",
+		}, {
+			descr:     "extract when statement from *AnyData",
+			childName: "theta",
+		}, {
+			descr:         "extract when statement from *Augment",
+			childName:     "kappa",
+			isAugment:     true,
+			augmentTarget: "alpha",
+		},
+	}
+
+	for _, tc := range testcases {
+		parentEntry := when
+		t.Run(tc.descr, func(t *testing.T) {
+			var child *Entry
+
+			if tc.isAugment {
+				child = parentEntry.Dir[tc.augmentTarget].Augmented[0]
+			} else {
+				if tc.isCase {
+					parentEntry = parentEntry.Dir[tc.choiceName]
+				}
+				child = parentEntry.Dir[tc.childName]
+			}
+
+			expectedWhen := "../condition = '" + tc.childName + "'"
+
+			if gotWhen, ok := child.GetWhenXPath(); !ok {
+				t.Errorf("Cannot get when statement of child entry %v", tc.childName)
+			} else if gotWhen != expectedWhen {
+				t.Errorf("Expected when XPath %v, but got %v", expectedWhen, gotWhen)
+			}
+		})
+	}
+}
+
+var testAugmentAndUsesModules = []struct {
+	name string
+	in   string
+}{
+	{
+		name: "original.yang",
+		in: `
+module original {
+  namespace "urn:original";
+  prefix "orig";
+
+  import groupings {
+    prefix grp;
+  }
+
+  container alpha {
+    leaf beta {
+      type string;
+    }
+    leaf psi {
+      type string;
+    }
+    leaf omega {
+      type string;
+    }
+    uses grp:nestedLevel0 {
+      when "beta = 'holaWorld'";
+    }
+  }
+}
+`,
+	},
+	{
+		name: "augments.yang",
+		in: `
+module augments {
+  namespace "urn:augments";
+  prefix "aug";
+
+  import original {
+    prefix orig;
+  }
+
+  import groupings {
+    prefix grp;
+  }
+
+  augment "/orig:alpha" {
+    when "orig:beta = 'helloWorld'";
+
+    container charlie {
+      leaf charlieLeaf {
+        type string;
+      }
+    }
+  }
+
+  grouping delta {
+    container echo {
+      leaf echoLeaf {
+        type string;
+      }
+    }
+  }
+
+  augment "/orig:alpha" {
+    when "orig:omega = 'privetWorld'";
+    uses delta {
+      when "current()/orig:beta = 'nihaoWorld'";
+    }
+  }
+}
+`,
+	},
+	{
+		name: "groupings.yang",
+		in: `
+module groupings {
+  namespace "urn:groupings";
+  prefix "grp";
+
+  import "original" {
+    prefix orig;
+  }
+
+  grouping nestedLevel0 {
+    leaf leafAtLevel0 {
+      type string;
+    }
+    uses nestedLevel1 {
+      when "orig:psi = 'geiasouWorld'";
+    }
+  }
+
+  grouping nestedLevel1 {
+    leaf leafAtLevel1 {
+      type string;
+    }
+    uses nestedLevel2 {
+      when "orig:omega = 'salveWorld'";
+    }
+  }
+
+  grouping nestedLevel2 {
+    leaf leafAtLevel2 {
+      type string;
+    }
+  }
+}
+`,
+	},
+}
+
+func TestAugmentedEntry(t *testing.T) {
+	ms := NewModules()
+	for _, tt := range testAugmentAndUsesModules {
+		if err := ms.Parse(tt.in, tt.name); err != nil {
+			t.Fatalf("could not parse module %s: %v", tt.name, err)
+		}
+	}
+
+	if errs := ms.Process(); len(errs) > 0 {
+		t.Fatalf("could not process modules: %v", errs)
+	}
+
+	orig, _ := ms.GetModule("original")
+
+	testcases := []struct {
+		descr             string
+		augmentEntry      *Entry
+		augmentWhenStmt   string
+		augmentChildNames map[string]bool
+	}{
+		{
+			descr:           "leaf charlie is augmented to container alpha",
+			augmentEntry:    orig.Dir["alpha"].Augmented[0],
+			augmentWhenStmt: "orig:beta = 'helloWorld'",
+			augmentChildNames: map[string]bool{
+				"charlie": false,
+			},
+		}, {
+			descr:           "grouping delta is augmented to container alpha",
+			augmentEntry:    orig.Dir["alpha"].Augmented[1],
+			augmentWhenStmt: "orig:omega = 'privetWorld'",
+			augmentChildNames: map[string]bool{
+				"echo": false,
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.descr, func(t *testing.T) {
+			augment := tc.augmentEntry
+
+			if tc.augmentWhenStmt != "" {
+				if gotAugmentWhenStmt, ok := augment.GetWhenXPath(); !ok {
+					t.Errorf("Expected augment when statement %v, but not present",
+						tc.augmentWhenStmt)
+				} else if gotAugmentWhenStmt != tc.augmentWhenStmt {
+					t.Errorf("Expected augment when statement %v, but got %v",
+						tc.augmentWhenStmt, gotAugmentWhenStmt)
+				}
+			}
+
+			for name, entry := range augment.Dir {
+				if _, ok := tc.augmentChildNames[name]; ok {
+					tc.augmentChildNames[name] = true
+				} else {
+					t.Errorf("Got unexpected child name %v in augment", name)
+				}
+
+				if entry.Dir != nil {
+					t.Errorf("Expected augment's child entry %v have nil dir, but got %v",
+						name, entry.Dir)
+				}
+			}
+
+			for name, matched := range tc.augmentChildNames {
+				if !matched {
+					t.Errorf("Expected child name %v in augment, but not present", name)
+				}
+			}
+
+		})
+	}
+}
+
+func TestUsesEntry(t *testing.T) {
+	ms := NewModules()
+	for _, tt := range testAugmentAndUsesModules {
+		if err := ms.Parse(tt.in, tt.name); err != nil {
+			t.Fatalf("could not parse module %s: %v", tt.name, err)
+		}
+	}
+
+	if errs := ms.Process(); len(errs) > 0 {
+		t.Fatalf("could not process modules: %v", errs)
+	}
+
+	orig, _ := ms.GetModule("original")
+
+	testcases := []struct {
+		descr              string
+		usesParentEntry    *Entry
+		usesWhenStmts      []string
+		groupingChildNames []map[string]bool
+		nestedLevel        int
+	}{
+		{
+			descr:              "second augment in augments.yang uses grouping delta",
+			usesParentEntry:    orig.Dir["alpha"].Augmented[1],
+			usesWhenStmts:      []string{"current()/orig:beta = 'nihaoWorld'"},
+			groupingChildNames: []map[string]bool{{"echo": false}},
+		}, {
+			descr:           "container alpha uses nested grouping nestedLevel0",
+			usesParentEntry: orig.Dir["alpha"],
+			usesWhenStmts: []string{
+				"beta = 'holaWorld'",
+				"orig:psi = 'geiasouWorld'",
+				"orig:omega = 'salveWorld'",
+			},
+			groupingChildNames: []map[string]bool{
+				{"leafAtLevel0": false, "leafAtLevel1": false, "leafAtLevel2": false},
+				{"leafAtLevel1": false, "leafAtLevel2": false},
+				{"leafAtLevel2": false},
+			},
+			nestedLevel: 2,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.descr, func(t *testing.T) {
+			usesParentEntry := tc.usesParentEntry
+			for i := 0; i <= tc.nestedLevel; i++ {
+				usesStmts := usesParentEntry.Uses
+				// want the usesStmts to have length 1, otherwise also need to verify
+				// every usesStmt slice element is expected.
+				if len(usesStmts) != 1 {
+					t.Errorf("Expected usesStmts to have length 1, but got %v",
+						len(usesStmts))
+				}
+
+				usesNode := usesStmts[0].Uses
+				grouping := usesStmts[0].Grouping
+
+				if tc.usesWhenStmts[i] != "" {
+					if gotUsesWhenStmt, ok := usesNode.When.Statement().Arg(); !ok {
+						t.Errorf("Expected uses when statement %v, but not present",
+							tc.usesWhenStmts[i])
+					} else if gotUsesWhenStmt != tc.usesWhenStmts[i] {
+						t.Errorf("Expected uses when statement %v, but got %v",
+							tc.usesWhenStmts[i], gotUsesWhenStmt)
+					}
+				}
+
+				for name, entry := range grouping.Dir {
+					if _, ok := tc.groupingChildNames[i][name]; ok {
+						tc.groupingChildNames[i][name] = true
+					} else {
+						t.Errorf("Got unexpected child name %v in uses", name)
+					}
+
+					if entry.Dir != nil {
+						t.Errorf("Expected uses's child entry %v have nil dir, but got %v",
+							name, entry.Dir)
+					}
+				}
+
+				for name, matched := range tc.groupingChildNames[i] {
+					if !matched {
+						t.Errorf("Expected child name %v in grouping %v, but not present",
+							name, grouping.Name)
+					}
+				}
+				usesParentEntry = grouping
+			}
+
+		})
+	}
+}
+
+func TestShallowDup(t *testing.T) {
+	testModule := struct {
+		name string
+		in   string
+	}{
+
+		name: "mod.yang",
+		in: `
+module mod {
+  namespace "urn:mod";
+  prefix "mod";
+
+  container level0 {
+    container level1-1 {
+      leaf level2-1 { type string;}
+    }
+
+    container level1-2 {
+      leaf level2-2 { type string;}
+    }
+
+    container level1-3{
+      container level2-3 {
+        leaf level3-1 { type string;}
+      }    
+    }
+  }
+}
+`,
+	}
+
+	ms := NewModules()
+
+	if err := ms.Parse(testModule.in, testModule.name); err != nil {
+		t.Fatalf("could not parse module %s: %v", testModule.name, err)
+	}
+
+	if errs := ms.Process(); len(errs) > 0 {
+		t.Fatalf("could not process modules: %v", errs)
+	}
+
+	mod, _ := ms.GetModule("mod")
+	level0 := mod.Dir["level0"]
+	level0ShallowDup := level0.shallowDup()
+
+	for name, entry := range level0.Dir {
+		shallowDupedEntry, ok := level0ShallowDup.Dir[name]
+		if !ok {
+			t.Errorf("Expect shallowDup() to duplicate direct child %v, but did not", name)
+		}
+		if len(entry.Dir) != 1 {
+			t.Errorf("Expect original entry's direct child have length 1 dir")
+		}
+		if shallowDupedEntry.Dir != nil {
+			t.Errorf("Expect shallowDup()'ed entry's direct child to have nil dir")
+		}
+	}
+}
+
 func TestIgnoreCircularDependencies(t *testing.T) {
 	tests := []struct {
 		name            string
