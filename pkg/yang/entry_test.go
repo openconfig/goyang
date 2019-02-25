@@ -17,10 +17,14 @@ package yang
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/openconfig/gnmi/errdiff"
 )
 
 func TestNilEntry(t *testing.T) {
@@ -945,6 +949,8 @@ func TestActionRPC(t *testing.T) {
 		operationPath []string
 		wantNodeKind  string
 		wantError     string
+		noInput       bool
+		noOutput      bool
 	}{
 		{
 			name:          "test action in container",
@@ -1035,6 +1041,55 @@ func TestActionRPC(t *testing.T) {
 }`,
 		},
 
+		{
+			name:          "minimal rpc",
+			wantNodeKind:  "rpc",
+			operationPath: []string{"operation"},
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  rpc operation {
+    description "rpc";
+  }
+}`,
+			noInput:  true,
+			noOutput: true,
+		},
+
+		{
+			name:          "input-only rpc",
+			wantNodeKind:  "rpc",
+			operationPath: []string{"operation"},
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  rpc operation {
+    description "rpc";
+    input {
+      leaf string { type string; }
+    }
+  }
+}`,
+			noOutput: true,
+		},
+
+		{
+			name:          "output-only rpc",
+			wantNodeKind:  "rpc",
+			operationPath: []string{"operation"},
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  rpc operation {
+    description "rpc";
+    output {
+      leaf string { type string; }
+    }
+  }
+}`,
+			noInput: true,
+		},
+
 		// test cases with errors (in module parsing)
 		{
 			name:      "rpc not module child",
@@ -1106,9 +1161,9 @@ func TestActionRPC(t *testing.T) {
 		// confirm the child RPCEntry was populated for the entry.
 		if e.RPC == nil {
 			t.Errorf("%s: entry at %v has nil RPC child, want: non-nil. Entry: %#v", tt.name, tt.operationPath, e)
-		} else if e.RPC.Input == nil {
+		} else if !tt.noInput && e.RPC.Input == nil {
 			t.Errorf("%s: RPCEntry has nil Input, want: non-nil. Entry: %#v", tt.name, e.RPC)
-		} else if e.RPC.Output == nil {
+		} else if !tt.noOutput && e.RPC.Output == nil {
 			t.Errorf("%s: RPCEntry has nil Output, want: non-nil. Entry: %#v", tt.name, e.RPC)
 		}
 	}
@@ -1410,5 +1465,640 @@ func TestEntryTypes(t *testing.T) {
 				t.Errorf("%s: got Is%v? %t, want Is%v? %t", tt.desc, stype, got, stype, want)
 			}
 		}
+	}
+}
+
+func TestFixChoice(t *testing.T) {
+	choiceEntry := &Entry{
+		Name: "choiceEntry",
+		Kind: ChoiceEntry,
+		Dir: map[string]*Entry{
+			"unnamedAnyDataCase": {
+				Name: "unnamedAnyDataCase",
+				Kind: AnyDataEntry,
+				Node: &AnyData{
+					Parent: &Container{
+						Name: "AnyDataParentNode",
+					},
+					Name: "unnamedAnyDataCase",
+					Source: &Statement{
+						Keyword:     "anyData-keyword",
+						HasArgument: true,
+						Argument:    "anyData-argument",
+						statements:  nil,
+					},
+					Extensions: []*Statement{
+						&Statement{
+							Keyword:     "anyData-extension",
+							HasArgument: true,
+							Argument:    "anyData-extension-arg",
+							statements:  nil,
+						},
+					},
+				},
+			},
+			"unnamedAnyXMLCase": {
+				Name: "unnamedAnyXMLCase",
+				Kind: AnyXMLEntry,
+				Node: &AnyXML{
+					Parent: &Container{
+						Name: "AnyXMLParentNode",
+					},
+					Name: "unnamedAnyXMLCase",
+					Source: &Statement{
+						Keyword:     "anyXML-keyword",
+						HasArgument: true,
+						Argument:    "anyXML-argument",
+						statements:  nil,
+					},
+					Extensions: []*Statement{
+						&Statement{
+							Keyword:     "anyXML-extension",
+							HasArgument: true,
+							Argument:    "anyXML-extension-arg",
+							statements:  nil,
+						},
+					},
+				},
+			},
+			"unnamedContainerCase": {
+				Name: "unnamedContainerCase",
+				Kind: DirectoryEntry,
+				Node: &Container{
+					Parent: &Container{
+						Name: "AnyContainerNode",
+					},
+					Name: "unnamedContainerCase",
+					Source: &Statement{
+						Keyword:     "container-keyword",
+						HasArgument: true,
+						Argument:    "container-argument",
+						statements:  nil,
+					},
+					Extensions: []*Statement{
+						&Statement{
+							Keyword:     "container-extension",
+							HasArgument: true,
+							Argument:    "container-extension-arg",
+							statements:  nil,
+						},
+					},
+				},
+			},
+			"unnamedLeafCase": {
+				Name: "unnamedLeafCase",
+				Kind: LeafEntry,
+				Node: &Leaf{
+					Parent: &Container{
+						Name: "leafParentNode",
+					},
+					Name: "unnamedLeafCase",
+					Source: &Statement{
+						Keyword:     "leaf-keyword",
+						HasArgument: true,
+						Argument:    "leaf-argument",
+						statements:  nil,
+					},
+					Extensions: []*Statement{
+						&Statement{
+							Keyword:     "leaf-extension",
+							HasArgument: true,
+							Argument:    "leaf-extension-arg",
+							statements:  nil,
+						},
+					},
+				},
+			},
+			"unnamedLeaf-ListCase": {
+				Name: "unnamedLeaf-ListCase",
+				Kind: LeafEntry,
+				Node: &LeafList{
+					Parent: &Container{
+						Name: "LeafListNode",
+					},
+					Name: "unnamedLeaf-ListCase",
+					Source: &Statement{
+						Keyword:     "leaflist-keyword",
+						HasArgument: true,
+						Argument:    "leaflist-argument",
+						statements:  nil,
+					},
+					Extensions: []*Statement{
+						&Statement{
+							Keyword:     "leaflist-extension",
+							HasArgument: true,
+							Argument:    "leaflist-extension-arg",
+							statements:  nil,
+						},
+					},
+				},
+			},
+			"unnamedListCase": {
+				Name: "unnamedListCase",
+				Kind: DirectoryEntry,
+				Node: &List{
+					Parent: &Container{
+						Name: "ListNode",
+					},
+					Name: "unnamedListCase",
+					Source: &Statement{
+						Keyword:     "list-keyword",
+						HasArgument: true,
+						Argument:    "list-argument",
+						statements:  nil,
+					},
+					Extensions: []*Statement{
+						&Statement{
+							Keyword:     "list-extension",
+							HasArgument: true,
+							Argument:    "list-extension-arg",
+							statements:  nil,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	choiceEntry.FixChoice()
+
+	for _, e := range []string{"AnyData", "AnyXML", "Container",
+		"Leaf", "Leaf-List", "List"} {
+		entryName := "unnamed" + e + "Case"
+		t.Run(entryName, func(t *testing.T) {
+
+			insertedCase := choiceEntry.Dir[entryName]
+			originalCase := insertedCase.Dir[entryName]
+
+			insertedNode := insertedCase.Node
+			if insertedNode.Kind() != "case" {
+				t.Errorf("Got inserted node type %s, expected case",
+					insertedNode.Kind())
+			}
+
+			originalNode := originalCase.Node
+			if originalNode.Kind() != strings.ToLower(e) {
+				t.Errorf("Got original node type %s, expected %s",
+					originalNode.Kind(), strings.ToLower(e))
+			}
+
+			if insertedNode.ParentNode() != originalNode.ParentNode() {
+				t.Errorf("Got inserted node's parent node %v, expected %v",
+					insertedNode.ParentNode(), originalNode.ParentNode())
+			}
+
+			if insertedNode.NName() != originalNode.NName() {
+				t.Errorf("Got inserted node's name %s, expected %s",
+					insertedNode.NName(), originalNode.NName())
+			}
+
+			if insertedNode.Statement() != originalNode.Statement() {
+				t.Errorf("Got inserted node's statement %v, expected %s",
+					insertedNode.Statement(), originalNode.Statement())
+			}
+
+			if len(insertedNode.Exts()) != len(originalNode.Exts()) {
+				t.Errorf("Got inserted node extensions slice len %d, expected %v",
+					len(insertedNode.Exts()), len(originalNode.Exts()))
+			}
+
+			for i, e := range insertedNode.Exts() {
+				if e != originalNode.Exts()[i] {
+					t.Errorf("Got inserted node's extension %v at index %d, expected %v",
+						e, i, originalNode.Exts()[i])
+				}
+			}
+		})
+	}
+}
+
+func mustReadFile(path string) string {
+	s, err := ioutil.ReadFile(path)
+	if err != nil {
+		panic(err)
+	}
+	return string(s)
+}
+
+func TestDeviation(t *testing.T) {
+	type deviationTest struct {
+		path  string
+		entry *Entry // entry is the entry that is wanted at a particular path, if a field is left as nil, it is not checked.
+	}
+	tests := []struct {
+		desc                    string
+		inFiles                 map[string]string
+		wants                   map[string][]deviationTest
+		wantParseErrSubstring   string
+		wantProcessErrSubstring string
+	}{{
+		desc:    "deviation with add",
+		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate.yang"))},
+		wants: map[string][]deviationTest{
+			"deviate": []deviationTest{{
+				path: "/target/add/config",
+				entry: &Entry{
+					Config: TSFalse,
+				},
+			}, {
+				path: "/target/add/mandatory",
+				entry: &Entry{
+					Mandatory: TSTrue,
+				},
+			}, {
+				path: "/target/add/min-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MinElements: &Value{Name: "42"},
+					},
+				},
+			}, {
+				path: "/target/add/max-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MaxElements: &Value{Name: "42"},
+					},
+				},
+			}, {
+				path: "/target/add/max-and-min-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MinElements: &Value{Name: "42"},
+						MaxElements: &Value{Name: "42"},
+					},
+				},
+			}, {
+				path: "/target/add/units",
+				entry: &Entry{
+					Units: "fish per second",
+				},
+			}},
+		},
+	}, {
+		desc: "error case - deviation add max-element to non-list",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a { type string; }
+
+					deviation /a {
+						deviate add {
+							max-elements 42;
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "tried to deviate max-elements on a non-list type",
+	}, {
+		desc: "error case - deviation add min elements to non-list",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a { type string; }
+
+					deviation /a {
+						deviate add {
+							min-elements 42;
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "tried to deviate min-elements on a non-list type",
+	}, {
+		desc:    "deviation - not supported",
+		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate-notsupported.yang"))},
+		wants: map[string][]deviationTest{
+			"deviate": []deviationTest{{
+				path: "/target",
+			}, {
+				path: "/target-list",
+			}, {
+				path: "/a-leaf",
+			}, {
+				path: "/a-leaflist",
+			}, {
+				path:  "survivor",
+				entry: &Entry{Name: "survivor"},
+			}},
+		},
+	}, {
+		desc: "deviation removing non-existent node",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					deviation /a/b/c {
+						deviate not-supported;
+					}
+				}
+			`,
+		},
+		wantProcessErrSubstring: "cannot find target node to deviate",
+	}, {
+		desc: "deviation not supported across modules",
+		inFiles: map[string]string{
+			"source": `
+				module source {
+					prefix "s";
+					namespace "urn:s";
+
+					leaf a { type string; }
+					leaf b { type string; }
+				}`,
+			"deviation": `
+					module deviation {
+						prefix "d";
+						namespace "urn:d";
+
+						import source { prefix s; }
+
+						deviation /s:a {
+							deviate not-supported;
+						}
+					}`,
+		},
+		wants: map[string][]deviationTest{
+			"source": []deviationTest{{
+				path: "/a",
+			}, {
+				path:  "/b",
+				entry: &Entry{},
+			}},
+		},
+	}, {
+		desc:    "deviation with replace",
+		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate-replace.yang"))},
+		wants: map[string][]deviationTest{
+			"deviate": []deviationTest{{
+				path: "/target/replace/config",
+				entry: &Entry{
+					Config: TSFalse,
+				},
+			}, {
+				path: "/target/replace/mandatory",
+				entry: &Entry{
+					Mandatory: TSTrue,
+				},
+			}, {
+				path: "/target/replace/min-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MinElements: &Value{Name: "42"},
+					},
+				},
+			}, {
+				path: "/target/replace/max-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MaxElements: &Value{Name: "42"},
+					},
+				},
+			}, {
+				path: "/target/replace/max-and-min-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MinElements: &Value{Name: "42"},
+						MaxElements: &Value{Name: "42"},
+					},
+				},
+			}, {
+				path: "/target/replace/units",
+				entry: &Entry{
+					Units: "fish per second",
+				},
+			}, {
+				path: "/target/replace/type",
+				entry: &Entry{
+					Type: &YangType{
+						Name: "uint16",
+						Kind: Yuint16,
+					},
+				},
+			}},
+		},
+	}, {
+		desc:    "deviation with delete",
+		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate-delete.yang"))},
+		wants: map[string][]deviationTest{
+			"deviate": []deviationTest{{
+				path: "/target/delete/config",
+				entry: &Entry{
+					Config: TSUnset,
+				},
+			}, {
+				path: "/target/delete/mandatory",
+				entry: &Entry{
+					Mandatory: TSUnset,
+				},
+			}, {
+				path: "/target/delete/min-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MinElements: nil,
+					},
+				},
+			}, {
+				path: "/target/delete/max-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MaxElements: nil,
+					},
+				},
+			}, {
+				path: "/target/delete/max-and-min-elements",
+				entry: &Entry{
+					ListAttr: &ListAttr{
+						MinElements: nil,
+						MaxElements: nil,
+					},
+				},
+			}, {
+				path: "/target/delete/units",
+				entry: &Entry{
+					Units: "",
+				},
+			}},
+		},
+	}, {
+		desc: "deviation using locally defined typedef",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					import source { prefix s; }
+
+					typedef rstr {
+						type string {
+							pattern "a.*";
+						}
+					}
+
+					deviation /s:a {
+						deviate replace {
+							type rstr;
+						}
+					}
+				}
+			`,
+			"source": `
+				module source {
+					prefix "s";
+					namespace "urn:s";
+
+					leaf a { type uint16; }
+				}
+			`,
+		},
+		wants: map[string][]deviationTest{
+			"source": []deviationTest{{
+				path: "/a",
+				entry: &Entry{
+					Type: &YangType{
+						Name:    "rstr",
+						Kind:    Ystring,
+						Pattern: []string{"a.*"},
+					},
+				},
+			}},
+		},
+	}, {
+		desc: "complex deviation of multiple leaves",
+		inFiles: map[string]string{
+			"foo": `
+			module foo {
+				prefix "f";
+				namespace "urn:f";
+
+				container a { leaf b { type string; } }
+
+				typedef abc { type boolean; }
+				typedef abt { type uint32; }
+
+				deviation /a/b {
+					// typedef is not valid here.
+					//typedef abc {
+					//  type boolean;
+					//}
+					deviate replace { type abc; }
+				}
+
+				deviation /a/b {
+					// typedef is not valid here.
+					//typedef abt {
+					//  type uint16;
+					//}
+					deviate replace { type abt; }
+				}
+			}`,
+		},
+		wants: map[string][]deviationTest{
+			"foo": []deviationTest{{
+				path: "/a/b",
+				entry: &Entry{
+					Type: &YangType{
+						Name: "abt",
+						Kind: Yuint32,
+					},
+				},
+			}},
+		},
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			ms := NewModules()
+			mergedSubmodule = map[string]bool{}
+
+			for name, mod := range tt.inFiles {
+				if err := ms.Parse(mod, name); err != nil {
+					if diff := errdiff.Substring(err, tt.wantParseErrSubstring); diff != "" {
+						t.Fatalf("error parsing module %s, %s", name, diff)
+					}
+				}
+			}
+
+			if errs := ms.Process(); len(errs) > 0 {
+				var match bool
+				for _, err := range errs {
+					if diff := errdiff.Substring(err, tt.wantProcessErrSubstring); diff == "" {
+						match = true
+						break
+					}
+				}
+				if !match {
+					t.Fatalf("got errs: %v, want: %v", errs, tt.wantProcessErrSubstring)
+				}
+			}
+
+			for mod, tcs := range tt.wants {
+				m, errs := ms.GetModule(mod)
+				if errs != nil {
+					t.Errorf("couldn't find module %s", mod)
+					continue
+				}
+
+				for idx, want := range tcs {
+					got := m.Find(want.path)
+					switch {
+					case got == nil && want.entry != nil:
+						t.Errorf("%d: expected entry %s does not exist", idx, want.path)
+						continue
+					case got != nil && want.entry == nil:
+						t.Errorf("%d: unexpected entry %s exists, got: %v", idx, want.path, got)
+						continue
+					case want.entry == nil:
+						continue
+					}
+
+					if got.Config != want.entry.Config {
+						t.Errorf("%d (%s): did not get expected config statement, got: %v, want: %v", idx, want.path, got.Config, want.entry.Config)
+					}
+
+					if got.Default != want.entry.Default {
+						t.Errorf("%d (%s): did not get expected default statement, got: %v, want: %v", idx, want.path, got.Default, want.entry.Default)
+					}
+
+					if got.Mandatory != want.entry.Mandatory {
+						t.Errorf("%d (%s): did not get expected mandatory statement, got: %v, want: %v", idx, want.path, got.Mandatory, want.entry.Mandatory)
+					}
+
+					if want.entry.ListAttr != nil {
+						if got.ListAttr == nil {
+							t.Errorf("%d (%s): listattr was nil for an entry expected to be a list at %s", idx, want.path, want.path)
+							continue
+						}
+						if want.entry.ListAttr.MinElements != nil {
+							if gotn, wantn := got.ListAttr.MinElements.Name, want.entry.ListAttr.MinElements.Name; gotn != wantn {
+								t.Errorf("%d (%s): min-elements, got: %v, want: %v", idx, want.path, gotn, wantn)
+							}
+						}
+					}
+
+					if want.entry.Type != nil {
+						if got.Type.Name != want.entry.Type.Name {
+							t.Errorf("%d (%s): type name, got: %s, want: %s", idx, want.path, got.Type.Name, want.entry.Type.Name)
+						}
+
+						if got.Type.Kind != want.entry.Type.Kind {
+							t.Errorf("%d (%s): type kind, got: %s, want: %s", idx, want.path, got.Type.Kind, want.entry.Type.Kind)
+						}
+					}
+
+					if got.Units != want.entry.Units {
+						t.Errorf("%d (%s): did not get expected units statement, got: %s, want: %s", idx, want.path, got.Units, want.entry.Units)
+					}
+				}
+			}
+		})
 	}
 }

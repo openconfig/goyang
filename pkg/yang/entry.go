@@ -71,10 +71,12 @@ type Entry struct {
 	Name        string    // our name, same as the key in our parent Dirs
 	Description string    `json:",omitempty"` // description from node, if any
 	Default     string    `json:",omitempty"` // default from node, if any
+	Units       string    `json:",omitempty"` // units associated with the type, if any
 	Errors      []error   `json:"-"`          // list of errors encountered on this node
 	Kind        EntryKind // kind of Entry
 	Config      TriState  // config state of this entry, if known
 	Prefix      *Value    `json:",omitempty"` // prefix to use from this point down
+	Mandatory   TriState  `json:",omitempty"` // whether this entry is mandatory in the tree
 
 	// Fields associated with directory nodes
 	Dir map[string]*Entry `json:",omitempty"`
@@ -93,7 +95,9 @@ type Entry struct {
 	// is a module only.
 	Identities []*Identity `json:",omitempty"`
 
-	Augments []*Entry `json:"-"` // Augments associated with this entry
+	Augments   []*Entry                   `json:"-"` // Augments associated with this entry.
+	Deviations []*DeviatedEntry           `json:"-"` // Deviations associated with this entry.
+	Deviate    map[deviationType][]*Entry `json:"-"`
 
 	// Extra maps all the unsupported fields to their values
 	Extra map[string][]interface{} `json:"-"`
@@ -223,6 +227,7 @@ const (
 	InputEntry
 	NotificationEntry
 	OutputEntry
+	DeviateEntry
 )
 
 // EntryKindToName maps EntryKind to their names
@@ -236,6 +241,7 @@ var EntryKindToName = map[EntryKind]string{
 	InputEntry:        "Input",
 	NotificationEntry: "Notification",
 	OutputEntry:       "Output",
+	DeviateEntry:      "Deviate",
 }
 
 func (k EntryKind) String() string {
@@ -355,6 +361,14 @@ func (e *Entry) add(key string, value *Entry) *Entry {
 	return e
 }
 
+// delete removes the directory entry key from the entry.
+func (e *Entry) delete(key string) {
+	if _, ok := e.Dir[key]; !ok {
+		e.errorf("%s: unknown child key %s", Source(e.Node), key)
+	}
+	delete(e.Dir, key)
+}
+
 // entryCache is used to prevent unnecessary recursion into previously
 // converted nodes.
 var entryCache = map[Node]*Entry{}
@@ -366,6 +380,55 @@ var entryCache = map[Node]*Entry{}
 var mergedSubmodule = map[string]bool{}
 
 var depth = 0
+
+// deviationType specifies an enumerated value covering the different substmts
+// to the deviate statement.
+type deviationType int64
+
+const (
+	// DeviationUnset specifies that the argument was unset, which is invalid.
+	DeviationUnset deviationType = iota
+	// DeviationNotSupported corresponds to the not-supported deviate argument.
+	DeviationNotSupported
+	// DeviationAdd corresponds to the add deviate argument to the deviate stmt.
+	DeviationAdd
+	// DeviationReplace corresponds to the replace argument to the deviate stmt.
+	DeviationReplace
+	// DeviationDelete corresponds to the delete argument to the deviate stmt.
+	DeviationDelete
+)
+
+var (
+	// fromDeviation maps from an enumerated deviation type to the YANG keyword.
+	fromDeviation = map[deviationType]string{
+		DeviationNotSupported: "not-supported",
+		DeviationAdd:          "add",
+		DeviationReplace:      "replace",
+		DeviationDelete:       "delete",
+		DeviationUnset:        "unknown",
+	}
+
+	// toDeviation maps from the YANG keyword to an enumerated deviation typee.
+	toDeviation = map[string]deviationType{
+		"not-supported": DeviationNotSupported,
+		"add":           DeviationAdd,
+		"replace":       DeviationReplace,
+		"delete":        DeviationDelete,
+	}
+)
+
+func (d deviationType) String() string {
+	return fromDeviation[d]
+}
+
+// DeviatedEntry stores a wrapped Entry that corresponds to a deviation.
+type DeviatedEntry struct {
+	Type         deviationType // Type specifies the deviation type.
+	DeviatedPath string        // DeviatedPath corresponds to the path that is being deviated.
+	// Entry is the embedded Entry storing the deviations that are made. Fields
+	// are set to the value in the schema after the deviation has been applied.
+	*Entry
+}
 
 // ToEntry expands node n into a directory Entry.  Expansion is based on the
 // YANG tags in the structure behind n.  ToEntry must only be used
@@ -397,11 +460,11 @@ func ToEntry(n Node) (e *Entry) {
 		}
 	}(n)
 
-	// configValue return TSTrue if i contains the value of true, TSFalse
+	// tristateValue returns TSTrue if i contains the value of true, TSFalse
 	// if it contains the value of false, and TSUnset if i does not have
 	// a set value (for instance, i is nil).  An error is returned if i
 	// contains a value other than true or false.
-	configValue := func(i interface{}) (TriState, error) {
+	tristateValue := func(i interface{}) (TriState, error) {
 		if v, ok := i.(*Value); ok && v != nil {
 			switch v.Name {
 			case "true":
@@ -416,7 +479,6 @@ func ToEntry(n Node) (e *Entry) {
 	}
 
 	var err error
-
 	// Handle non-directory nodes (leaf, leafref, and oddly enough, uses).
 	switch s := n.(type) {
 	case *Leaf:
@@ -432,7 +494,7 @@ func ToEntry(n Node) (e *Entry) {
 		}
 		e.Type = s.Type.YangType
 		entryCache[n] = e
-		e.Config, err = configValue(s.Config)
+		e.Config, err = tristateValue(s.Config)
 		e.addError(err)
 		e.Prefix = getRootPrefix(e)
 		return e
@@ -504,6 +566,8 @@ func ToEntry(n Node) (e *Entry) {
 		e.Kind = OutputEntry
 	case *Notification:
 		e.Kind = NotificationEntry
+	case *Deviate:
+		e.Kind = DeviateEntry
 	}
 
 	// Use Elem to get the Value of structure that n is pointing to, not
@@ -524,7 +588,7 @@ func ToEntry(n Node) (e *Entry) {
 		case "":
 			e.addError(fmt.Errorf("%s: nil statement", Source(n)))
 		case "config":
-			e.Config, err = configValue(fv.Interface())
+			e.Config, err = tristateValue(fv.Interface())
 			e.addError(err)
 		case "description":
 			if v := fv.Interface().(*Value); v != nil {
@@ -641,7 +705,14 @@ func ToEntry(n Node) (e *Entry) {
 			// seems fine to ignore them for now, we are
 			// just interested in the tree structure.
 			for _, r := range fv.Interface().([]*RPC) {
-				e.add(r.Name, ToEntry(r))
+				switch rpc := ToEntry(r); {
+				case rpc.RPC == nil:
+					// When "rpc" has no "input" or "output" children
+					rpc.RPC = &RPCEntry{}
+					fallthrough
+				default:
+					e.add(r.Name, rpc)
+				}
 			}
 
 		case "input":
@@ -675,18 +746,45 @@ func ToEntry(n Node) (e *Entry) {
 				e.merge(nil, nil, ToEntry(a))
 			}
 		case "type":
-			// We don't expect this to happen, so throw an error.
-			// BUG(borman): I think a deviate statement might trigger this.
-			e.addError(fmt.Errorf("%s: unexpected type in %s:%s", Source(n), n.Kind(), n.NName()))
+			// The type keyword is specific to deviate to change a type. Other type handling
+			// (e.g., leaf type resolution) is done outside of this case.
+			n, ok := n.(*Deviate)
+			if !ok {
+				e.addError(fmt.Errorf("unexpected type found, only valid under Deviate, is %T", n))
+				continue
+			}
 
+			if n.Type != nil {
+				if errs := n.Type.resolve(); errs != nil {
+					e.addError(fmt.Errorf("deviation has unresolvable type, %v", errs))
+					continue
+				}
+				e.Type = n.Type.YangType
+			}
+			continue
 		// Keywords that do not need to be handled as an Entry as they are added
 		// to other dictionaries.
-		case "default",
-			"typedef":
+		case "default":
+			if e.Kind == LeafEntry {
+				// default is handled separately for a leaf, but in a deviate statement
+				// we must deal with it here.
+				continue
+			}
+			d, ok := fv.Interface().(*Value)
+			if !ok {
+				e.addError(fmt.Errorf("%s: unexpected default type in %s:%s", Source(n), n.Kind(), n.NName()))
+			}
+			e.Default = d.asString()
+		case "typedef":
 			continue
 		case "deviation":
 			if a := fv.Interface().([]*Deviation); a != nil {
 				for _, d := range a {
+					e.Deviations = append(e.Deviations, &DeviatedEntry{
+						Entry:        ToEntry(d),
+						DeviatedPath: d.Statement().Argument,
+					})
+
 					for _, sd := range d.Deviate {
 						if sd.Type != nil {
 							sd.Type.resolve()
@@ -694,15 +792,66 @@ func ToEntry(n Node) (e *Entry) {
 					}
 				}
 			}
+		case "deviate":
+			if a := fv.Interface().([]*Deviate); a != nil {
+				for _, d := range a {
+					de := ToEntry(d)
+
+					dt, ok := toDeviation[d.Statement().Argument]
+					if !ok {
+						e.addError(fmt.Errorf("%s: unknown deviation type in %s:%s", Source(n), n.Kind(), n.NName()))
+						continue
+					}
+
+					if e.Deviate == nil {
+						e.Deviate = map[deviationType][]*Entry{}
+					}
+
+					e.Deviate[dt] = append(e.Deviate[dt], de)
+				}
+			}
+		case "mandatory":
+			v, ok := fv.Interface().(*Value)
+			if !ok {
+				e.addError(fmt.Errorf("%s: did not get expected value type", Source(n)))
+			}
+			e.Mandatory, err = tristateValue(v)
+			e.addError(err)
+		case "max-elements", "min-elements":
+			if e.Kind != DeviateEntry {
+				continue
+			}
+			// we can get max-elements or min-elements in a deviate statement, so create the
+			// corresponding logic.
+			v, ok := fv.Interface().(*Value)
+			if !ok {
+				e.addError(fmt.Errorf("%s: max or min elements had wrong type, %s:%s", Source(n), n.Kind(), n.NName()))
+				continue
+			}
+
+			if e.ListAttr == nil {
+				e.ListAttr = &ListAttr{}
+			}
+
+			if name == "max-elements" {
+				e.ListAttr.MaxElements = v
+			} else {
+				e.ListAttr.MinElements = v
+			}
+		case "units":
+			v, ok := fv.Interface().(*Value)
+			if !ok {
+				e.addError(fmt.Errorf("%s: units had wrong type, %s:%s", Source(n), n.Kind(), n.NName()))
+			}
+			if v != nil {
+				e.Units = v.asString()
+			}
 		// TODO(borman): unimplemented keywords
 		case "belongs-to",
 			"contact",
 			"extension",
 			"feature",
 			"if-feature",
-			"mandatory",
-			"max-elements",
-			"min-elements",
 			"must",
 			"namespace",
 			"ordered-by",
@@ -781,6 +930,88 @@ func (e *Entry) Augment(addErrors bool) (processed, skipped int) {
 	return processed, skipped
 }
 
+// ApplyDeviate walks the deviations within the supplied entry, and applies them to the
+// schema.
+func (e *Entry) ApplyDeviate() []error {
+	var errs []error
+	appendErr := func(err error) { errs = append(errs, err) }
+	for _, d := range e.Deviations {
+		deviatedNode := e.Find(d.DeviatedPath)
+		if deviatedNode == nil {
+			appendErr(fmt.Errorf("cannot find target node to deviate, %s", d.DeviatedPath))
+			continue
+		}
+
+		for dt, dv := range d.Deviate {
+			for _, devSpec := range dv {
+				switch dt {
+				case DeviationAdd, DeviationReplace:
+					if devSpec.Config != TSUnset {
+						deviatedNode.Config = devSpec.Config
+					}
+
+					if devSpec.Default != "" {
+						deviatedNode.Default = ""
+					}
+
+					if devSpec.Mandatory != TSUnset {
+						deviatedNode.Mandatory = devSpec.Mandatory
+					}
+
+					if devSpec.ListAttr != nil && devSpec.ListAttr.MinElements != nil {
+						if !deviatedNode.IsList() && !deviatedNode.IsLeafList() {
+							appendErr(fmt.Errorf("tried to deviate min-elements on a non-list type %s", deviatedNode.Kind))
+							continue
+						}
+						deviatedNode.ListAttr.MinElements = devSpec.ListAttr.MinElements
+					}
+
+					if devSpec.ListAttr != nil && devSpec.ListAttr.MaxElements != nil {
+						if !deviatedNode.IsList() && !deviatedNode.IsLeafList() {
+							appendErr(fmt.Errorf("tried to deviate max-elements on a non-list type %s", deviatedNode.Kind))
+							continue
+						}
+						deviatedNode.ListAttr.MaxElements = devSpec.ListAttr.MaxElements
+					}
+
+					if devSpec.Units != "" {
+						deviatedNode.Units = devSpec.Units
+					}
+
+					if devSpec.Type != nil {
+						deviatedNode.Type = devSpec.Type
+					}
+
+				case DeviationNotSupported:
+					dp := deviatedNode.Parent
+					if dp == nil {
+						appendErr(fmt.Errorf("%s: node %s does not have a valid parent, but deviate not-supported references one", Source(e.Node), e.Name))
+						continue
+					}
+					dp.delete(deviatedNode.Name)
+				case DeviationDelete:
+					if devSpec.Config != TSUnset {
+						deviatedNode.Config = TSUnset
+					}
+
+					if devSpec.Default == "" {
+						deviatedNode.Default = ""
+					}
+
+					if devSpec.Mandatory != TSUnset {
+						devSpec.Mandatory = TSUnset
+					}
+				default:
+					appendErr(fmt.Errorf("invalid deviation type %s", dt))
+				}
+			}
+		}
+	}
+
+	return errs
+
+}
+
 // FixChoice inserts missing Case entries in a choice
 func (e *Entry) FixChoice() {
 	if e.Kind == ChoiceEntry && len(e.Errors) == 0 {
@@ -788,7 +1019,12 @@ func (e *Entry) FixChoice() {
 			if ce.Kind != CaseEntry {
 				ne := &Entry{
 					Parent: e,
-					Node:   ce.Node,
+					Node: &Case{
+						Parent:     ce.Node.ParentNode(),
+						Name:       ce.Node.NName(),
+						Source:     ce.Node.Statement(),
+						Extensions: ce.Node.Exts(),
+					},
 					Name:   ce.Name,
 					Kind:   CaseEntry,
 					Config: ce.Config,

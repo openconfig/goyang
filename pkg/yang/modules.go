@@ -238,7 +238,7 @@ func (ms *Modules) FindModuleByPrefix(prefix string) (*Module, error) {
 			switch {
 			case m == found:
 			case found != nil:
-				return nil, fmt.Errorf("prefix %s matches two or more modules (%s, %s)\n", prefix, found.Name, m.Name)
+				return nil, fmt.Errorf("prefix %s matches two or more modules (%s, %s)", prefix, found.Name, m.Name)
 			default:
 				found = m
 			}
@@ -379,6 +379,23 @@ func (ms *Modules) Process() []error {
 		ToEntry(m).Augment(true)
 		errs = append(errs, ToEntry(m).GetErrors()...)
 	}
+
+	// The deviation statement is only valid under a module or submodule,
+	// which allows us to avoid having to process it within ToEntry, and
+	// rather we can just walk all modules and submodules *after* entries
+	// are resolved. This means we do not need to concern ourselves that
+	// an entry does not exist.
+	dvP := map[string]bool{} // cache the modules we've handled since we have both modname and modname@revision-date
+	for _, devmods := range []map[string]*Module{ms.Modules, ms.SubModules} {
+		for _, m := range devmods {
+			e := ToEntry(m)
+			if !dvP[e.Name] {
+				errs = append(errs, e.ApplyDeviate()...)
+				dvP[e.Name] = true
+			}
+		}
+	}
+
 	return errorSort(errs)
 }
 

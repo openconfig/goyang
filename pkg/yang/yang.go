@@ -43,11 +43,11 @@ func (s *Value) Exts() []*Statement    { return s.Extensions }
 // asRangeInt returns the value v as an int64 if it is between the values of
 // min and max inclusive.  An error is returned if v is out of range or does
 // not parse into a number.  If v is nil then an error is returned.
-func (v *Value) asRangeInt(min, max int64) (int64, error) {
-	if v == nil {
+func (s *Value) asRangeInt(min, max int64) (int64, error) {
+	if s == nil {
 		return 0, fmt.Errorf("value is required in the range of [%d..%d]", min, max)
 	}
-	n, err := ParseNumber(v.Name)
+	n, err := ParseNumber(s.Name)
 	if err != nil {
 		return 0, err
 	}
@@ -62,35 +62,35 @@ func (v *Value) asRangeInt(min, max int64) (int64, error) {
 		return 0, err
 	}
 	if i < min || i > max {
-		return 0, fmt.Errorf("value %s out of range [%d..%d]", v.Name, min, max)
+		return 0, fmt.Errorf("value %s out of range [%d..%d]", s.Name, min, max)
 	}
 	return i, nil
 }
 
 // asBool returns v as a boolean (true or flase) or returns an error if v
 // is neither true nor false.  If v is nil then false is returned.
-func (v *Value) asBool() (bool, error) {
+func (s *Value) asBool() (bool, error) {
 	// A missing value is considered false
-	if v == nil {
+	if s == nil {
 		return false, nil
 	}
-	switch v.Name {
+	switch s.Name {
 	case "true":
 		return true, nil
 	case "false":
 		return false, nil
 	default:
-		return false, fmt.Errorf("invalid boolean: %s", v.Name)
+		return false, fmt.Errorf("invalid boolean: %s", s.Name)
 	}
 }
 
 // asString simply returns the string value of v.  If v is nil then an empty
 // string is returned.
-func (v *Value) asString() string {
-	if v == nil {
+func (s *Value) asString() string {
+	if s == nil {
 		return ""
 	}
-	return v.Name
+	return s.Name
 }
 
 // See http://tools.ietf.org/html/rfc6020#section-7 for a description of the
@@ -181,8 +181,8 @@ func (s *Module) FullName() string {
 
 // GetPrefix returns the proper prefix of m.  Useful when looking up types
 // in modules found by FindModuleByPrefix.
-func (m *Module) GetPrefix() string {
-	pfx := m.getPrefix()
+func (s *Module) GetPrefix() string {
+	pfx := s.getPrefix()
 	if pfx == nil {
 		// This case can be true during testing.
 		return ""
@@ -190,14 +190,14 @@ func (m *Module) GetPrefix() string {
 	return pfx.Name
 }
 
-func (m *Module) getPrefix() *Value {
+func (s *Module) getPrefix() *Value {
 	switch {
-	case m == nil:
+	case s == nil:
 		return nil
-	case m.Prefix != nil:
-		return m.Prefix
-	case m.BelongsTo != nil:
-		return m.BelongsTo.Prefix
+	case s.Prefix != nil:
+		return s.Prefix
+	case s.BelongsTo != nil:
+		return s.BelongsTo.Prefix
 	default:
 		return nil
 	}

@@ -1,0 +1,42 @@
+module deviate {
+    prefix "d";
+    namespace "urn:d";
+
+    grouping substmts {
+        container child {
+            leaf zzz { type string; }
+        }
+    }
+
+    container target {
+        uses substmts;
+    }
+
+    list target-list {
+        key "k";
+
+        leaf k { type string; }
+        uses substmts;
+    }
+
+    leaf a-leaf { type string; }
+    leaf a-leaflist { type string; }
+
+    leaf survivor { type string; }
+
+    deviation /target {
+        deviate not-supported;
+    }
+
+    deviation /target-list {
+        deviate not-supported;
+    }
+
+    deviation /a-leaf {
+        deviate not-supported;
+    }
+
+    deviation /a-leaflist {
+        deviate not-supported;
+    }
+}
