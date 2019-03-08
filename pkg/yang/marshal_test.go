@@ -129,6 +129,61 @@ func TestMarshalJSON(t *testing.T) {
 					},
 				},
 			},
+			Augments: []*Entry{{
+				Name: "augment",
+				Node: &Leaf{
+					Name: "leaf",
+				},
+				Kind:   LeafEntry,
+				Config: TSFalse,
+				Prefix: &Value{
+					Name: "ModulePrefix",
+					Source: &Statement{
+						Keyword:     "prefix",
+						Argument:    "ModulePrefix",
+						HasArgument: true,
+					},
+				},
+			}},
+			Augmented: []*Entry{{
+				Name: "augmented",
+				Node: &Leaf{
+					Name: "leaf",
+				},
+				Kind:   LeafEntry,
+				Config: TSTrue,
+				Prefix: &Value{
+					Name: "ModulePrefix",
+					Source: &Statement{
+						Keyword:     "prefix",
+						Argument:    "ModulePrefix",
+						HasArgument: true,
+					},
+				},
+			}},
+			Uses: []*UsesStmt{{
+				Uses: &Uses{
+					Name: "grouping",
+				},
+				Grouping: &Entry{
+					Name: "grouping",
+					Node: &Grouping{
+						Name: "grouping",
+						Leaf: []*Leaf{{
+							Name: "groupingLeaf",
+						}},
+					},
+					Config: TSFalse,
+					Prefix: &Value{
+						Name: "ModulePrefix",
+						Source: &Statement{
+							Keyword:     "prefix",
+							Argument:    "ModulePrefix",
+							HasArgument: true,
+						},
+					},
+				},
+			}},
 		},
 		want: `{
   "Name": "container",
@@ -183,7 +238,57 @@ func TestMarshalJSON(t *testing.T) {
         ]
       }
     }
-  }
+  },
+  "Augments": [
+    {
+      "Name": "augment",
+      "Kind": 0,
+      "Config": 2,
+      "Prefix": {
+        "Name": "ModulePrefix",
+        "Source": {
+          "Keyword": "prefix",
+          "HasArgument": true,
+          "Argument": "ModulePrefix"
+        }
+      }
+    }
+  ],
+  "Augmented": [
+    {
+      "Name": "augmented",
+      "Kind": 0,
+      "Config": 1,
+      "Prefix": {
+        "Name": "ModulePrefix",
+        "Source": {
+          "Keyword": "prefix",
+          "HasArgument": true,
+          "Argument": "ModulePrefix"
+        }
+      }
+    }
+  ],
+  "Uses": [
+    {
+      "Uses": {
+        "Name": "grouping"
+      },
+      "Grouping": {
+        "Name": "grouping",
+        "Kind": 0,
+        "Config": 2,
+        "Prefix": {
+          "Name": "ModulePrefix",
+          "Source": {
+            "Keyword": "prefix",
+            "HasArgument": true,
+            "Argument": "ModulePrefix"
+          }
+        }
+      }
+    }
+  ]
 }`,
 	}, {
 		name: "Entry with list and leaflist",

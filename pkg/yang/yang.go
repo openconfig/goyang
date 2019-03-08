@@ -622,17 +622,17 @@ func (s *Grouping) Typedefs() []*Typedef   { return s.Typedef }
 // A Uses is defined in: http://tools.ietf.org/html/rfc6020#section-7.12
 type Uses struct {
 	Name       string       `yang:"Name,nomerge"`
-	Source     *Statement   `yang:"Statement,nomerge"`
-	Parent     Node         `yang:"Parent,nomerge"`
-	Extensions []*Statement `yang:"Ext"`
+	Source     *Statement   `yang:"Statement,nomerge" json:"-"`
+	Parent     Node         `yang:"Parent,nomerge" json:"-"`
+	Extensions []*Statement `yang:"Ext" json:"-"`
 
-	Augment     *Augment  `yang:"augment"`
-	Description *Value    `yang:"description"`
-	IfFeature   []*Value  `yang:"if-feature"`
-	Refine      []*Refine `yang:"refine"`
-	Reference   *Value    `yang:"reference"`
-	Status      *Value    `yang:"status"`
-	When        *Value    `yang:"when"`
+	Augment     *Augment  `yang:"augment" json:",omitempty"`
+	Description *Value    `yang:"description" json:",omitempty"`
+	IfFeature   []*Value  `yang:"if-feature" json:"-"`
+	Refine      []*Refine `yang:"refine" json:"-"`
+	Reference   *Value    `yang:"reference" json:"-"`
+	Status      *Value    `yang:"status" json:"-"`
+	When        *Value    `yang:"when" json:",omitempty"`
 }
 
 func (Uses) Kind() string             { return "uses" }
