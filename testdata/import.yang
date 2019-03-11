@@ -1,0 +1,15 @@
+// Copyright 2019 Arista Inc.
+
+module import {
+  namespace "urn:mod";
+  prefix "import";
+
+  import base {
+    prefix base;
+    description "description in import block";
+  }
+  import other {
+    prefix other;
+    reference "RFC xyz refers to other";
+  }
+}

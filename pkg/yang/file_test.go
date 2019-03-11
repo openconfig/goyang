@@ -96,9 +96,9 @@ func TestScanForPathsAndAddModules(t *testing.T) {
 	// add the paths found in the scan to the module path
 	AddPath(paths...)
 
-	// confirm we can load the four modules that exist in
+	// confirm we can load the five modules that exist in
 	// the two paths we scanned.
-	modules := []string{"aug", "base", "other", "subdir1"}
+	modules := []string{"aug", "base", "other", "subdir1", "import"}
 	ms := NewModules()
 	for _, name := range modules {
 		if _, err := ms.GetModule(name); err != nil {
