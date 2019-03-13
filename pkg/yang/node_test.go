@@ -15,6 +15,7 @@
 package yang
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 )
@@ -69,8 +70,60 @@ func TestNode(t *testing.T) {
 				return fmt.Errorf("got node: %v, want type: import", n)
 			}
 
-			if is.Reference == nil || is.Reference.Statement().Argument != "bar" {
+			switch {
+			case is.Reference == nil:
+				return errors.New("did not get expected reference, got: nil, want: *yang.Statement")
+			case is.Reference.Statement().Argument != "bar":
 				return fmt.Errorf("did not get expected reference, got: %v, want: 'bar'", is.Reference.Statement())
+			}
+
+			return nil
+		},
+	}, {
+		desc: "import description statement",
+		inFn: func(ms *Modules) (Node, error) {
+
+			m, err := ms.FindModuleByPrefix("t")
+			if err != nil {
+				return nil, fmt.Errorf("can't find module in %v", ms)
+			}
+
+			if len(m.Import) == 0 {
+				return nil, fmt.Errorf("node %v is missing imports", m)
+			}
+
+			return m.Import[0], nil
+		},
+		inModules: map[string]string{
+			"test": `
+				module test {
+					prefix "t";
+					namespace "urn:t";
+
+					import foo {
+						prefix "f";
+						description "foo module";
+					}
+				}
+			`,
+			"foo": `
+				module foo {
+					prefix "f";
+					namespace "urn:f";
+				}
+			`,
+		},
+		wantNode: func(n Node) error {
+			is, ok := n.(*Import)
+			if !ok {
+				return fmt.Errorf("got node: %v, want type: import", n)
+			}
+
+			switch {
+			case is.Description == nil:
+				return errors.New("did not get expected reference, got: nil, want: *yang.Statement")
+			case is.Description.Statement().Argument != "foo module":
+				return fmt.Errorf("did not get expected reference, got: '%v', want: 'foo module'", is.Description.Statement().Argument)
 			}
 
 			return nil

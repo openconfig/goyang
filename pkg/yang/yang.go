@@ -212,7 +212,8 @@ type Import struct {
 
 	Prefix       *Value `yang:"prefix,required"`
 	RevisionDate *Value `yang:"revision-date"`
-	Reference    *Value `yang:"reference"`
+	Reference    *Value `yang:"reference,nomerge"`
+	Description  *Value `yang:"description,nomerge"`
 
 	// Module is the imported module.  The types and groupings are
 	// available to the importer with the defined prefix.
