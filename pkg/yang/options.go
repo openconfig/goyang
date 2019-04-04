@@ -22,6 +22,11 @@ type Options struct {
 	// package will explicitly ignore the case where a submodule will include
 	// itself through a circular reference.
 	IgnoreSubmoduleCircularDependencies bool
+	// StoreUses controls whether the Uses field of each YANG entry should be
+	// populated. Setting this value to true will cause each Entry which is
+	// generated within the schema to store the logical grouping from which it
+	// is derived.
+	StoreUses bool
 }
 
 // ParseOptions sets the options for the current YANG module parsing. It can be

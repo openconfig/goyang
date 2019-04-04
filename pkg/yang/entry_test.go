@@ -405,7 +405,7 @@ module when {
   }
 
   anyxml eta {
-    when "../condition = 'eta'";   
+    when "../condition = 'eta'";
   }
 
   anydata theta {
@@ -428,6 +428,9 @@ module when {
 }
 
 func TestGetWhenXPath(t *testing.T) {
+	ParseOptions.StoreUses = true
+	defer func() { ParseOptions.StoreUses = false }()
+
 	ms := NewModules()
 	for _, tt := range testWhenModules {
 		if err := ms.Parse(tt.in, tt.name); err != nil {
@@ -696,6 +699,9 @@ func TestAugmentedEntry(t *testing.T) {
 }
 
 func TestUsesEntry(t *testing.T) {
+	ParseOptions.StoreUses = true
+	defer func() { ParseOptions.StoreUses = false }()
+
 	ms := NewModules()
 	for _, tt := range testAugmentAndUsesModules {
 		if err := ms.Parse(tt.in, tt.name); err != nil {
@@ -813,7 +819,7 @@ module mod {
     container level1-3{
       container level2-3 {
         leaf level3-1 { type string;}
-      }    
+      }
     }
   }
 }
