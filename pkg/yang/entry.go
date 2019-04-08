@@ -796,7 +796,9 @@ func ToEntry(n Node) (e *Entry) {
 			for _, a := range fv.Interface().([]*Uses) {
 				grouping := ToEntry(a)
 				e.merge(nil, nil, grouping)
-				e.Uses = append(e.Uses, &UsesStmt{a, grouping.shallowDup()})
+				if ParseOptions.StoreUses {
+					e.Uses = append(e.Uses, &UsesStmt{a, grouping.shallowDup()})
+				}
 			}
 		case "type":
 			// The type keyword is specific to deviate to change a type. Other type handling
