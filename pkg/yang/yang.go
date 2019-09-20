@@ -332,7 +332,7 @@ func (s *Type) Statement() *Statement { return s.Source }
 func (s *Type) Exts() []*Statement    { return s.Extensions }
 
 // A Container is defined in: http://tools.ietf.org/html/rfc6020#section-7.5
-// and http://tools.ietf.org/html/rfc7950#section-7.5 ("action" sub-statement)
+// and http://tools.ietf.org/html/rfc7950#section-7.5 ("container" sub-statement)
 type Container struct {
 	Name       string       `yang:"Name,nomerge"`
 	Source     *Statement   `yang:"Statement,nomerge"`
@@ -442,7 +442,7 @@ func (s *LeafList) Statement() *Statement { return s.Source }
 func (s *LeafList) Exts() []*Statement    { return s.Extensions }
 
 // A List is defined in: http://tools.ietf.org/html/rfc6020#section-7.8
-// and http://tools.ietf.org/html/rfc7950#section-7.8 ("action" sub-statement)
+// and http://tools.ietf.org/html/rfc7950#section-7.8 ("list" sub-statement)
 type List struct {
 	Name       string       `yang:"Name,nomerge"`
 	Source     *Statement   `yang:"Statement,nomerge"`
@@ -590,7 +590,7 @@ func (s *AnyData) Statement() *Statement { return s.Source }
 func (s *AnyData) Exts() []*Statement    { return s.Extensions }
 
 // A Grouping is defined in: http://tools.ietf.org/html/rfc6020#section-7.11
-// and http://tools.ietf.org/html/rfc7950#section-7.12 ("action" sub-statement)
+// and http://tools.ietf.org/html/rfc7950#section-7.12 ("grouping" sub-statement)
 type Grouping struct {
 	Name       string       `yang:"Name,nomerge"`
 	Source     *Statement   `yang:"Statement,nomerge"`
@@ -778,7 +778,7 @@ func (s *Notification) Groupings() []*Grouping { return s.Grouping }
 func (s *Notification) Typedefs() []*Typedef   { return s.Typedef }
 
 // An Augment is defined in: http://tools.ietf.org/html/rfc6020#section-7.15
-// and http://tools.ietf.org/html/rfc7950#section-7.17 ("action" sub-statement)
+// and http://tools.ietf.org/html/rfc7950#section-7.17 ("augment" sub-statement)
 type Augment struct {
 	Name       string       `yang:"Name,nomerge"`
 	Source     *Statement   `yang:"Statement,nomerge"`
