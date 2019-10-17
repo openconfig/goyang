@@ -650,15 +650,16 @@ type Refine struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Default     *Value  `yang:"default"`
-	Description *Value  `yang:"description"`
-	Reference   *Value  `yang:"reference"`
-	Config      *Value  `yang:"config"`
-	Mandatory   *Value  `yang:"mandatory"`
-	Presence    *Value  `yang:"presence"`
-	Must        []*Must `yang:"must"`
-	MaxElements *Value  `yang:"max-elements"`
-	MinElements *Value  `yang:"min-elements"`
+	Default     *Value   `yang:"default"`
+	Description *Value   `yang:"description"`
+	IfFeature   []*Value `yang:"if-feature"`
+	Reference   *Value   `yang:"reference"`
+	Config      *Value   `yang:"config"`
+	Mandatory   *Value   `yang:"mandatory"`
+	Presence    *Value   `yang:"presence"`
+	Must        []*Must  `yang:"must"`
+	MaxElements *Value   `yang:"max-elements"`
+	MinElements *Value   `yang:"min-elements"`
 }
 
 func (Refine) Kind() string             { return "refine" }
@@ -817,6 +818,7 @@ type Identity struct {
 
 	Base        *Value      `yang:"base" json:"-"`
 	Description *Value      `yang:"description" json:"-"`
+	IfFeature   []*Value    `yang:"if-feature" json:"-"`
 	Reference   *Value      `yang:"reference" json:"-"`
 	Status      *Value      `yang:"status" json:"-"`
 	Values      []*Identity `json:",omitempty"`
@@ -973,10 +975,11 @@ type Enum struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Description *Value `yang:"description"`
-	Reference   *Value `yang:"reference"`
-	Status      *Value `yang:"status"`
-	Value       *Value `yang:"value"`
+	Description *Value   `yang:"description"`
+	IfFeature   []*Value `yang:"if-feature"`
+	Reference   *Value   `yang:"reference"`
+	Status      *Value   `yang:"status"`
+	Value       *Value   `yang:"value"`
 }
 
 func (Enum) Kind() string             { return "enum" }
@@ -992,10 +995,11 @@ type Bit struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Description *Value `yang:"description"`
-	Reference   *Value `yang:"reference"`
-	Status      *Value `yang:"status"`
-	Position    *Value `yang:"position"`
+	Description *Value   `yang:"description"`
+	IfFeature   []*Value `yang:"if-feature"`
+	Reference   *Value   `yang:"reference"`
+	Status      *Value   `yang:"status"`
+	Position    *Value   `yang:"position"`
 }
 
 func (Bit) Kind() string             { return "bit" }
