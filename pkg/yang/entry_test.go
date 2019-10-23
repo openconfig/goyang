@@ -1658,6 +1658,228 @@ func TestActionRPC(t *testing.T) {
 	}
 }
 
+var testIfFeatureModules = []struct {
+	name string
+	in   string
+}{
+	{
+		name: "if-feature.yang",
+		in: `module if-feature {
+  namespace "urn:if-feature";
+  prefix "feat";
+
+  container cont {
+    if-feature ft;
+    action act {
+      if-feature ft;
+    }
+  }
+
+  anydata data {
+    if-feature ft1;
+    if-feature ft2;
+  }
+
+  anyxml xml {
+    if-feature ft;
+  }
+
+  choice ch {
+    if-feature ft;
+    case cs {
+      if-feature ft;
+    }
+  }
+
+  feature f {
+    if-feature ft;
+  }
+
+  leaf l {
+    if-feature ft;
+    type bits {
+      bit A {
+        if-feature ft;
+      }
+    }
+  }
+
+  leaf-list ll {
+    if-feature ft;
+    type enumeration {
+      enum zero {
+        if-feature ft;
+      }
+    }
+  }
+
+  list ls {
+    if-feature ft;
+  }
+
+  notification n {
+    if-feature ft;
+  }
+
+  rpc r {
+    if-feature ft;
+  }
+
+  augment "/cont" {
+    if-feature ft;
+  }
+
+  identity id {
+    if-feature ft;
+  }
+
+  uses g {
+    if-feature ft-uses;
+    refine rf {
+      if-feature ft-refine;
+    }
+  }
+  grouping g {}
+}
+`,
+	},
+}
+
+func TestIfFeature(t *testing.T) {
+	entryIfFeatures := func(e *Entry) []*Value {
+		extra := e.Extra["if-feature"]
+		if len(extra) == 0 {
+			return nil
+		}
+		return extra[0].([]*Value)
+	}
+
+	ms := NewModules()
+	for _, tt := range testIfFeatureModules {
+		if err := ms.Parse(tt.in, tt.name); err != nil {
+			t.Fatalf("could not parse module %s: %v", tt.name, err)
+		}
+	}
+
+	if errs := ms.Process(); len(errs) > 0 {
+		t.Fatalf("could not process modules: %v", errs)
+	}
+
+	mod, _ := ms.GetModule("if-feature")
+
+	testcases := []struct {
+		name           string
+		inIfFeatures   []*Value
+		wantIfFeatures []string
+	}{
+		// Node statements
+		{
+			name:           "action",
+			inIfFeatures:   entryIfFeatures(mod.Dir["cont"].Dir["act"]),
+			wantIfFeatures: []string{"ft"},
+		},
+		{
+			name:           "anydata",
+			inIfFeatures:   entryIfFeatures(mod.Dir["data"]),
+			wantIfFeatures: []string{"ft1", "ft2"},
+		},
+		{
+			name:           "anyxml",
+			inIfFeatures:   entryIfFeatures(mod.Dir["xml"]),
+			wantIfFeatures: []string{"ft"},
+		},
+		{
+			name:           "case",
+			inIfFeatures:   entryIfFeatures(mod.Dir["ch"].Dir["cs"]),
+			wantIfFeatures: []string{"ft"},
+		},
+		{
+			name:           "choice",
+			inIfFeatures:   entryIfFeatures(mod.Dir["ch"]),
+			wantIfFeatures: []string{"ft"},
+		},
+		{
+			name:           "container",
+			inIfFeatures:   entryIfFeatures(mod.Dir["cont"]),
+			wantIfFeatures: []string{"ft"},
+		},
+		{
+			name:           "feature",
+			inIfFeatures:   mod.Extra["feature"][0].([]*Feature)[0].IfFeature,
+			wantIfFeatures: []string{"ft"},
+		},
+		{
+			name:           "leaf",
+			inIfFeatures:   entryIfFeatures(mod.Dir["l"]),
+			wantIfFeatures: []string{"ft"},
+		},
+		{
+			name:           "leaf-list",
+			inIfFeatures:   entryIfFeatures(mod.Dir["ll"]),
+			wantIfFeatures: []string{"ft"},
+		},
+		{
+			name:           "list",
+			inIfFeatures:   entryIfFeatures(mod.Dir["ls"]),
+			wantIfFeatures: []string{"ft"},
+		},
+		{
+			name:           "notification",
+			inIfFeatures:   entryIfFeatures(mod.Dir["n"]),
+			wantIfFeatures: []string{"ft"},
+		},
+		{
+			name:           "rpc",
+			inIfFeatures:   entryIfFeatures(mod.Dir["r"]),
+			wantIfFeatures: []string{"ft"},
+		},
+		// Other statements
+		{
+			name:           "augment",
+			inIfFeatures:   entryIfFeatures(mod.Dir["cont"].Augmented[0]),
+			wantIfFeatures: []string{"ft"},
+		},
+		{
+			name:           "bit",
+			inIfFeatures:   mod.Dir["l"].Node.(*Leaf).Type.Bit[0].IfFeature,
+			wantIfFeatures: []string{"ft"},
+		},
+		{
+			name:           "enum",
+			inIfFeatures:   mod.Dir["ll"].Node.(*Leaf).Type.Enum[0].IfFeature,
+			wantIfFeatures: []string{"ft"},
+		},
+		{
+			name:           "identity",
+			inIfFeatures:   mod.Identities[0].IfFeature,
+			wantIfFeatures: []string{"ft"},
+		},
+		{
+			name:           "refine",
+			inIfFeatures:   ms.Modules["if-feature"].Uses[0].Refine[0].IfFeature,
+			wantIfFeatures: []string{"ft-refine"},
+		},
+		{
+			name:           "uses",
+			inIfFeatures:   ms.Modules["if-feature"].Uses[0].IfFeature,
+			wantIfFeatures: []string{"ft-uses"},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			var names []string
+			for _, f := range tc.inIfFeatures {
+				names = append(names, f.Name)
+			}
+
+			if !reflect.DeepEqual(names, tc.wantIfFeatures) {
+				t.Errorf("%s: did not get expected if-features, got %v, want %v", tc.name, names, tc.wantIfFeatures)
+			}
+		})
+	}
+}
+
 // addTreeE takes an input Entry and appends it to a directory, keyed by path, to the Entry.
 // If the Entry has children, they are appended to the directory recursively. Used in test
 // cases where a path is to be referred to.

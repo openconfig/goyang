@@ -548,6 +548,7 @@ func ToEntry(n Node) (e *Entry) {
 		e.Config, err = tristateValue(s.Config)
 		e.addError(err)
 		e.Prefix = getRootPrefix(e)
+		addExtrasToLeaf(n, e)
 		return e
 	case *LeafList:
 		// Create the equivalent leaf element that we are a list of.
@@ -575,6 +576,7 @@ func ToEntry(n Node) (e *Entry) {
 			OrderedBy:   s.OrderedBy,
 		}
 		e.Prefix = getRootPrefix(e)
+		addExtrasToLeaf(n, e)
 		return e
 	case *Uses:
 		g := FindGrouping(s, s.Name, map[string]bool{})
@@ -584,7 +586,9 @@ func ToEntry(n Node) (e *Entry) {
 		// We need to return a duplicate so we resolve properly
 		// when the group is used in multiple locations and the
 		// grouping has a leafref that references outside the group.
-		return ToEntry(g).dup()
+		e := ToEntry(g).dup()
+		addExtrasToLeaf(n, e)
+		return e
 	}
 
 	e = newDirectory(n)
@@ -941,6 +945,30 @@ func ToEntry(n Node) (e *Entry) {
 	}
 
 	return e
+}
+
+// addExtrasToLeaf stores the values for unimplemented keywords in leaf entries.
+func addExtrasToLeaf(n Node, e *Entry) {
+	v := reflect.ValueOf(n).Elem()
+	t := v.Type()
+
+	for i := t.NumField() - 1; i > 0; i-- {
+		f := t.Field(i)
+		yang := f.Tag.Get("yang")
+		if yang == "" {
+			continue
+		}
+		fv := v.Field(i)
+		name := strings.Split(yang, ",")[0]
+		switch name {
+		case "if-feature",
+			"must",
+			"reference",
+			"status",
+			"when":
+			e.Extra[name] = append(e.Extra[name], fv.Interface())
+		}
+	}
 }
 
 // getRootPrefix returns the prefix of e's root node (module)
