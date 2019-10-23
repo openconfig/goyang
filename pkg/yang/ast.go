@@ -66,7 +66,7 @@ type meta struct {
 }
 
 func init() {
-	initTypes(reflect.TypeOf(&meta{}))
+	initTypes(reflect.TypeOf(&meta{}), &typeDict)
 }
 
 // aliases is a map of "aliased" names, that is, two types of statements
@@ -78,7 +78,11 @@ var aliases = map[string]string{
 // BuildAST builds an abstract syntax tree based on the yang statement s.
 // Normally it should return a *Module.
 func BuildAST(s *Statement) (Node, error) {
-	v, err := build(s, nilValue)
+	return buildASTWithTypeDict(s, &typeDict)
+}
+
+func buildASTWithTypeDict(s *Statement, d *typeDictionary) (Node, error) {
+	v, err := build(s, nilValue, d)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +91,7 @@ func BuildAST(s *Statement) (Node, error) {
 
 // build builds and returns an AST from the statement s, with parent p, or
 // returns an error.  The type of value returned depends on the keyword in s.
-func build(s *Statement, p reflect.Value) (v reflect.Value, err error) {
+func build(s *Statement, p reflect.Value, d *typeDictionary) (v reflect.Value, err error) {
 	defer func() {
 		// If we are returning a real Node then call addTypedefs
 		// if the node possibly contains typedefs.
@@ -95,7 +99,7 @@ func build(s *Statement, p reflect.Value) (v reflect.Value, err error) {
 			return
 		}
 		if t, ok := v.Interface().(Typedefer); ok {
-			addTypedefs(t)
+			d.addTypedefs(t)
 		}
 	}()
 	kind := s.Keyword
@@ -258,7 +262,7 @@ func build(s *Statement, p reflect.Value) (v reflect.Value, err error) {
 //                   (This is to support merging Module and SubModule).
 //
 // If at contains substructures, initTypes recurses on the substructures.
-func initTypes(at reflect.Type) {
+func initTypes(at reflect.Type, d *typeDictionary) {
 	if typeMap[at] != nil {
 		return // we already defined this type
 	}
@@ -323,7 +327,7 @@ func initTypes(at reflect.Type) {
 			switch nameMap[name] {
 			case nil:
 				nameMap[name] = dt
-				initTypes(dt) // Make sure that structure type is included
+				initTypes(dt, d) // Make sure that structure type is included
 			case dt:
 			default:
 				panic("redeclared type " + name)
@@ -400,7 +404,7 @@ func initTypes(at reflect.Type) {
 				}
 
 				// Use build to build the value for this field.
-				sv, err := build(s, v)
+				sv, err := build(s, v, d)
 				if err != nil {
 					return err
 				}
@@ -423,7 +427,7 @@ func initTypes(at reflect.Type) {
 					if v.Type() != at {
 						panic(fmt.Sprintf("given type %s, need type %s", v.Type(), at))
 					}
-					sv, err := build(s, v)
+					sv, err := build(s, v, d)
 					if err != nil {
 						return err
 					}

@@ -77,7 +77,7 @@ func TestTypeResolve(t *testing.T) {
 		// in Type.
 	} {
 		// We can initialize a value to ourself, so to it here.
-		errs := tt.in.resolve()
+		errs := tt.in.resolve(&typeDict)
 
 		// TODO(borman):  Do not hack out Root and Base.  These
 		// are hacked out for now because they can be self-referential,

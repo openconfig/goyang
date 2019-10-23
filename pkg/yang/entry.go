@@ -495,6 +495,7 @@ func ToEntry(n Node) (e *Entry) {
 			Errors: []error{err},
 		}
 	}
+	ms := getModules(n)
 	if e := entryCache[n]; e != nil {
 		return e
 	}
@@ -534,7 +535,7 @@ func ToEntry(n Node) (e *Entry) {
 	switch s := n.(type) {
 	case *Leaf:
 		e := newLeaf(n)
-		if errs := s.Type.resolve(); errs != nil {
+		if errs := s.Type.resolve(ms.typeDict); errs != nil {
 			e.Errors = errs
 		}
 		if s.Description != nil {
@@ -810,7 +811,7 @@ func ToEntry(n Node) (e *Entry) {
 			}
 
 			if n.Type != nil {
-				if errs := n.Type.resolve(); errs != nil {
+				if errs := n.Type.resolve(ms.typeDict); errs != nil {
 					e.addError(fmt.Errorf("deviation has unresolvable type, %v", errs))
 					continue
 				}
@@ -842,7 +843,7 @@ func ToEntry(n Node) (e *Entry) {
 
 					for _, sd := range d.Deviate {
 						if sd.Type != nil {
-							sd.Type.resolve()
+							sd.Type.resolve(ms.typeDict)
 						}
 					}
 				}
@@ -941,6 +942,13 @@ func ToEntry(n Node) (e *Entry) {
 	}
 
 	return e
+}
+
+func getModules(n Node) *Modules {
+	for n.ParentNode() != nil {
+		n = n.ParentNode()
+	}
+	return n.(*Module).modules
 }
 
 // getRootPrefix returns the prefix of e's root node (module)
