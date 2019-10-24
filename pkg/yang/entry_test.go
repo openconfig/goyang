@@ -1880,6 +1880,88 @@ func TestIfFeature(t *testing.T) {
 	}
 }
 
+var testNotificationModules = []struct {
+	name string
+	in   string
+}{
+	{
+		name: "notification.yang",
+		in: `module notification {
+  namespace "urn:notification";
+  prefix "n";
+
+  notification n {}
+
+  grouping g {
+    notification g-n {}
+  }
+
+  container cont {
+    notification cont-n {}
+  }
+
+  list ls {
+    notification ls-n {}
+    uses g;
+  }
+
+  augment "/cont" {
+    notification aug-n {}
+  }
+}
+`,
+	},
+}
+
+func TestNotification(t *testing.T) {
+	ms := NewModules()
+	for _, tt := range testNotificationModules {
+		if err := ms.Parse(tt.in, tt.name); err != nil {
+			t.Fatalf("could not parse module %s: %v", tt.name, err)
+		}
+	}
+
+	if errs := ms.Process(); len(errs) > 0 {
+		t.Fatalf("could not process modules: %v", errs)
+	}
+
+	mod, _ := ms.GetModule("notification")
+
+	testcases := []struct {
+		name     string
+		wantPath []string
+	}{
+		{
+			name:     "module",
+			wantPath: []string{"n"},
+		},
+		{
+			name:     "container",
+			wantPath: []string{"cont", "cont-n"},
+		},
+		{
+			name:     "list",
+			wantPath: []string{"ls", "ls-n"},
+		},
+		{
+			name:     "grouping",
+			wantPath: []string{"ls", "g-n"},
+		},
+		{
+			name:     "augment",
+			wantPath: []string{"cont", "aug-n"},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if e := getEntry(mod, tc.wantPath); e == nil || e.Node.Kind() != "notification" {
+				t.Errorf("%s: want notification entry at: %v, got: %+v", tc.name, tc.wantPath, e)
+			}
+		})
+	}
+}
+
 // addTreeE takes an input Entry and appends it to a directory, keyed by path, to the Entry.
 // If the Entry has children, they are appended to the directory recursively. Used in test
 // cases where a path is to be referred to.

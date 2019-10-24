@@ -339,25 +339,26 @@ type Container struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Anydata     []*AnyData   `yang:"anydata"`
-	Action      []*Action    `yang:"action"`
-	Anyxml      []*AnyXML    `yang:"anyxml"`
-	Choice      []*Choice    `yang:"choice"`
-	Config      *Value       `yang:"config"`
-	Container   []*Container `yang:"container"`
-	Description *Value       `yang:"description"`
-	Grouping    []*Grouping  `yang:"grouping"`
-	IfFeature   []*Value     `yang:"if-feature"`
-	Leaf        []*Leaf      `yang:"leaf"`
-	LeafList    []*LeafList  `yang:"leaf-list"`
-	List        []*List      `yang:"list"`
-	Must        []*Must      `yang:"must"`
-	Presence    *Value       `yang:"presence"`
-	Reference   *Value       `yang:"reference"`
-	Status      *Value       `yang:"status"`
-	Typedef     []*Typedef   `yang:"typedef"`
-	Uses        []*Uses      `yang:"uses"`
-	When        *Value       `yang:"when"`
+	Anydata      []*AnyData      `yang:"anydata"`
+	Action       []*Action       `yang:"action"`
+	Anyxml       []*AnyXML       `yang:"anyxml"`
+	Choice       []*Choice       `yang:"choice"`
+	Config       *Value          `yang:"config"`
+	Container    []*Container    `yang:"container"`
+	Description  *Value          `yang:"description"`
+	Grouping     []*Grouping     `yang:"grouping"`
+	IfFeature    []*Value        `yang:"if-feature"`
+	Leaf         []*Leaf         `yang:"leaf"`
+	LeafList     []*LeafList     `yang:"leaf-list"`
+	List         []*List         `yang:"list"`
+	Must         []*Must         `yang:"must"`
+	Notification []*Notification `yang:"notification"`
+	Presence     *Value          `yang:"presence"`
+	Reference    *Value          `yang:"reference"`
+	Status       *Value          `yang:"status"`
+	Typedef      []*Typedef      `yang:"typedef"`
+	Uses         []*Uses         `yang:"uses"`
+	When         *Value          `yang:"when"`
 }
 
 func (Container) Kind() string              { return "container" }
@@ -449,29 +450,30 @@ type List struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Anydata     []*AnyData   `yang:"anydata"`
-	Action      []*Action    `yang:"action"`
-	Anyxml      []*AnyXML    `yang:"anyxml"`
-	Choice      []*Choice    `yang:"choice"`
-	Config      *Value       `yang:"config"`
-	Container   []*Container `yang:"container"`
-	Description *Value       `yang:"description"`
-	Grouping    []*Grouping  `yang:"grouping"`
-	IfFeature   []*Value     `yang:"if-feature"`
-	Key         *Value       `yang:"key"`
-	Leaf        []*Leaf      `yang:"leaf"`
-	LeafList    []*LeafList  `yang:"leaf-list"`
-	List        []*List      `yang:"list"`
-	MaxElements *Value       `yang:"max-elements"`
-	MinElements *Value       `yang:"min-elements"`
-	Must        []*Must      `yang:"must"`
-	OrderedBy   *Value       `yang:"ordered-by"`
-	Reference   *Value       `yang:"reference"`
-	Status      *Value       `yang:"status"`
-	Typedef     []*Typedef   `yang:"typedef"`
-	Unique      []*Value     `yang:"unique"`
-	Uses        []*Uses      `yang:"uses"`
-	When        *Value       `yang:"when"`
+	Anydata      []*AnyData      `yang:"anydata"`
+	Action       []*Action       `yang:"action"`
+	Anyxml       []*AnyXML       `yang:"anyxml"`
+	Choice       []*Choice       `yang:"choice"`
+	Config       *Value          `yang:"config"`
+	Container    []*Container    `yang:"container"`
+	Description  *Value          `yang:"description"`
+	Grouping     []*Grouping     `yang:"grouping"`
+	IfFeature    []*Value        `yang:"if-feature"`
+	Key          *Value          `yang:"key"`
+	Leaf         []*Leaf         `yang:"leaf"`
+	LeafList     []*LeafList     `yang:"leaf-list"`
+	List         []*List         `yang:"list"`
+	MaxElements  *Value          `yang:"max-elements"`
+	MinElements  *Value          `yang:"min-elements"`
+	Must         []*Must         `yang:"must"`
+	Notification []*Notification `yang:"notification"`
+	OrderedBy    *Value          `yang:"ordered-by"`
+	Reference    *Value          `yang:"reference"`
+	Status       *Value          `yang:"status"`
+	Typedef      []*Typedef      `yang:"typedef"`
+	Unique       []*Value        `yang:"unique"`
+	Uses         []*Uses         `yang:"uses"`
+	When         *Value          `yang:"when"`
 }
 
 func (List) Kind() string              { return "list" }
@@ -597,20 +599,21 @@ type Grouping struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Anydata     []*AnyData   `yang:"anydata"`
-	Action      []*Action    `yang:"action"`
-	Anyxml      []*AnyXML    `yang:"anyxml"`
-	Choice      []*Choice    `yang:"choice"`
-	Container   []*Container `yang:"container"`
-	Description *Value       `yang:"description"`
-	Grouping    []*Grouping  `yang:"grouping"`
-	Leaf        []*Leaf      `yang:"leaf"`
-	LeafList    []*LeafList  `yang:"leaf-list"`
-	List        []*List      `yang:"list"`
-	Reference   *Value       `yang:"reference"`
-	Status      *Value       `yang:"status"`
-	Typedef     []*Typedef   `yang:"typedef"`
-	Uses        []*Uses      `yang:"uses"`
+	Anydata      []*AnyData      `yang:"anydata"`
+	Action       []*Action       `yang:"action"`
+	Anyxml       []*AnyXML       `yang:"anyxml"`
+	Choice       []*Choice       `yang:"choice"`
+	Container    []*Container    `yang:"container"`
+	Description  *Value          `yang:"description"`
+	Grouping     []*Grouping     `yang:"grouping"`
+	Leaf         []*Leaf         `yang:"leaf"`
+	LeafList     []*LeafList     `yang:"leaf-list"`
+	List         []*List         `yang:"list"`
+	Notification []*Notification `yang:"notification"`
+	Reference    *Value          `yang:"reference"`
+	Status       *Value          `yang:"status"`
+	Typedef      []*Typedef      `yang:"typedef"`
+	Uses         []*Uses         `yang:"uses"`
 }
 
 func (Grouping) Kind() string              { return "grouping" }
@@ -786,21 +789,22 @@ type Augment struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Anydata     []*AnyData   `yang:"anydata"`
-	Action      []*Action    `yang:"action"`
-	Anyxml      []*AnyXML    `yang:"anyxml"`
-	Case        []*Case      `yang:"case"`
-	Choice      []*Choice    `yang:"choice"`
-	Container   []*Container `yang:"container"`
-	Description *Value       `yang:"description"`
-	IfFeature   []*Value     `yang:"if-feature"`
-	Leaf        []*Leaf      `yang:"leaf"`
-	LeafList    []*LeafList  `yang:"leaf-list"`
-	List        []*List      `yang:"list"`
-	Reference   *Value       `yang:"reference"`
-	Status      *Value       `yang:"status"`
-	Uses        []*Uses      `yang:"uses"`
-	When        *Value       `yang:"when"`
+	Anydata      []*AnyData      `yang:"anydata"`
+	Action       []*Action       `yang:"action"`
+	Anyxml       []*AnyXML       `yang:"anyxml"`
+	Case         []*Case         `yang:"case"`
+	Choice       []*Choice       `yang:"choice"`
+	Container    []*Container    `yang:"container"`
+	Description  *Value          `yang:"description"`
+	IfFeature    []*Value        `yang:"if-feature"`
+	Leaf         []*Leaf         `yang:"leaf"`
+	LeafList     []*LeafList     `yang:"leaf-list"`
+	List         []*List         `yang:"list"`
+	Notification []*Notification `yang:"notification"`
+	Reference    *Value          `yang:"reference"`
+	Status       *Value          `yang:"status"`
+	Uses         []*Uses         `yang:"uses"`
+	When         *Value          `yang:"when"`
 }
 
 func (Augment) Kind() string             { return "augment" }
