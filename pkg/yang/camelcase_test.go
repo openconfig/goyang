@@ -24,15 +24,19 @@ func TestCamelCase(t *testing.T) {
 	}{
 		{"one", "One"},
 		{"one_two", "OneTwo"},
+		{"__one__two__three__four", "XOne_Two_Three_Four"},
+		{"one.two.three", "OneTwoThree"},
+		{"one.two.three.", "OneTwoThree_"},
 		{"_my_field_name_2", "XMyFieldName_2"},
 		{"Something_Capped", "Something_Capped"},
-		{"/foo/bar", "XFooBar"},
+		{"_Foo-bar", "XFooBar"},
 		{"my_Name", "My_Name"},
 		{"OneTwo", "OneTwo"},
 		{"_", "X"},
 		{"_a_", "XA_"},
 		{"ietf-interface", "IETFInterface"},
 		{"ietf-interface-1", "IETFInterface_1"},
+		{"out-unicast.pkts", "OutUnicastPkts"},
 	}
 	for _, tc := range tests {
 		if got := CamelCase(tc.in); got != tc.want {

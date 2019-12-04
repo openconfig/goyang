@@ -28,23 +28,30 @@ func isASCIIDigit(c byte) bool {
 	return '0' <= c && c <= '9'
 }
 
-// CamelCase returns the CamelCased name.
-// If there is an interior underscore or dash followed by a lower case letter,
-// drop the underscore or dash and convert the letter to upper case.  There is a
-// remote possibility of this rewrite causing a name collision, but it's so
-// remote we're prepared to pretend it's nonexistent - since the C++ generator
-// lowercases names, it's extremely unlikely to have two fields with different
-// capitalizations.  In short, _my_field_name_2 becomes XMyFieldName_2.
+// CamelCase returns a CamelCased name for a YANG identifier.
+// Currently this supports the output being used for a Go or proto identifier.
+// Dash and dot are first converted to underscore, and then any underscores
+// before a lower-case letter are removed, and the letter converted to upper-case.
+// The first letter is always upper-case in order to be an exported name in Go.
+// There is a remote possibility of this rewrite causing a name collision, but
+// it's so remote we're prepared to pretend it's nonexistent - since the C++
+// generator lowercases names, it's extremely unlikely to have two fields with
+// different capitalizations. In short, _my_field-name_2 becomes XMyFieldName_2.
+// If the input does not conform to the YANG identifier specification
+// (https://tools.ietf.org/html/rfc7950#section-6.2), then there is no
+// guarantee on the form of the output.
 func CamelCase(s string) string {
+	if s == "" {
+		return ""
+	}
+
 	fix := func(c byte) byte {
-		if c == '/' || c == '-' || c == ':' {
+		if c == '-' || c == '.' {
 			return '_'
 		}
 		return c
 	}
-	if s == "" {
-		return ""
-	}
+
 	t := make([]byte, 0, 32)
 	i := 0
 	if fix(s[0]) == '_' {
@@ -52,6 +59,7 @@ func CamelCase(s string) string {
 		t = append(t, 'X')
 		i++
 	}
+
 	// Invariant: if the next letter is lower case, it must be converted
 	// to upper case.
 	// That is, we process a word at a time, where words are marked by _ or
@@ -77,6 +85,7 @@ func CamelCase(s string) string {
 			i++
 			t = append(t, s[i])
 		}
+		// If the word turns out to be a special word, then use that instead.
 		if kn := knownWords[string(t[start:])]; kn != "" {
 			t = append(t[:start], []byte(kn)...)
 		}
