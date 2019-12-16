@@ -31,15 +31,15 @@ func isASCIIDigit(c byte) bool {
 // CamelCase returns a CamelCased name for a YANG identifier.
 // Currently this supports the output being used for a Go or proto identifier.
 // Dash and dot are first converted to underscore, and then any underscores
-// before a lower-case letter are removed, and the letter converted to upper-case.
+// before a lower-case letter are removed, and the letter converted to
+// upper-case. Any input characters not part of the YANG identifier
+// specification (https://tools.ietf.org/html/rfc7950#section-6.2) are treated
+// as lower-case characters.
 // The first letter is always upper-case in order to be an exported name in Go.
 // There is a remote possibility of this rewrite causing a name collision, but
 // it's so remote we're prepared to pretend it's nonexistent - since the C++
 // generator lowercases names, it's extremely unlikely to have two fields with
 // different capitalizations. In short, _my_field-name_2 becomes XMyFieldName_2.
-// If the input does not conform to the YANG identifier specification
-// (https://tools.ietf.org/html/rfc7950#section-6.2), then there is no
-// guarantee on the form of the output.
 func CamelCase(s string) string {
 	if s == "" {
 		return ""

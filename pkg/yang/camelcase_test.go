@@ -37,6 +37,13 @@ func TestCamelCase(t *testing.T) {
 		{"ietf-interface", "IETFInterface"},
 		{"ietf-interface-1", "IETFInterface_1"},
 		{"out-unicast.pkts", "OutUnicastPkts"},
+		// Invalid input conversion behaviours:
+		{"one/two", "One/two"},
+		{"/one/two", "/one/two"},
+		{"one:two", "One:two"},
+		{"::one::two", "::one::two"},
+		{"one|two", "One|two"},
+		{"one||two", "One||two"},
 	}
 	for _, tc := range tests {
 		if got := CamelCase(tc.in); got != tc.want {
