@@ -1320,7 +1320,6 @@ func (e *Entry) merge(prefix *Value, namespace *Value, oe *Entry) {
 			e.Dir[k] = v
 		}
 	}
-
 }
 
 // nless returns -1 if a is less than b, 0 if a == b, and 1 if a > b.
