@@ -156,6 +156,19 @@ foo {
 		},
 		{line: line(), in: `
 foo {
+   key "value1     value2
+
+	 value3";
+}
+`,
+			out: []*Statement{
+				S("foo",
+					SA("key", "value1     value2\n\n value3"),
+				),
+			},
+		},
+		{line: line(), in: `
+foo {
    key value;
    key2;
 }
