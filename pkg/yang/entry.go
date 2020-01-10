@@ -1316,6 +1316,7 @@ func (e *Entry) merge(prefix *Value, namespace *Value, oe *Entry) {
 			e.addError(er.Errors[0])
 		} else {
 			v.Parent = e
+			v.Exts = append(v.Exts, oe.Exts...)
 			e.Dir[k] = v
 		}
 	}

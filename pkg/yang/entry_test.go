@@ -24,6 +24,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/openconfig/gnmi/errdiff"
 )
 
@@ -1083,6 +1085,7 @@ func TestFullModuleProcess(t *testing.T) {
 		inModules        map[string]string
 		inIgnoreCircDeps bool
 		wantLeaves       map[string][]string
+		customVerify     func(t *testing.T, module *Entry)
 		wantErr          bool
 	}{{
 		name: "circular import via child",
@@ -1297,6 +1300,112 @@ func TestFullModuleProcess(t *testing.T) {
 		wantLeaves: map[string][]string{
 			"parent": {"s", "d"},
 		},
+	}, {
+		name: "parent with grouping and with extension",
+		inModules: map[string]string{
+			"parent": `
+			module parent {
+				prefix "p";
+				namespace "urn:p";
+
+				import extensions {
+					prefix "ext";
+				}
+
+				container c {
+					ext:c-define "c's extension";
+					uses daughter-group {
+						ext:u-define "uses's extension";
+					}
+				}
+
+				grouping daughter-group {
+					ext:g-define "grouping's extension";
+
+					leaf l {
+						ext:l-define "l's extension";
+						type string;
+					}
+
+					container c2 {
+						leaf l2 {
+							type string;
+						}
+					}
+				}
+			}
+			`,
+			"extension": `
+			module extensions {
+				prefix "q";
+				namespace "urn:q";
+
+				extension c-define {
+					description
+					"Takes as an argument a name string.
+					c's extension.";
+					argument "name";
+			       }
+				extension g-define {
+					description
+					"Takes as an argument a name string.
+					grouping's extension.";
+					argument "name";
+			       }
+				extension l-define {
+					description
+					"Takes as an argument a name string.
+					l's extension.";
+					argument "name";
+			       }
+				extension u-define {
+					description
+					"Takes as an argument a name string.
+					uses's extension.";
+					argument "name";
+			       }
+			}
+			`,
+		},
+		wantLeaves: map[string][]string{
+			"parent": {"c"},
+		},
+		customVerify: func(t *testing.T, module *Entry) {
+			// Verify that an extension within the uses statement
+			// and within a grouping's definition is copied to each
+			// of the top-level nodes within the grouping, and no
+			// one else above or below.
+			less := cmpopts.SortSlices(func(l, r *Statement) bool { return l.Keyword < r.Keyword })
+
+			wantExts := []*Statement{
+				{Keyword: "ext:c-define", HasArgument: true, Argument: "c's extension"},
+			}
+			if diff := cmp.Diff(wantExts, module.Dir["c"].Exts, cmpopts.IgnoreUnexported(Statement{}), less); diff != "" {
+				t.Errorf("container c Exts (-want, +got):\n%s", diff)
+			}
+
+			wantExts = []*Statement{
+				{Keyword: "ext:g-define", HasArgument: true, Argument: "grouping's extension"},
+				{Keyword: "ext:l-define", HasArgument: true, Argument: "l's extension"},
+				{Keyword: "ext:u-define", HasArgument: true, Argument: "uses's extension"},
+			}
+			if diff := cmp.Diff(wantExts, module.Dir["c"].Dir["l"].Exts, cmpopts.IgnoreUnexported(Statement{}), less); diff != "" {
+				t.Errorf("leaf l Exts (-want, +got):\n%s", diff)
+			}
+
+			wantExts = []*Statement{
+				{Keyword: "ext:g-define", HasArgument: true, Argument: "grouping's extension"},
+				{Keyword: "ext:u-define", HasArgument: true, Argument: "uses's extension"},
+			}
+			if diff := cmp.Diff(wantExts, module.Dir["c"].Dir["c2"].Exts, cmpopts.IgnoreUnexported(Statement{}), less); diff != "" {
+				t.Errorf("container c2 Exts (-want, +got):\n%s", diff)
+			}
+
+			wantExts = []*Statement{}
+			if diff := cmp.Diff(wantExts, module.Dir["c"].Dir["c2"].Dir["l2"].Exts, cmpopts.IgnoreUnexported(Statement{}), less, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("leaf l2 Exts (-want, +got):\n%s", diff)
+			}
+		},
 	}}
 
 	for _, tt := range tests {
@@ -1339,6 +1448,10 @@ func TestFullModuleProcess(t *testing.T) {
 			sort.Strings(leaves)
 			if !reflect.DeepEqual(l, leaves) {
 				t.Errorf("%s: did not get expected leaves in %s, got: %v, want: %v", tt.name, m, leaves, l)
+			}
+
+			if tt.customVerify != nil {
+				tt.customVerify(t, mod)
 			}
 		}
 	}
