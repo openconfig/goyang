@@ -430,8 +430,6 @@ var entryCache = map[Node]*Entry{}
 // the name of the including (sub)module and the included submodule.
 var mergedSubmodule = map[string]bool{}
 
-var depth = 0
-
 // deviationType specifies an enumerated value covering the different substmts
 // to the deviate statement.
 type deviationType int64
