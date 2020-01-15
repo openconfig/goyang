@@ -352,12 +352,6 @@ func (e *Entry) GetErrors() []error {
 	return errorSort(errs)
 }
 
-// asKind sets the kind of e to k and returns e.
-func (e *Entry) asKind(k EntryKind) *Entry {
-	e.Kind = k
-	return e
-}
-
 // add adds the directory entry key assigned to the provided value.
 func (e *Entry) add(key string, value *Entry) *Entry {
 	value.Parent = e
