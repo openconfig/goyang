@@ -352,12 +352,6 @@ func (e *Entry) GetErrors() []error {
 	return errorSort(errs)
 }
 
-// asKind sets the kind of e to k and returns e.
-func (e *Entry) asKind(k EntryKind) *Entry {
-	e.Kind = k
-	return e
-}
-
 // add adds the directory entry key assigned to the provided value.
 func (e *Entry) add(key string, value *Entry) *Entry {
 	value.Parent = e
@@ -429,8 +423,6 @@ var entryCache = map[Node]*Entry{}
 // ignored. The keys of the map are a string that is formed by concatenating
 // the name of the including (sub)module and the included submodule.
 var mergedSubmodule = map[string]bool{}
-
-var depth = 0
 
 // deviationType specifies an enumerated value covering the different substmts
 // to the deviate statement.
