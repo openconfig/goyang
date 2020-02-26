@@ -1320,7 +1320,7 @@ func TestFullModuleProcess(t *testing.T) {
 				}
 
 				grouping daughter-group {
-					ext:g-define "grouping's extension";
+					ext:g-define "daughter-group's extension";
 
 					leaf l {
 						ext:l-define "l's extension";
@@ -1334,11 +1334,17 @@ func TestFullModuleProcess(t *testing.T) {
 					}
 
 					// test nested grouping extensions.
-					uses son-group;
+					uses son-group {
+						ext:sg-define "son-group's extension";
+					}
 				}
 
 				grouping son-group {
-					leaf s { type string; }
+					leaf s {
+						ext:s-define "s's extension";
+						type string;
+					}
+
 				}
 			}
 			`,
@@ -1356,7 +1362,19 @@ func TestFullModuleProcess(t *testing.T) {
 				extension g-define {
 					description
 					"Takes as an argument a name string.
-					grouping's extension.";
+					daughter-group's extension.";
+					argument "name";
+			       }
+				extension sg-define {
+					description
+					"Takes as an argument a name string.
+					son-groups's extension.";
+					argument "name";
+			       }
+				extension s-define {
+					description
+					"Takes as an argument a name string.
+					s's extension.";
 					argument "name";
 			       }
 				extension l-define {
@@ -1391,7 +1409,7 @@ func TestFullModuleProcess(t *testing.T) {
 			}
 
 			if diff := cmp.Diff([]*Statement{
-				{Keyword: "ext:g-define", HasArgument: true, Argument: "grouping's extension"},
+				{Keyword: "ext:g-define", HasArgument: true, Argument: "daughter-group's extension"},
 				{Keyword: "ext:l-define", HasArgument: true, Argument: "l's extension"},
 				{Keyword: "ext:u-define", HasArgument: true, Argument: "uses's extension"},
 			}, module.Dir["c"].Dir["l"].Exts, cmpopts.IgnoreUnexported(Statement{}), less); diff != "" {
@@ -1399,14 +1417,16 @@ func TestFullModuleProcess(t *testing.T) {
 			}
 
 			if diff := cmp.Diff([]*Statement{
-				{Keyword: "ext:g-define", HasArgument: true, Argument: "grouping's extension"},
+				{Keyword: "ext:g-define", HasArgument: true, Argument: "daughter-group's extension"},
+				{Keyword: "ext:sg-define", HasArgument: true, Argument: "son-group's extension"},
+				{Keyword: "ext:s-define", HasArgument: true, Argument: "s's extension"},
 				{Keyword: "ext:u-define", HasArgument: true, Argument: "uses's extension"},
 			}, module.Dir["c"].Dir["s"].Exts, cmpopts.IgnoreUnexported(Statement{}), less); diff != "" {
 				t.Errorf("leaf s Exts (-want, +got):\n%s", diff)
 			}
 
 			if diff := cmp.Diff([]*Statement{
-				{Keyword: "ext:g-define", HasArgument: true, Argument: "grouping's extension"},
+				{Keyword: "ext:g-define", HasArgument: true, Argument: "daughter-group's extension"},
 				{Keyword: "ext:u-define", HasArgument: true, Argument: "uses's extension"},
 			}, module.Dir["c"].Dir["c2"].Exts, cmpopts.IgnoreUnexported(Statement{}), less); diff != "" {
 				t.Errorf("container c2 Exts (-want, +got):\n%s", diff)
