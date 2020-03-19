@@ -547,7 +547,10 @@ func FromFloat(f float64) Number {
 	if f < float64(MinInt64) {
 		return minNumber
 	}
-	var fracDig uint8
+
+	// Per RFC7950/6020, fraction-digits must be at least 1.
+	fracDig := uint8(1)
+	f *= 10.0
 	for ; Frac(f) != 0.0 && fracDig <= MaxFractionDigits; fracDig++ {
 		f *= 10.0
 	}
@@ -711,11 +714,11 @@ func (n Number) add(i uint64) Number {
 			n.Kind = Positive
 		case !n.IsDecimal():
 			n.Value -= i
-		case n.Value <= i:
+		case n.Value <= pow10(n.FractionDigits)*i:
 			// All following cases now handle decimals.
 			n.Value = (pow10(n.FractionDigits) * i) - n.Value
 			n.Kind = Positive
-		case n.Value > i:
+		default:
 			n.Value -= pow10(n.FractionDigits) * i
 		}
 	case Positive:
