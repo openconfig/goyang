@@ -697,25 +697,33 @@ func (n Number) Int() (int64, error) {
 }
 
 // add adds i to n without checking overflow.  We really only need to be
-// able to add 1 for our code. panics if n is a decimal.
+// able to add 1 for our code.
 func (n Number) add(i uint64) Number {
-	if n.IsDecimal() {
-		panic("cannot call add() on decimal number " + n.String())
-	}
 	switch n.Kind {
 	case MinNumber:
 		return n
 	case MaxNumber:
 		return n
 	case Negative:
-		if n.Value <= i {
+		switch {
+		case n.Value <= i && !n.IsDecimal():
 			n.Value = i - n.Value
 			n.Kind = Positive
-		} else {
+		case !n.IsDecimal():
 			n.Value -= i
+		case n.Value <= i:
+			// All following cases now handle decimals.
+			n.Value = (pow10(n.FractionDigits) * i) - n.Value
+			n.Kind = Positive
+		case n.Value > i:
+			n.Value -= pow10(n.FractionDigits) * i
 		}
 	case Positive:
-		n.Value += i
+		if !n.IsDecimal() {
+			n.Value += i
+		} else {
+			n.Value += i * pow10(n.FractionDigits)
+		}
 	default:
 		panic("add to unknown number type")
 	}
