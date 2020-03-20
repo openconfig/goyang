@@ -604,8 +604,8 @@ func ParseNumber(s string) (n Number, err error) {
 // precision of numStr is used to set the number of fractional digits.
 // numStr must conform to Section 9.3.4.
 func DecimalValueFromString(numStr string, fracDigRequired int) (n Number, err error) {
-	if fracDigRequired > int(MaxFractionDigits) {
-		return n, fmt.Errorf("too many fraction digits %d > max of %d", fracDigRequired, MaxFractionDigits)
+	if fracDigRequired > int(MaxFractionDigits) || fracDigRequired < 1 {
+		return n, fmt.Errorf("invalid number of fraction digits %d > max of %d, minimum 1", fracDigRequired, MaxFractionDigits)
 	}
 
 	s := numStr
@@ -619,6 +619,7 @@ func DecimalValueFromString(numStr string, fracDigRequired int) (n Number, err e
 	if fracDigRequired < 0 {
 		fracDigRequired = fracDig
 	}
+
 	if fracDig > fracDigRequired {
 		return n, fmt.Errorf("%s has too much precision, expect <= %d fractional digits", s, fracDigRequired)
 	}
@@ -636,7 +637,7 @@ func DecimalValueFromString(numStr string, fracDigRequired int) (n Number, err e
 		v = -v
 	}
 
-	return Number{Kind: kind, Value: uint64(v), FractionDigits: uint8(fracDig)}, nil
+	return Number{Kind: kind, Value: uint64(v), FractionDigits: uint8(fracDigRequired)}, nil
 }
 
 // String returns n as a string in decimal.

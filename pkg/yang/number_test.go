@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/openconfig/gnmi/errdiff"
 )
 
 const (
@@ -235,6 +236,116 @@ func TestAdd(t *testing.T) {
 			got := tt.inVal.add(tt.inAdd)
 			if !cmp.Equal(got, tt.want) {
 				t.Fatalf("did get expected result, got: %s, want: %s", got.String(), tt.want.String())
+			}
+		})
+	}
+}
+
+func TestDecimalValueFromString(t *testing.T) {
+	tests := []struct {
+		desc             string
+		inStr            string
+		inFracDig        int
+		want             Number
+		wantErrSubstring string
+	}{{
+		desc:             "too few fractional digits",
+		inStr:            "1.000",
+		inFracDig:        0,
+		wantErrSubstring: "invalid number of fraction digits",
+	}, {
+		desc:             "too many fraction digits",
+		inStr:            "1.000",
+		inFracDig:        24,
+		wantErrSubstring: "invalid number of fraction digits",
+	}, {
+		desc:             "more digits supplied",
+		inStr:            "1.14242",
+		inFracDig:        2,
+		wantErrSubstring: "has too much precision",
+	}, {
+		desc:      "single digit precision",
+		inStr:     "1.1",
+		inFracDig: 1,
+		want:      Number{Value: 11, FractionDigits: 1},
+	}, {
+		desc:      "max precision",
+		inStr:     "0.100000000000000000",
+		inFracDig: 18,
+		want:      FromFloat(0.1),
+	}, {
+		desc:      "max precision but not supplied",
+		inStr:     "0.1",
+		inFracDig: 4,
+		want:      FromFloat(0.1),
+	}, {
+		desc:             "invalid string supplied",
+		inStr:            "fish",
+		inFracDig:        17,
+		wantErrSubstring: "not a valid decimal number",
+	}, {
+		desc:      "negative number",
+		inStr:     "-42.0",
+		inFracDig: 1,
+		want:      FromFloat(-42),
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			got, err := DecimalValueFromString(tt.inStr, tt.inFracDig)
+			if err != nil {
+				if diff := errdiff.Substring(err, tt.wantErrSubstring); diff != "" {
+					t.Fatalf("did not get expected error, %s", diff)
+				}
+				return
+			}
+
+			if !cmp.Equal(got, tt.want) {
+				t.Fatalf("did not get expected Number, got: %s, want: %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNumberString(t *testing.T) {
+	tests := []struct {
+		desc string
+		in   Number
+		want string
+	}{{
+		desc: "min",
+		in:   Number{Kind: MinNumber},
+		want: "min",
+	}, {
+		desc: "max",
+		in:   Number{Kind: MaxNumber},
+		want: "max",
+	}, {
+		desc: "integer",
+		in:   Number{Value: 1},
+		want: "1",
+	}, {
+		desc: "negative integer",
+		in:   Number{Value: 1, Kind: Negative},
+		want: "-1",
+	}, {
+		desc: "decimal, fractional digits = 1",
+		in:   Number{Value: 1, FractionDigits: 1},
+		want: "0.1",
+	}, {
+		desc: "decimal, fractional digits = 18",
+		in:   Number{Value: 123456789012345678, FractionDigits: 18},
+		want: "0.123456789012345678",
+	}, {
+		desc: "negative decimal",
+		in:   Number{Value: 100, FractionDigits: 2, Kind: Negative},
+		want: "-1.00",
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			if got := tt.in.String(); got != tt.want {
+				t.Fatalf("did not get expected number, got: %s, want: %s", got, tt.want)
 			}
 		})
 	}
