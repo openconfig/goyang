@@ -61,127 +61,147 @@ func Rf(a, b int64, fracDig uint8) YRange {
 }
 
 func TestRangeEqual(t *testing.T) {
-	for x, tt := range []struct {
-		r1, r2 YangRange
-		ok     bool
-	}{
-		{ok: true},                          // empty range contained in empty range
-		{r1: YangRange{R(1, 2)}, ok: false}, // empty range contained in range
-		{r2: YangRange{R(1, 2)}, ok: false}, // range contained in empty range
-		{
-			YangRange{R(1, 2)},
-			YangRange{R(1, 2)},
-			true,
-		},
-		{
-			YangRange{R(1, 3)},
-			YangRange{R(1, 2)},
-			false,
-		},
-		{
-			YangRange{R(1, 2), R(4, 5)},
-			YangRange{R(1, 2), R(4, 5)},
-			true,
-		},
-		{
-			YangRange{R(1, 2), R(4, 6)},
-			YangRange{R(1, 2), R(4, 5)},
-			false,
-		},
-		{
-			YangRange{R(1, 2)},
-			YangRange{R(1, 2), R(4, 5)},
-			false,
-		},
-		{
-			YangRange{R(1, 2), R(4, 5)},
-			YangRange{R(1, 2)},
-			false,
-		},
-	} {
-		if ok := tt.r1.Equal(tt.r2); ok != tt.ok {
-			t.Errorf("#%d: got %v, want %v", x, ok, tt.ok)
-		}
+	tests := []struct {
+		desc        string
+		inBaseRange YangRange
+		inTestRange YangRange
+		want        bool
+	}{{
+		desc: "empty range equals empty range",
+		want: true,
+	}, {
+		desc:        "test range is default",
+		inBaseRange: YangRange{R(1, 2)}, want: false,
+	}, {
+		desc:        "base range is default",
+		inTestRange: YangRange{R(1, 2)}, want: false,
+	}, {
+		desc:        "equal ranges",
+		inBaseRange: YangRange{R(1, 2)},
+		inTestRange: YangRange{R(1, 2)},
+		want:        true,
+	}, {
+		desc:        "wider base range",
+		inBaseRange: YangRange{R(1, 3)},
+		inTestRange: YangRange{R(1, 2)},
+		want:        false,
+	}, {
+		desc:        "equal ranges with multiple subranges",
+		inBaseRange: YangRange{R(1, 2), R(4, 5)},
+		inTestRange: YangRange{R(1, 2), R(4, 5)},
+		want:        true,
+	}, {
+		desc:        "multiple subranges with one unequal",
+		inBaseRange: YangRange{R(1, 2), R(4, 6)},
+		inTestRange: YangRange{R(1, 2), R(4, 5)},
+		want:        false,
+	}, {
+		desc:        "extra subrange in base range",
+		inBaseRange: YangRange{R(1, 2)},
+		inTestRange: YangRange{R(1, 2), R(4, 5)},
+		want:        false,
+	}, {
+		desc:        "extra subrange in test range",
+		inBaseRange: YangRange{R(1, 2), R(4, 5)},
+		inTestRange: YangRange{R(1, 2)},
+		want:        false,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			if want := tt.inBaseRange.Equal(tt.inTestRange); want != tt.want {
+				t.Errorf("got %v, want %v", want, tt.want)
+			}
+		})
 	}
 }
 
 func TestRangeContains(t *testing.T) {
-	for x, tt := range []struct {
-		r1, r2 YangRange
-		ok     bool
-	}{
-		{ok: true},
-		{r1: YangRange{R(1, 2)}, ok: true},
-		{r2: YangRange{R(1, 2)}, ok: true},
-		{
-			r1: YangRange{R(1, 2)},
-			r2: YangRange{R(1, 2)},
-			ok: true,
-		},
-		{
-			r1: YangRange{R(1, 5)},
-			r2: YangRange{R(2, 3)},
-			ok: true,
-		},
-		{
-			r1: YangRange{R(2, 3)},
-			r2: YangRange{R(1, 5)},
-			ok: false,
-		},
-		{
-			r1: YangRange{R(1, 10)},
-			r2: YangRange{R(1, 2), R(4, 5), R(7, 10)},
-			ok: true,
-		},
-		{
-			r1: YangRange{R(1, 10)},
-			r2: YangRange{R(1, 2), R(7, 11)},
-			ok: false,
-		},
-		{
-			r1: YangRange{R(1, 9), R(11, 19), R(21, 29)},
-			r2: YangRange{R(23, 25)},
-			ok: true,
-		},
-		{
-			r1: YangRange{R(1, 9), R(11, 19), R(21, 29)},
-			r2: YangRange{R(23, 23)},
-			ok: true,
-		},
-		{
-			r1: YangRange{R(1, 9), R(11, 19), R(21, 29)},
-			r2: YangRange{R(20, 20)},
-			ok: false,
-		},
-		{
-			r1: YangRange{R(1, 10)},
-			r2: YangRange{R(useMin, useMax)},
-			ok: true,
-		},
-		{
-			r1: YangRange{R(useMin, useMax)},
-			r2: YangRange{R(1, 10)},
-			ok: true,
-		},
-		{
-			r1: YangRange{R(1024, 65535)},
-			r2: YangRange{R(useMin, 4096), R(5120, useMax)},
-			ok: true,
-		},
-		{
-			r1: YangRange{R(1024, 65535)},
-			r2: YangRange{R(-999999, 4096), R(5120, useMax)},
-			ok: false,
-		},
-		{
-			r1: YangRange{R(1024, 65535)},
-			r2: YangRange{R(useMin, 4096), R(5120, 999999)},
-			ok: false,
-		},
-	} {
-		if ok := tt.r1.Contains(tt.r2); ok != tt.ok {
-			t.Errorf("#%d: got %v, want %v", x, ok, tt.ok)
-		}
+	tests := []struct {
+		desc        string
+		inBaseRange YangRange
+		inTestRange YangRange
+		want        bool
+	}{{
+		desc: "empty range contained in empty range",
+		want: true,
+	}, {
+		inBaseRange: YangRange{R(1, 2)},
+		want:        true,
+	}, {
+		inTestRange: YangRange{R(1, 2)},
+		want:        true,
+	}, {
+		desc:        "equal ranges contain",
+		inBaseRange: YangRange{R(1, 2)},
+		inTestRange: YangRange{R(1, 2)},
+		want:        true,
+	}, {
+		desc:        "superset contains",
+		inBaseRange: YangRange{R(1, 5)},
+		inTestRange: YangRange{R(2, 3)},
+		want:        true,
+	}, {
+		desc:        "subset doesn't contain",
+		inBaseRange: YangRange{R(2, 3)},
+		inTestRange: YangRange{R(1, 5)},
+		want:        false,
+	}, {
+		desc:        "contain subranges",
+		inBaseRange: YangRange{R(1, 10)},
+		inTestRange: YangRange{R(1, 2), R(4, 5), R(7, 10)},
+		want:        true,
+	}, {
+		desc:        "subranges leaks out",
+		inBaseRange: YangRange{R(1, 10)},
+		inTestRange: YangRange{R(1, 2), R(7, 11)},
+		want:        false,
+	}, {
+		desc:        "subranges containing a subset",
+		inBaseRange: YangRange{R(1, 9), R(11, 19), R(21, 29)},
+		inTestRange: YangRange{R(23, 25)},
+		want:        true,
+	}, {
+		desc:        "subranges containing a single valued range",
+		inBaseRange: YangRange{R(1, 9), R(11, 19), R(21, 29)},
+		inTestRange: YangRange{R(23, 23)},
+		want:        true,
+	}, {
+		desc:        "subranges doesn't contain a single outside value",
+		inBaseRange: YangRange{R(1, 9), R(11, 19), R(21, 29)},
+		inTestRange: YangRange{R(20, 20)},
+		want:        false,
+	}, {
+		inBaseRange: YangRange{R(1, 10)},
+		inTestRange: YangRange{R(useMin, useMax)},
+		want:        true,
+	}, {
+		desc:        "full range contains any",
+		inBaseRange: YangRange{R(useMin, useMax)},
+		inTestRange: YangRange{R(1, 10)},
+		want:        true,
+	}, {
+		inBaseRange: YangRange{R(1024, 65535)},
+		inTestRange: YangRange{R(useMin, 4096), R(5120, useMax)},
+		want:        true,
+	}, {
+		desc:        "ranges don't overlap with max word used",
+		inBaseRange: YangRange{R(1024, 65535)},
+		inTestRange: YangRange{R(-999999, 4096), R(5120, useMax)},
+		want:        false,
+	}, {
+		desc:        "ranges don't overlap with min word used",
+		inBaseRange: YangRange{R(1024, 65535)},
+		inTestRange: YangRange{R(useMin, 4096), R(5120, 999999)},
+		want:        false,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			if want := tt.inBaseRange.Contains(tt.inTestRange); want != tt.want {
+				t.Errorf("got %v, want %v", want, tt.want)
+			}
+		})
 	}
 }
 
