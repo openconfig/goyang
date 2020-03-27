@@ -461,17 +461,17 @@ var baseTypes = map[string]*YangType{
 
 // These are the default ranges defined by the YANG standard.
 var (
-	Int8Range  = mustParseRanges("-128..127")
-	Int16Range = mustParseRanges("-32768..32767")
-	Int32Range = mustParseRanges("-2147483648..2147483647")
-	Int64Range = mustParseRanges("-9223372036854775808..9223372036854775807")
+	Int8Range  = mustParseRangesInt("-128..127")
+	Int16Range = mustParseRangesInt("-32768..32767")
+	Int32Range = mustParseRangesInt("-2147483648..2147483647")
+	Int64Range = mustParseRangesInt("-9223372036854775808..9223372036854775807")
 
-	Uint8Range  = mustParseRanges("0..255")
-	Uint16Range = mustParseRanges("0..65535")
-	Uint32Range = mustParseRanges("0..4294967295")
-	Uint64Range = mustParseRanges("0..18446744073709551615")
+	Uint8Range  = mustParseRangesInt("0..255")
+	Uint16Range = mustParseRangesInt("0..65535")
+	Uint32Range = mustParseRangesInt("0..4294967295")
+	Uint64Range = mustParseRangesInt("0..18446744073709551615")
 
-	Decimal64Range = mustParseRanges("min..max")
+	Decimal64Range = mustParseRangesDecimal("min..max", 1)
 )
 
 const (
@@ -547,7 +547,10 @@ func FromFloat(f float64) Number {
 	if f < float64(MinInt64) {
 		return minNumber
 	}
-	var fracDig uint8
+
+	// Per RFC7950/6020, fraction-digits must be at least 1.
+	fracDig := uint8(1)
+	f *= 10.0
 	for ; Frac(f) != 0.0 && fracDig <= MaxFractionDigits; fracDig++ {
 		f *= 10.0
 	}
@@ -563,10 +566,11 @@ func FromFloat(f float64) Number {
 	return n
 }
 
-// ParseNumber returns s as a Number.  Numbers may be represented in decimal,
+// ParseInt returns s as a Number with FractionDigits=0.
 // octal, or hexadecimal using the standard prefix notations (e.g., 0 and 0x)
-func ParseNumber(s string) (n Number, err error) {
+func ParseInt(s string) (Number, error) {
 	s = strings.TrimSpace(s)
+	var n Number
 	switch s {
 	case "max":
 		return maxNumber, nil
@@ -587,35 +591,49 @@ func ParseNumber(s string) (n Number, err error) {
 		n.Kind = Negative
 		ns = s[1:]
 	}
-	n.Value, err = strconv.ParseUint(ns, 0, 64)
-	if err == nil {
-		return n, nil
-	}
 
-	return DecimalValueFromString(s, -1)
+	var err error
+	n.Value, err = strconv.ParseUint(ns, 0, 64)
+	return n, err
 }
 
-// DecimalValueFromString returns a decimal Number representation of inStr.
-// If fracDigRequired is >= 0, the number is represented with fracDigRequired
-// fractional digits, regardless of the precision of numStr, otherwise the
-// precision of numStr is used to set the number of fractional digits.
+// ParseDecimal returns s as a Number with a non-zero FractionDigits.
+// octal, or hexadecimal using the standard prefix notations (e.g., 0 and 0x)
+func ParseDecimal(s string, fracDigRequired uint8) (n Number, err error) {
+	s = strings.TrimSpace(s)
+	switch s {
+	case "max":
+		return maxNumber, nil
+	case "min":
+		return minNumber, nil
+	case "":
+		return n, errors.New("converting empty string to number")
+	case "+", "-":
+		return n, errors.New("sign with no value")
+	}
+
+	return decimalValueFromString(s, fracDigRequired)
+}
+
+// decimalValueFromString returns a decimal Number representation of numStr.
+// fracDigRequired is used to set the number of fractional digits, which must
+// be at least the greatest precision seen in numStr.
+// which must be between 1 and 18.
 // numStr must conform to Section 9.3.4.
-func DecimalValueFromString(numStr string, fracDigRequired int) (n Number, err error) {
-	if fracDigRequired > int(MaxFractionDigits) {
-		return n, fmt.Errorf("too many fraction digits %d > max of %d", fracDigRequired, MaxFractionDigits)
+func decimalValueFromString(numStr string, fracDigRequired uint8) (n Number, err error) {
+	if fracDigRequired > MaxFractionDigits || fracDigRequired < 1 {
+		return n, fmt.Errorf("invalid number of fraction digits %d > max of %d, minimum 1", fracDigRequired, MaxFractionDigits)
 	}
 
 	s := numStr
 	dx := strings.Index(s, ".")
-	fracDig := 0
+	var fracDig uint8
 	if dx >= 0 {
-		fracDig = len(s) - 1 - dx
+		fracDig = uint8(len(s) - 1 - dx)
 		// remove first decimal, if dx > 1, will fail ParseInt below
 		s = s[:dx] + s[dx+1:]
 	}
-	if fracDigRequired < 0 {
-		fracDigRequired = fracDig
-	}
+
 	if fracDig > fracDigRequired {
 		return n, fmt.Errorf("%s has too much precision, expect <= %d fractional digits", s, fracDigRequired)
 	}
@@ -633,7 +651,7 @@ func DecimalValueFromString(numStr string, fracDigRequired int) (n Number, err e
 		v = -v
 	}
 
-	return Number{Kind: kind, Value: uint64(v), FractionDigits: uint8(fracDig)}, nil
+	return Number{Kind: kind, Value: uint64(v), FractionDigits: fracDigRequired}, nil
 }
 
 // String returns n as a string in decimal.
@@ -696,12 +714,8 @@ func (n Number) Int() (int64, error) {
 	return 0, errors.New("unknown number type")
 }
 
-// add adds i to n without checking overflow.  We really only need to be
-// able to add 1 for our code. panics if n is a decimal.
-func (n Number) add(i uint64) Number {
-	if n.IsDecimal() {
-		panic("cannot call add() on decimal number " + n.String())
-	}
+// addQuantum adds the smallest quantum to n without checking overflow.
+func (n Number) addQuantum(i uint64) Number {
 	switch n.Kind {
 	case MinNumber:
 		return n
@@ -790,16 +804,41 @@ func (r YRange) Valid() bool {
 // A YangRange is a set of non-overlapping ranges.
 type YangRange []YRange
 
-// ParseRanges parses s into a series of ranges.  Each individual range is
-// in s is separated by the pipe character (|).  The min and max value of
-// a range are separated by "..".  An error is returned if the range is
-// invalid.  The resulting range is sorted and coalesced.
-func ParseRanges(s string) (YangRange, error) {
+// ParseRangesInt parses s into a series of ranges. Each individual range is in s
+// is separated by the pipe character (|).  The min and max value of a range
+// are separated by "..".  An error is returned if the range is invalid. The
+// output range is sorted and coalesced.
+func ParseRangesInt(s string) (YangRange, error) {
+	return parseRanges(s, false, 0)
+}
+
+// ParseRangesDecimal parses s into a series of ranges. Each individual range is in s
+// is separated by the pipe character (|).  The min and max value of a range
+// are separated by "..".  An error is returned if the range is invalid. The
+// output range is sorted and coalesced.
+func ParseRangesDecimal(s string, fracDigRequired uint8) (YangRange, error) {
+	return parseRanges(s, true, fracDigRequired)
+}
+
+// parseRanges parses s into a series of ranges. Each individual range is in s
+// is separated by the pipe character (|).  The min and max value of a range
+// are separated by "..".  An error is returned if the range is invalid. The
+// output range is sorted and coalesced. fracDigRequired is ignored when
+// decimal=false.
+func parseRanges(s string, decimal bool, fracDigRequired uint8) (YangRange, error) {
+	parseNumber := func(s string) (Number, error) {
+		if decimal {
+			return ParseDecimal(s, fracDigRequired)
+		} else {
+			return ParseInt(s)
+		}
+	}
+
 	parts := strings.Split(s, "|")
 	r := make(YangRange, len(parts))
 	for i, s := range parts {
 		parts := strings.Split(s, "..")
-		min, err := ParseNumber(parts[0])
+		min, err := parseNumber(parts[0])
 		if err != nil {
 			return nil, err
 		}
@@ -808,15 +847,15 @@ func ParseRanges(s string) (YangRange, error) {
 		case 1:
 			max = min
 		case 2:
-			max, err = ParseNumber(parts[1])
+			max, err = parseNumber(parts[1])
 			if err != nil {
 				return nil, err
 			}
 		default:
-			return nil, fmt.Errorf("two many ..'s in %s", s)
+			return nil, fmt.Errorf("too many '..' in %s", s)
 		}
 		if max.Less(min) {
-			return nil, fmt.Errorf("%s less than %s", max, min)
+			return nil, fmt.Errorf("range boundaries out of order (%s less than %s): %s", max, min, s)
 		}
 		r[i] = YRange{min, max}
 	}
@@ -824,12 +863,13 @@ func ParseRanges(s string) (YangRange, error) {
 		return nil, err
 	}
 
-	return coalesce(r), nil
+	r = coalesce(r)
+	return r, nil
 }
 
 // coalesce coalesces r into as few ranges as possible.  For example,
 // 1..5|6..10 would become 1..10.  r is assumed to be sorted.
-// r is assumed to be valid (see Validate)
+// r is assumed to be valid (see Validate).
 func coalesce(r YangRange) YangRange {
 	// coalesce the ranges if we have more than 1.
 	if len(r) < 2 {
@@ -845,7 +885,7 @@ func coalesce(r YangRange) YangRange {
 		// r1 starts inside of cr[i]
 		// r1.Min cr[i].Max+1
 		// r1 is beyond cr[i]
-		if cr[i].Max.add(1).Less(r1.Min) {
+		if cr[i].Max.addQuantum(1).Less(r1.Min) {
 			// r1 starts after cr[i], this is a new range
 			i++
 			cr[i] = r1
@@ -856,8 +896,16 @@ func coalesce(r YangRange) YangRange {
 	return cr[:i+1]
 }
 
-func mustParseRanges(s string) YangRange {
-	r, err := ParseRanges(s)
+func mustParseRangesInt(s string) YangRange {
+	r, err := ParseRangesInt(s)
+	if err != nil {
+		panic(err)
+	}
+	return r
+}
+
+func mustParseRangesDecimal(s string, fracDigRequired uint8) YangRange {
+	r, err := ParseRangesDecimal(s, fracDigRequired)
 	if err != nil {
 		panic(err)
 	}
@@ -932,30 +980,25 @@ func (r YangRange) Equal(q YangRange) bool {
 
 // Contains returns true if all possible values in s are also possible values
 // in r.  An empty range is assumed to be min..max.
+// TODO(wenbli): The current behaviour of this is confusing and unexplained by
+// comments: why does the presence of min/max always cause the range to be
+// considered as contained? Should test on current schema, and if there are no
+// problems, change it to its natural definition.
 func (r YangRange) Contains(s YangRange) bool {
+	// No range means allow everything in range for the type.
 	if len(s) == 0 || len(r) == 0 {
 		return true
 	}
 
-	rc := make(chan YRange)
-	go func() {
-		for _, v := range r {
-			rc <- v
-		}
-		close(rc)
-	}()
-
-	// All ranges are sorted and coalesced which means each range
-	// in s must exist
-
-	// We know rc will always produce at least one value
-	rr, ok := <-rc
+	// Check if every range in s is subsumed under r.
+	// Both range lists should be in order and non-adjacent (coalesced).
+	ri := 0
 	for _, ss := range s {
 		// min is always within range
 		if ss.Min.Kind != MinNumber {
-			for rr.Max.Less(ss.Min) {
-				rr, ok = <-rc
-				if !ok {
+			for r[ri].Max.Less(ss.Min) {
+				ri += 1
+				if ri == len(r) {
 					return false
 				}
 			}
@@ -963,7 +1006,7 @@ func (r YangRange) Contains(s YangRange) bool {
 		if (ss.Max.Kind == MaxNumber) || (ss.Min.Kind == MinNumber) {
 			continue
 		}
-		if ss.Min.Less(rr.Min) || rr.Max.Less(ss.Max) {
+		if ss.Min.Less(r[ri].Min) || r[ri].Max.Less(ss.Max) {
 			return false
 		}
 	}

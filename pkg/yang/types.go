@@ -239,8 +239,9 @@ check:
 	}
 	// If we are directly of type decimal64 then we must specify
 	// fraction-digits.
+	isDecimal64 := y.Kind == Ydecimal64 && (t.Name == "decimal64" || t.FractionDigits != nil)
 	switch {
-	case y.Kind == Ydecimal64 && (t.Name == "decimal64" || t.FractionDigits != nil):
+	case isDecimal64:
 		i, err := t.FractionDigits.asRangeInt(1, 18)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: %v", Source(t), err))
@@ -275,7 +276,7 @@ check:
 	}
 
 	if t.Range != nil {
-		yr, err := ParseRanges(t.Range.Name)
+		yr, err := parseRanges(t.Range.Name, isDecimal64, uint8(y.FractionDigits))
 		switch {
 		case err != nil:
 			errs = append(errs, fmt.Errorf("%s: bad range: %v", Source(t.Range), err))
@@ -288,7 +289,7 @@ check:
 	}
 
 	if t.Length != nil {
-		yr, err := ParseRanges(t.Length.Name)
+		yr, err := ParseRangesInt(t.Length.Name)
 		switch {
 		case err != nil:
 			errs = append(errs, fmt.Errorf("%s: bad length: %v", Source(t.Length), err))
@@ -310,7 +311,7 @@ check:
 		if value == nil {
 			return e.SetNext(name)
 		}
-		n, err := ParseNumber(value.Name)
+		n, err := ParseInt(value.Name)
 		if err != nil {
 			return err
 		}
