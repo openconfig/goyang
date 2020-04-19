@@ -389,3 +389,29 @@ module base {
 		}
 	}
 }
+
+func TestItemsChannelFull(t *testing.T) {
+	for _, tt := range []struct {
+		in  string
+		err string
+	}{
+		// token must include more errors than the size of the lexer's items channel
+		{in: `yang-version 1.1;description "\/\/\/\/\/\/";`, err: tooMany},
+	} {
+		t.Run("", func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					if r != tt.err {
+						t.Errorf("expected %s but got %#v", tt.err, r)
+					}
+				} else if tt.err != "" {
+					t.Errorf("expected a panic of %#v but saw no panic", tt.err)
+				}
+			}()
+
+			if s, err := Parse(tt.in, "test.yang"); err == nil || s != nil {
+				t.Errorf("parsing did not cause expected panic")
+			}
+		})
+	}
+}
