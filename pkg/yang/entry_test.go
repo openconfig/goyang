@@ -1668,6 +1668,26 @@ var testIfFeatureModules = []struct {
   namespace "urn:if-feature";
   prefix "feat";
 
+  feature ft-container;
+  feature ft-action;
+  feature ft-anydata1;
+  feature ft-anydata2;
+  feature ft-anyxml;
+  feature ft-choice;
+  feature ft-case;
+  feature ft-feature;
+  feature ft-leaf;
+  feature ft-bit;
+  feature ft-leaf-list;
+  feature ft-enum;
+  feature ft-list;
+  feature ft-notification;
+  feature ft-rpc;
+  feature ft-augment;
+  feature ft-identity;
+  feature ft-uses;
+  feature ft-refine;
+
   container cont {
     if-feature ft-container;
     action act {
@@ -1754,6 +1774,15 @@ func TestIfFeature(t *testing.T) {
 		return extra[0].([]*Value)
 	}
 
+	featureByName := func(e *Entry, name string) *Feature {
+		for _, f := range e.Extra["feature"][0].([]*Feature) {
+			if f.Name == name {
+				return f
+			}
+		}
+		return nil
+	}
+
 	ms := NewModules()
 	for _, tt := range testIfFeatureModules {
 		if err := ms.Parse(tt.in, tt.name); err != nil {
@@ -1805,7 +1834,7 @@ func TestIfFeature(t *testing.T) {
 		},
 		{
 			name:           "feature",
-			inIfFeatures:   mod.Extra["feature"][0].([]*Feature)[0].IfFeature,
+			inIfFeatures:   featureByName(mod, "f").IfFeature,
 			wantIfFeatures: []string{"ft-feature"},
 		},
 		{
