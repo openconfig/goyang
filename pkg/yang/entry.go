@@ -548,7 +548,7 @@ func ToEntry(n Node) (e *Entry) {
 		e.Config, err = tristateValue(s.Config)
 		e.addError(err)
 		e.Prefix = getRootPrefix(e)
-		addExtrasToLeaf(n, e)
+		addExtraKeywordsToLeafEntry(n, e)
 		return e
 	case *LeafList:
 		// Create the equivalent leaf element that we are a list of.
@@ -576,7 +576,7 @@ func ToEntry(n Node) (e *Entry) {
 			OrderedBy:   s.OrderedBy,
 		}
 		e.Prefix = getRootPrefix(e)
-		addExtrasToLeaf(n, e)
+		addExtraKeywordsToLeafEntry(n, e)
 		return e
 	case *Uses:
 		g := FindGrouping(s, s.Name, map[string]bool{})
@@ -587,7 +587,7 @@ func ToEntry(n Node) (e *Entry) {
 		// when the group is used in multiple locations and the
 		// grouping has a leafref that references outside the group.
 		e := ToEntry(g).dup()
-		addExtrasToLeaf(n, e)
+		addExtraKeywordsToLeafEntry(n, e)
 		return e
 	}
 
@@ -947,8 +947,8 @@ func ToEntry(n Node) (e *Entry) {
 	return e
 }
 
-// addExtrasToLeaf stores the values for unimplemented keywords in leaf entries.
-func addExtrasToLeaf(n Node, e *Entry) {
+// addExtraKeywordsToLeafEntry stores the values for unimplemented keywords in leaf entries.
+func addExtraKeywordsToLeafEntry(n Node, e *Entry) {
 	v := reflect.ValueOf(n).Elem()
 	t := v.Type()
 

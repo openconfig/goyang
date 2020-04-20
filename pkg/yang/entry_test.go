@@ -1669,68 +1669,68 @@ var testIfFeatureModules = []struct {
   prefix "feat";
 
   container cont {
-    if-feature ft;
+    if-feature ft-container;
     action act {
-      if-feature ft;
+      if-feature ft-action;
     }
   }
 
   anydata data {
-    if-feature ft1;
-    if-feature ft2;
+    if-feature ft-anydata1;
+    if-feature ft-anydata2;
   }
 
   anyxml xml {
-    if-feature ft;
+    if-feature ft-anyxml;
   }
 
   choice ch {
-    if-feature ft;
+    if-feature ft-choice;
     case cs {
-      if-feature ft;
+      if-feature ft-case;
     }
   }
 
   feature f {
-    if-feature ft;
+    if-feature ft-feature;
   }
 
   leaf l {
-    if-feature ft;
+    if-feature ft-leaf;
     type bits {
       bit A {
-        if-feature ft;
+        if-feature ft-bit;
       }
     }
   }
 
   leaf-list ll {
-    if-feature ft;
+    if-feature ft-leaf-list;
     type enumeration {
       enum zero {
-        if-feature ft;
+        if-feature ft-enum;
       }
     }
   }
 
   list ls {
-    if-feature ft;
+    if-feature ft-list;
   }
 
   notification n {
-    if-feature ft;
+    if-feature ft-notification;
   }
 
   rpc r {
-    if-feature ft;
+    if-feature ft-rpc;
   }
 
   augment "/cont" {
-    if-feature ft;
+    if-feature ft-augment;
   }
 
   identity id {
-    if-feature ft;
+    if-feature ft-identity;
   }
 
   uses g {
@@ -1776,83 +1776,83 @@ func TestIfFeature(t *testing.T) {
 		{
 			name:           "action",
 			inIfFeatures:   entryIfFeatures(mod.Dir["cont"].Dir["act"]),
-			wantIfFeatures: []string{"ft"},
+			wantIfFeatures: []string{"ft-action"},
 		},
 		{
 			name:           "anydata",
 			inIfFeatures:   entryIfFeatures(mod.Dir["data"]),
-			wantIfFeatures: []string{"ft1", "ft2"},
+			wantIfFeatures: []string{"ft-anydata1", "ft-anydata2"},
 		},
 		{
 			name:           "anyxml",
 			inIfFeatures:   entryIfFeatures(mod.Dir["xml"]),
-			wantIfFeatures: []string{"ft"},
+			wantIfFeatures: []string{"ft-anyxml"},
 		},
 		{
 			name:           "case",
 			inIfFeatures:   entryIfFeatures(mod.Dir["ch"].Dir["cs"]),
-			wantIfFeatures: []string{"ft"},
+			wantIfFeatures: []string{"ft-case"},
 		},
 		{
 			name:           "choice",
 			inIfFeatures:   entryIfFeatures(mod.Dir["ch"]),
-			wantIfFeatures: []string{"ft"},
+			wantIfFeatures: []string{"ft-choice"},
 		},
 		{
 			name:           "container",
 			inIfFeatures:   entryIfFeatures(mod.Dir["cont"]),
-			wantIfFeatures: []string{"ft"},
+			wantIfFeatures: []string{"ft-container"},
 		},
 		{
 			name:           "feature",
 			inIfFeatures:   mod.Extra["feature"][0].([]*Feature)[0].IfFeature,
-			wantIfFeatures: []string{"ft"},
+			wantIfFeatures: []string{"ft-feature"},
 		},
 		{
 			name:           "leaf",
 			inIfFeatures:   entryIfFeatures(mod.Dir["l"]),
-			wantIfFeatures: []string{"ft"},
+			wantIfFeatures: []string{"ft-leaf"},
 		},
 		{
 			name:           "leaf-list",
 			inIfFeatures:   entryIfFeatures(mod.Dir["ll"]),
-			wantIfFeatures: []string{"ft"},
+			wantIfFeatures: []string{"ft-leaf-list"},
 		},
 		{
 			name:           "list",
 			inIfFeatures:   entryIfFeatures(mod.Dir["ls"]),
-			wantIfFeatures: []string{"ft"},
+			wantIfFeatures: []string{"ft-list"},
 		},
 		{
 			name:           "notification",
 			inIfFeatures:   entryIfFeatures(mod.Dir["n"]),
-			wantIfFeatures: []string{"ft"},
+			wantIfFeatures: []string{"ft-notification"},
 		},
 		{
 			name:           "rpc",
 			inIfFeatures:   entryIfFeatures(mod.Dir["r"]),
-			wantIfFeatures: []string{"ft"},
+			wantIfFeatures: []string{"ft-rpc"},
 		},
 		// Other statements
 		{
 			name:           "augment",
 			inIfFeatures:   entryIfFeatures(mod.Dir["cont"].Augmented[0]),
-			wantIfFeatures: []string{"ft"},
+			wantIfFeatures: []string{"ft-augment"},
 		},
 		{
 			name:           "bit",
 			inIfFeatures:   mod.Dir["l"].Node.(*Leaf).Type.Bit[0].IfFeature,
-			wantIfFeatures: []string{"ft"},
+			wantIfFeatures: []string{"ft-bit"},
 		},
 		{
 			name:           "enum",
 			inIfFeatures:   mod.Dir["ll"].Node.(*Leaf).Type.Enum[0].IfFeature,
-			wantIfFeatures: []string{"ft"},
+			wantIfFeatures: []string{"ft-enum"},
 		},
 		{
 			name:           "identity",
 			inIfFeatures:   mod.Identities[0].IfFeature,
-			wantIfFeatures: []string{"ft"},
+			wantIfFeatures: []string{"ft-identity"},
 		},
 		{
 			name:           "refine",
