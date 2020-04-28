@@ -42,7 +42,7 @@ func Bytes(indent, b []byte) []byte {
 	if len(lines[len(lines)-1]) == 0 {
 		lines = lines[:len(lines)-1]
 	}
-	return bytes.Join(append([][]byte{[]byte{}}, lines...), indent)
+	return bytes.Join(append([][]byte{{}}, lines...), indent)
 }
 
 // NewWriter returns an io.Writer that prefixes the lines written to it with
@@ -74,7 +74,7 @@ func (w *iw) Write(buf []byte) (int, error) {
 		lines = lines[:len(lines)-1]
 	}
 	if !w.partial {
-		lines = append([][]byte{[]byte{}}, lines...)
+		lines = append([][]byte{{}}, lines...)
 	}
 	joined := bytes.Join(lines, w.prefix)
 	w.partial = joined[len(joined)-1] != '\n'

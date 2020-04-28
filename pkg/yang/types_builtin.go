@@ -371,89 +371,89 @@ func init() {
 }
 
 var baseTypes = map[string]*YangType{
-	"int8": &YangType{
+	"int8": {
 		Name:  "int8",
 		Kind:  Yint8,
 		Range: Int8Range,
 	},
-	"int16": &YangType{
+	"int16": {
 		Name:  "int16",
 		Kind:  Yint16,
 		Range: Int16Range,
 	},
-	"int32": &YangType{
+	"int32": {
 		Name:  "int32",
 		Kind:  Yint32,
 		Range: Int32Range,
 	},
-	"int64": &YangType{
+	"int64": {
 		Name:  "int64",
 		Kind:  Yint64,
 		Range: Int64Range,
 	},
-	"uint8": &YangType{
+	"uint8": {
 		Name:  "uint8",
 		Kind:  Yuint8,
 		Range: Uint8Range,
 	},
-	"uint16": &YangType{
+	"uint16": {
 		Name:  "uint16",
 		Kind:  Yuint16,
 		Range: Uint16Range,
 	},
-	"uint32": &YangType{
+	"uint32": {
 		Name:  "uint32",
 		Kind:  Yuint32,
 		Range: Uint32Range,
 	},
-	"uint64": &YangType{
+	"uint64": {
 		Name:  "uint64",
 		Kind:  Yuint64,
 		Range: Uint64Range,
 	},
 
-	"decimal64": &YangType{
+	"decimal64": {
 		Name:  "decimal64",
 		Kind:  Ydecimal64,
 		Range: Decimal64Range,
 	},
-	"string": &YangType{
+	"string": {
 		Name: "string",
 		Kind: Ystring,
 	},
-	"boolean": &YangType{
+	"boolean": {
 		Name: "boolean",
 		Kind: Ybool,
 	},
-	"enumeration": &YangType{
+	"enumeration": {
 		Name: "enumeration",
 		Kind: Yenum,
 	},
-	"bits": &YangType{
+	"bits": {
 		Name: "bits",
 		Kind: Ybits,
 	},
-	"binary": &YangType{
+	"binary": {
 		Name: "binary",
 		Kind: Ybinary,
 	},
-	"leafref": &YangType{
+	"leafref": {
 		Name: "leafref",
 		Kind: Yleafref,
 	},
-	"identityref": &YangType{
+	"identityref": {
 		Name: "identityref",
 		Kind: Yidentityref,
 	},
-	"empty": &YangType{
+	"empty": {
 		Name: "empty",
 		Kind: Yempty,
 	},
-	"union": &YangType{
+	"union": {
 		Name: "union",
 		Kind: Yunion,
 	},
-	"instance-identifier": &YangType{
+	"instance-identifier": {
 		Name: "instance-identifier",
 		Kind: YinstanceIdentifier,
 	},
