@@ -1,3 +1,0 @@
-language: go
-after_success:
-        - ./scripts/coverage.sh
