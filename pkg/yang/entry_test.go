@@ -2020,7 +2020,7 @@ func TestEntryTypes(t *testing.T) {
 				Kind: CaseEntry,
 				Name: "case1",
 				Dir: map[string]*Entry{
-					"case1-leaf1": &Entry{
+					"case1-leaf1": {
 						Kind: LeafEntry,
 						Name: "Case1Leaf1",
 						Type: &YangType{Kind: Ystring},
@@ -2120,7 +2120,7 @@ func TestFixChoice(t *testing.T) {
 						statements:  nil,
 					},
 					Extensions: []*Statement{
-						&Statement{
+						{
 							Keyword:     "anyData-extension",
 							HasArgument: true,
 							Argument:    "anyData-extension-arg",
@@ -2144,7 +2144,7 @@ func TestFixChoice(t *testing.T) {
 						statements:  nil,
 					},
 					Extensions: []*Statement{
-						&Statement{
+						{
 							Keyword:     "anyXML-extension",
 							HasArgument: true,
 							Argument:    "anyXML-extension-arg",
@@ -2168,7 +2168,7 @@ func TestFixChoice(t *testing.T) {
 						statements:  nil,
 					},
 					Extensions: []*Statement{
-						&Statement{
+						{
 							Keyword:     "container-extension",
 							HasArgument: true,
 							Argument:    "container-extension-arg",
@@ -2192,7 +2192,7 @@ func TestFixChoice(t *testing.T) {
 						statements:  nil,
 					},
 					Extensions: []*Statement{
-						&Statement{
+						{
 							Keyword:     "leaf-extension",
 							HasArgument: true,
 							Argument:    "leaf-extension-arg",
@@ -2216,7 +2216,7 @@ func TestFixChoice(t *testing.T) {
 						statements:  nil,
 					},
 					Extensions: []*Statement{
-						&Statement{
+						{
 							Keyword:     "leaflist-extension",
 							HasArgument: true,
 							Argument:    "leaflist-extension-arg",
@@ -2240,7 +2240,7 @@ func TestFixChoice(t *testing.T) {
 						statements:  nil,
 					},
 					Extensions: []*Statement{
-						&Statement{
+						{
 							Keyword:     "list-extension",
 							HasArgument: true,
 							Argument:    "list-extension-arg",
@@ -2327,7 +2327,7 @@ func TestDeviation(t *testing.T) {
 		desc:    "deviation with add",
 		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate.yang"))},
 		wants: map[string][]deviationTest{
-			"deviate": []deviationTest{{
+			"deviate": {{
 				path: "/target/add/config",
 				entry: &Entry{
 					Config: TSFalse,
@@ -2406,7 +2406,7 @@ func TestDeviation(t *testing.T) {
 		desc:    "deviation - not supported",
 		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate-notsupported.yang"))},
 		wants: map[string][]deviationTest{
-			"deviate": []deviationTest{{
+			"deviate": {{
 				path: "/target",
 			}, {
 				path: "/target-list",
@@ -2458,7 +2458,7 @@ func TestDeviation(t *testing.T) {
 					}`,
 		},
 		wants: map[string][]deviationTest{
-			"source": []deviationTest{{
+			"source": {{
 				path: "/a",
 			}, {
 				path:  "/b",
@@ -2469,7 +2469,7 @@ func TestDeviation(t *testing.T) {
 		desc:    "deviation with replace",
 		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate-replace.yang"))},
 		wants: map[string][]deviationTest{
-			"deviate": []deviationTest{{
+			"deviate": {{
 				path: "/target/replace/config",
 				entry: &Entry{
 					Config: TSFalse,
@@ -2520,7 +2520,7 @@ func TestDeviation(t *testing.T) {
 		desc:    "deviation with delete",
 		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate-delete.yang"))},
 		wants: map[string][]deviationTest{
-			"deviate": []deviationTest{{
+			"deviate": {{
 				path: "/target/delete/config",
 				entry: &Entry{
 					Config: TSUnset,
@@ -2592,7 +2592,7 @@ func TestDeviation(t *testing.T) {
 			`,
 		},
 		wants: map[string][]deviationTest{
-			"source": []deviationTest{{
+			"source": {{
 				path: "/a",
 				entry: &Entry{
 					Type: &YangType{
@@ -2634,7 +2634,7 @@ func TestDeviation(t *testing.T) {
 			}`,
 		},
 		wants: map[string][]deviationTest{
-			"foo": []deviationTest{{
+			"foo": {{
 				path: "/a/b",
 				entry: &Entry{
 					Type: &YangType{

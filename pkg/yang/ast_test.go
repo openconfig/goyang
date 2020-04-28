@@ -273,10 +273,10 @@ main_node the_node {
 					Name: "field_value",
 				},
 				Slice: []*Value{
-					&Value{
+					{
 						Name: "sl1",
 					},
-					&Value{
+					{
 						Name: "sl2",
 					},
 				},
@@ -289,7 +289,7 @@ main_node the_node {
 					},
 				},
 				ChildSlice: []*SubNode{
-					&SubNode{
+					{
 						Source: SA("child_slice", "element1",
 							SA("sub_field", "el1")),
 						Name: "element1",
@@ -297,7 +297,7 @@ main_node the_node {
 							Name: "el1",
 						},
 					},
-					&SubNode{
+					{
 						Source: SA("child_slice", "element2",
 							SA("sub_field", "el2")),
 						Name: "element2",

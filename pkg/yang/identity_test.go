@@ -50,10 +50,10 @@ type identityTestCase struct {
 
 // Test cases for basic identity extraction.
 var basicTestCases = []identityTestCase{
-	identityTestCase{
+	{
 		name: "basic-test-case-1: Check identity is found in module.",
 		in: []inputModule{
-			inputModule{
+			{
 				name: "idtest-one",
 				content: `
 					module idtest-one {
@@ -65,14 +65,14 @@ var basicTestCases = []identityTestCase{
 				`},
 		},
 		identities: []identityOut{
-			identityOut{module: "idtest-one", name: "TEST_ID"},
+			{module: "idtest-one", name: "TEST_ID"},
 		},
 		err: "basic-test-case-1: could not resolve identities",
 	},
-	identityTestCase{
+	{
 		name: "basic-test-case-2: Check identity with base is found in module.",
 		in: []inputModule{
-			inputModule{
+			{
 				name: "idtest-two",
 				content: `
 					module idtest-two {
@@ -88,9 +88,9 @@ var basicTestCases = []identityTestCase{
 				`},
 		},
 		identities: []identityOut{
-			identityOut{module: "idtest-two", name: "TEST_ID"},
-			identityOut{module: "idtest-two", name: "TEST_ID_TWO"},
-			identityOut{module: "idtest-two", name: "TEST_CHILD", baseName: "TEST_ID"},
+			{module: "idtest-two", name: "TEST_ID"},
+			{module: "idtest-two", name: "TEST_ID_TWO"},
+			{module: "idtest-two", name: "TEST_CHILD", baseName: "TEST_ID"},
 		},
 		err: "basic-test-case-2: could not resolve identities",
 	},
@@ -144,10 +144,10 @@ func TestIdentityExtract(t *testing.T) {
 
 // Test cases for validating that identities can be resolved correctly.
 var treeTestCases = []identityTestCase{
-	identityTestCase{
+	{
 		name: "tree-test-case-1: Validate identity resolution across modules",
 		in: []inputModule{
-			inputModule{
+			{
 				name: "base.yang",
 				content: `
 				  module base {
@@ -161,7 +161,7 @@ var treeTestCases = []identityTestCase{
 				    }
 				  }
 				`},
-			inputModule{
+			{
 				name: "remote.yang",
 				content: `
 				  module remote {
@@ -173,22 +173,22 @@ var treeTestCases = []identityTestCase{
 				`},
 		},
 		identities: []identityOut{
-			identityOut{
+			{
 				module: "remote",
 				name:   "REMOTE_BASE",
 				values: []string{"LOCAL_REMOTE_BASE"},
 			},
-			identityOut{
+			{
 				module:   "base",
 				name:     "LOCAL_REMOTE_BASE",
 				baseName: "r:REMOTE_BASE",
 			},
 		},
 	},
-	identityTestCase{
+	{
 		name: "tree-test-case-2: Multi-level inheritance validation.",
 		in: []inputModule{
-			inputModule{
+			{
 				name: "base.yang",
 				content: `
 				  module base {
@@ -218,7 +218,7 @@ var treeTestCases = []identityTestCase{
 				`},
 		},
 		identities: []identityOut{
-			identityOut{
+			{
 				module: "base",
 				name:   "GREATGRANDFATHER",
 				values: []string{
@@ -230,38 +230,38 @@ var treeTestCases = []identityTestCase{
 					"BROTHER",
 				},
 			},
-			identityOut{
+			{
 				module:   "base",
 				name:     "GRANDFATHER",
 				baseName: "GREATGRANDFATHER",
 				values:   []string{"FATHER", "UNCLE", "SON", "BROTHER"},
 			},
-			identityOut{
+			{
 				module:   "base",
 				name:     "GREATUNCLE",
 				baseName: "GREATGRANDFATHER",
 			},
-			identityOut{
+			{
 				module:   "base",
 				name:     "FATHER",
 				baseName: "GRANDFATHER",
 				values:   []string{"SON", "BROTHER"},
 			},
-			identityOut{
+			{
 				module:   "base",
 				name:     "UNCLE",
 				baseName: "GRANDFATHER",
 			},
-			identityOut{
+			{
 				module:   "base",
 				name:     "BROTHER",
 				baseName: "FATHER",
 			},
 		},
 	},
-	identityTestCase{
+	{
 		in: []inputModule{
-			inputModule{
+			{
 				name: "base.yang",
 				content: `
 				  module base {
@@ -282,28 +282,28 @@ var treeTestCases = []identityTestCase{
 				`},
 		},
 		identities: []identityOut{
-			identityOut{
+			{
 				module: "base",
 				name:   "BASE",
 				values: []string{"NOTBASE"},
 			},
-			identityOut{
+			{
 				module:   "base",
 				name:     "NOTBASE",
 				baseName: "BASE",
 			},
 		},
 		idrefs: []idrefOut{
-			idrefOut{
+			{
 				module: "base",
 				name:   "idref",
 				values: []string{"NOTBASE"},
 			},
 		},
 	},
-	identityTestCase{
+	{
 		in: []inputModule{
-			inputModule{
+			{
 				name: "base.yang",
 				content: `
 				  module base4 {
@@ -328,28 +328,28 @@ var treeTestCases = []identityTestCase{
 				`},
 		},
 		identities: []identityOut{
-			identityOut{
+			{
 				module: "base4",
 				name:   "BASE4",
 				values: []string{"CHILD4"},
 			},
-			identityOut{
+			{
 				module:   "base4",
 				name:     "CHILD4",
 				baseName: "BASE4",
 			},
 		},
 		idrefs: []idrefOut{
-			idrefOut{
+			{
 				module: "base4",
 				name:   "tref",
 				values: []string{"CHILD4"},
 			},
 		},
 	},
-	identityTestCase{
+	{
 		in: []inputModule{
-			inputModule{
+			{
 				name: "base.yang",
 				content: `
 					module base5 {
@@ -380,19 +380,19 @@ var treeTestCases = []identityTestCase{
 					}`},
 		},
 		identities: []identityOut{
-			identityOut{
+			{
 				module: "base5",
 				name:   "BASE5A",
 				values: []string{"FIVE_ONE"},
 			},
-			identityOut{
+			{
 				module: "base5",
 				name:   "BASE5B",
 				values: []string{"FIVE_TWO"},
 			},
 		},
 		idrefs: []idrefOut{
-			idrefOut{
+			{
 				module: "base5",
 				name:   "union",
 				values: []string{"FIVE_ONE", "FIVE_TWO"},
