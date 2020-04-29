@@ -1,4 +1,4 @@
-![Go](https://github.com/openconfig/goyang/workflows/Go/badge.svg)
+![Go](https://github.com/openconfig/goyang/workflows/Go/badge.svg?branch=master)
 [![Coverage Status](https://coveralls.io/repos/github/openconfig/goyang/badge.svg?branch=master)](https://coveralls.io/github/openconfig/goyang?branch=master)
 
 # goyang
