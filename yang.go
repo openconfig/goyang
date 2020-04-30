@@ -56,10 +56,11 @@ import (
 // Each format must register a formatter with register.  The function f will
 // be called once with the set of yang Entry trees generated.
 type formatter struct {
-	name  string
-	f     func(io.Writer, []*yang.Entry)
-	help  string
-	flags *getopt.Set
+	name              string
+	f                 func(io.Writer, []*yang.Entry)
+	includeSubmodules bool
+	help              string
+	flags             *getopt.Set
 }
 
 var formatters = map[string]*formatter{}
@@ -160,7 +161,8 @@ Formats:
 	if format == "" {
 		format = "tree"
 	}
-	if _, ok := formatters[format]; !ok {
+	f, ok := formatters[format]
+	if !ok {
 		fmt.Fprintf(os.Stderr, "%s: invalid format.  Choices are %s\n", format, strings.Join(formats, ", "))
 		stop(1)
 
@@ -200,6 +202,14 @@ Formats:
 		if mods[m.Name] == nil {
 			mods[m.Name] = m
 			names = append(names, m.Name)
+		}
+	}
+	if f.includeSubmodules {
+		for _, m := range ms.SubModules {
+			if mods[m.Name] == nil {
+				mods[m.Name] = m
+				names = append(names, m.Name)
+			}
 		}
 	}
 	sort.Strings(names)
