@@ -43,6 +43,8 @@ func doOcVersions(w io.Writer, entries []*yang.Entry) {
 			continue
 		}
 
+		fmt.Fprintf(w, "%s.yang:", m.Name)
+
 		for _, e := range m.Extensions {
 			keywordParts := strings.Split(e.Keyword, ":")
 			if len(keywordParts) != 2 {
@@ -55,10 +57,11 @@ func doOcVersions(w io.Writer, entries []*yang.Entry) {
 				if extMod == nil {
 					fmt.Fprintf(os.Stderr, "unable to find module using prefix %q from referencing module %q\n", pfx, m.Name)
 				} else if extMod.Name == "openconfig-extensions" {
-					fmt.Fprintf(w, "%s.yang: openconfig-version:%q\n", m.Name, e.Argument)
+					fmt.Fprintf(w, " openconfig-version:%q", e.Argument)
 				}
 			}
 		}
 
+		fmt.Fprintf(w, "\n")
 	}
 }
