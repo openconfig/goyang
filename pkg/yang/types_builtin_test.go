@@ -305,6 +305,28 @@ func TestCoalesce(t *testing.T) {
 	}
 }
 
+func TestYangRangeSort(t *testing.T) {
+	for x, tt := range []struct {
+                in, out YangRange
+        }{
+                {YangRange{}, YangRange{}},
+                {YangRange{R(1, 4), R(6, 10)}, YangRange{R(1, 4), R(6, 10)}},
+                {YangRange{R(6, 10), R(1, 4)}, YangRange{R(1, 4), R(6, 10)}},
+                {YangRange{Rf(10, 25, 1), Rf(30, 40, 1)}, YangRange{Rf(10, 25, 1), Rf(30, 40, 1)}},
+                {YangRange{Rf(30, 40, 1), Rf(10, 25, 1)}, YangRange{Rf(10, 25, 1), Rf(30, 40, 1)}},
+                {YangRange{R(1, 2)}, YangRange{R(1, 2)}},
+                {YangRange{R(1, 2), R(4, 5)}, YangRange{R(1, 2), R(4, 5)}},
+                {YangRange{R(1, 3), R(2, 5)}, YangRange{R(1, 3), R(2, 5)}},
+                {YangRange{R(1, 10), R(2, 5)}, YangRange{R(1, 10), R(2, 5)}},
+                {YangRange{R(1, 10), R(1, 2), R(4, 5), R(7, 8)}, YangRange{R(1, 2), R(1, 10), R(4, 5), R(7, 8)}},
+        } {
+                tt.in.Sort()
+                if !tt.in.Equal(tt.out) {
+                        t.Errorf("#%d: got %v, want %v", x, tt.in, tt.out)
+                }
+        }
+}
+
 func TestParseRangesDecimal(t *testing.T) {
 	tests := []struct {
 		desc             string

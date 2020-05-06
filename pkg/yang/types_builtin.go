@@ -859,18 +859,17 @@ func parseRanges(s string, decimal bool, fracDigRequired uint8) (YangRange, erro
 		}
 		r[i] = YRange{min, max}
 	}
-	sort.Sort(r)
+	r.Sort()
+	r = coalesce(r)
+
 	if err := r.Validate(); err != nil {
 		return nil, err
 	}
-
-	r = coalesce(r)
 	return r, nil
 }
 
 // coalesce coalesces r into as few ranges as possible.  For example,
 // 1..5|6..10 would become 1..10.  r is assumed to be sorted.
-// r is assumed to be valid (see Validate).
 func coalesce(r YangRange) YangRange {
 	// coalesce the ranges if we have more than 1.
 	if len(r) < 2 {
@@ -947,7 +946,11 @@ func (r YangRange) Less(i, j int) bool {
 
 // Validate returns an error if r has either an invalid range or has
 // overlapping ranges.
+// r is expected to be sorted use YangRange.Sort()
 func (r YangRange) Validate() error {
+	if !sort.IsSorted(r) {
+		return errors.New("range not sorted")
+	}
 	switch {
 	case len(r) == 0:
 		return nil
@@ -962,6 +965,11 @@ func (r YangRange) Validate() error {
 		}
 	}
 	return nil
+}
+
+// Sort r. Must be called before Validate and coalesce if unsorted
+func (r YangRange) Sort() {
+	sort.Sort(r)
 }
 
 // Equal returns true if ranges r and q are identically equivalent.
