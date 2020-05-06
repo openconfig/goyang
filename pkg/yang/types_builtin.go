@@ -859,6 +859,7 @@ func parseRanges(s string, decimal bool, fracDigRequired uint8) (YangRange, erro
 		}
 		r[i] = YRange{min, max}
 	}
+	sort.Sort(r)
 	if err := r.Validate(); err != nil {
 		return nil, err
 	}
@@ -944,10 +945,9 @@ func (r YangRange) Less(i, j int) bool {
 	}
 }
 
-// Validate sorts r and returns an error if r has either an invalid range or has
+// Validate returns an error if r has either an invalid range or has
 // overlapping ranges.
 func (r YangRange) Validate() error {
-	sort.Sort(r)
 	switch {
 	case len(r) == 0:
 		return nil
