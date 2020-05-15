@@ -24,8 +24,9 @@ import (
 )
 
 // UsePosixPatternExt specifies that openconfig-extensions:posix-pattern should
-// be used in place of the default pattern statement for all string types.
-// If the extension is not found, then the parsing will fail.
+// be used in place of the default pattern statement for all string types.  If
+// the number of posix-pattern statements doesn't match the number of pattern
+// statements within each type statement, the parsing will fail.
 var UsePosixPatternExt bool
 
 // A typeDictionary is a dictonary of all Typedefs defined in all Typedefers.
@@ -372,6 +373,7 @@ check:
 	}
 
 	if UsePosixPatternExt {
+		// Use posix pattern extension in place of the existing patterns.
 		posixPatterns, err := MatchingExtensions(t, "openconfig-extensions", "posix-pattern")
 		if err != nil {
 			return []error{err}

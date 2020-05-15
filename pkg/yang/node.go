@@ -124,6 +124,8 @@ func FindModuleByPrefix(n Node, prefix string) *Module {
 	return nil
 }
 
+// MatchingExtensions returns the subset of the given node's extensions
+// that match the given module and identifier.
 func MatchingExtensions(n Node, module, identifier string) ([]*Statement, error) {
 	var matchingExtensions []*Statement
 	for _, ext := range n.Exts() {
