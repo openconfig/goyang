@@ -18,6 +18,8 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 // TestNode provides a framework for processing tests that can check particular
@@ -128,6 +130,84 @@ func TestNode(t *testing.T) {
 
 			return nil
 		},
+	}, {
+		desc: "Test MatchingExtensions",
+		inFn: func(ms *Modules) (Node, error) {
+
+			m, err := ms.FindModuleByPrefix("t")
+			if err != nil {
+				return nil, fmt.Errorf("can't find module in %v", ms)
+			}
+
+			if len(m.Leaf) == 0 {
+				return nil, fmt.Errorf("node %v is missing imports", m)
+			}
+
+			_, err = ms.FindModuleByPrefix("f")
+			if err != nil {
+				return nil, err
+			}
+
+			return m.Leaf[0].Type, nil
+		},
+		inModules: map[string]string{
+			"test": `
+				module test {
+					prefix "t";
+					namespace "urn:t";
+
+					import foo {
+						prefix "f";
+						description "foo module";
+					}
+
+					leaf test-leaf {
+						type string {
+							pattern 'alpha';
+							f:bar 'boo';
+							f:bar 'coo';
+							f:far 'coo';
+							f:bar 'foo';
+						}
+					}
+				}
+			`,
+			"foo": `
+				module foo {
+					prefix "f";
+					namespace "urn:f";
+
+					extension bar {
+						argument "baz";
+					}
+
+					extension far {
+						argument "baz";
+					}
+				}
+			`,
+		},
+		wantNode: func(n Node) error {
+			n, ok := n.(*Type)
+			if !ok {
+				return fmt.Errorf("got node: %v, want type: Leaf", n)
+			}
+
+			var bars []string
+			matches, err := MatchingExtensions(n, "foo", "bar")
+			if err != nil {
+				return err
+			}
+			for _, ext := range matches {
+				bars = append(bars, ext.Argument)
+			}
+
+			if diff := cmp.Diff(bars, []string{"boo", "coo", "foo"}); diff != "" {
+				return fmt.Errorf("MatchingExtensions (-got, +want):\n%s", diff)
+			}
+
+			return nil
+		},
 	}}
 
 	for _, tt := range tests {
@@ -138,6 +218,10 @@ func TestNode(t *testing.T) {
 				if err := ms.Parse(m, n); err != nil {
 					t.Errorf("error parsing module %s, got: %v, want: nil", n, err)
 				}
+			}
+
+			if errs := ms.Process(); errs != nil {
+				t.Fatal(errs)
 			}
 
 			node, err := tt.inFn(ms)

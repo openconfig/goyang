@@ -23,6 +23,11 @@ import (
 	"sync"
 )
 
+// UsePosixPatternExt specifies that openconfig-extensions:posix-pattern should
+// be used in place of the default pattern statement for all string types.
+// If the extension is not found, then the parsing will fail.
+var UsePosixPatternExt bool
+
 // A typeDictionary is a dictonary of all Typedefs defined in all Typedefers.
 // A map of Nodes is used rather than a map of Typedefers to simplify usage
 // when traversing up a Node tree.
@@ -350,19 +355,36 @@ check:
 	for _, p := range y.Pattern {
 		patterns[p] = true
 	}
-	for _, pv := range t.Pattern {
-		p := pv.Name
+
+	checkAndAddPattern := func(n Node, p string) {
 		if _, err := syntax.Parse(p, syntax.Perl); err != nil {
 			if re, ok := err.(*syntax.Error); ok {
 				// Error adds "error parsing regexp" to
 				// the error, re.Code is the real error.
 				err = errors.New(re.Code.String())
 			}
-			errs = append(errs, fmt.Errorf("%s: bad pattern: %v: %s", Source(pv), err, p))
+			errs = append(errs, fmt.Errorf("%s: bad pattern: %v: %s", Source(n), err, p))
 		}
 		if !patterns[p] {
 			patterns[p] = true
 			y.Pattern = append(y.Pattern, p)
+		}
+	}
+
+	if UsePosixPatternExt {
+		posixPatterns, err := MatchingExtensions(t, "openconfig-extensions", "posix-pattern")
+		if err != nil {
+			return []error{err}
+		}
+		if len(posixPatterns) != len(t.Pattern) {
+			return []error{fmt.Errorf("%s: %d posix pattern(s) and %d regular pattern(s), expecting equal", Source(t), len(posixPatterns), len(t.Pattern))}
+		}
+		for _, ext := range posixPatterns {
+			checkAndAddPattern(ext, ext.Argument)
+		}
+	} else {
+		for _, pv := range t.Pattern {
+			checkAndAddPattern(pv, pv.Name)
 		}
 	}
 
