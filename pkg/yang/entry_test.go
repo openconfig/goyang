@@ -2739,7 +2739,7 @@ func TestLeafEntryTypes(t *testing.T) {
 	tests := []struct {
 		name          string
 		inModules     map[string]string
-		inEntryPath   string
+		wantEntryPath string
 		wantErrSubstr string
 	}{{
 		name: "direct decimal64 type",
@@ -2759,7 +2759,7 @@ func TestLeafEntryTypes(t *testing.T) {
 			}
 			`,
 		},
-		inEntryPath: "/test/gain-adjustment",
+		wantEntryPath: "/test/gain-adjustment",
 	}, {
 		name: "typedef decimal64 type",
 		inModules: map[string]string{
@@ -2783,7 +2783,32 @@ func TestLeafEntryTypes(t *testing.T) {
 			}
 			`,
 		},
-		inEntryPath: "/test/gain-adjustment",
+		wantEntryPath: "/test/gain-adjustment",
+	}, {
+		name: "typedef decimal64 type with overriding fraction-digits",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				typedef "optical-dB" {
+					type "decimal64" {
+						fraction-digits "1";
+					}
+				}
+
+				leaf "gain-adjustment" {
+					type "optical-dB" {
+						fraction-digits "2";
+						range "-12.0..12.0";
+					}
+					default "0.0";
+				}
+			}
+			`,
+		},
+		wantErrSubstr: "fraction-digits not allowed in this base type",
 	}}
 
 	for _, tt := range tests {
@@ -2801,7 +2826,13 @@ func TestLeafEntryTypes(t *testing.T) {
 		}
 
 		if errs := ms.Process(); len(errs) > 0 {
-			t.Errorf("%s: ms.Process(), got unexpected error processing entries: %v", tt.name, errs)
+			if len(errs) == 1 {
+				if diff := errdiff.Substring(errs[0], tt.wantErrSubstr); diff != "" {
+					t.Fatalf("did not get expected error, %s", diff)
+				}
+				return
+			}
+			t.Errorf("%s: ms.Process(), got too many errors processing entries: %v", tt.name, errs)
 			continue
 		}
 
@@ -2810,8 +2841,8 @@ func TestLeafEntryTypes(t *testing.T) {
 			addTreeE(ToEntry(m), dir)
 		}
 
-		if _, ok := dir[tt.inEntryPath]; !ok {
-			t.Errorf("%s: could not find entry %s within the dir: %v", tt.name, tt.inEntryPath, dir)
+		if _, ok := dir[tt.wantEntryPath]; !ok {
+			t.Errorf("%s: could not find entry %s within the dir: %v", tt.name, tt.wantEntryPath, dir)
 		}
 	}
 }
