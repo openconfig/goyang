@@ -239,8 +239,10 @@ check:
 	}
 	// If we are directly of type decimal64 then we must specify
 	// fraction-digits.
-	isDecimal64 := y.Kind == Ydecimal64 && (t.Name == "decimal64" || t.FractionDigits != nil)
+	isDecimal64 := y.Kind == Ydecimal64 && (t.Name == "decimal64" || y.FractionDigits != 0)
 	switch {
+	case isDecimal64 && y.FractionDigits != 0:
+		// FractionDigits already set via type inheritance.
 	case isDecimal64:
 		i, err := t.FractionDigits.asRangeInt(1, 18)
 		if err != nil {

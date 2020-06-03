@@ -2734,3 +2734,84 @@ func TestDeviation(t *testing.T) {
 		})
 	}
 }
+
+func TestLeafEntryTypes(t *testing.T) {
+	tests := []struct {
+		name          string
+		inModules     map[string]string
+		inEntryPath   string
+		wantErrSubstr string
+	}{{
+		name: "direct decimal64 type",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				leaf "gain-adjustment" {
+					type "decimal64" {
+						fraction-digits "1";
+						range "-12.0..12.0";
+					}
+					default "0.0";
+				}
+			}
+			`,
+		},
+		inEntryPath: "/test/gain-adjustment",
+	}, {
+		name: "typedef decimal64 type",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				typedef "optical-dB" {
+					type "decimal64" {
+						fraction-digits "1";
+					}
+				}
+
+				leaf "gain-adjustment" {
+					type "optical-dB" {
+						range "-12.0..12.0";
+					}
+					default "0.0";
+				}
+			}
+			`,
+		},
+		inEntryPath: "/test/gain-adjustment",
+	}}
+
+	for _, tt := range tests {
+		ms := NewModules()
+		var errs []error
+		for n, m := range tt.inModules {
+			if err := ms.Parse(m, n); err != nil {
+				errs = append(errs, err)
+			}
+		}
+
+		if len(errs) > 0 {
+			t.Errorf("%s: ms.Parse(), got unexpected error parsing input modules: %v", tt.name, errs)
+			continue
+		}
+
+		if errs := ms.Process(); len(errs) > 0 {
+			t.Errorf("%s: ms.Process(), got unexpected error processing entries: %v", tt.name, errs)
+			continue
+		}
+
+		dir := map[string]*Entry{}
+		for _, m := range ms.Modules {
+			addTreeE(ToEntry(m), dir)
+		}
+
+		if _, ok := dir[tt.inEntryPath]; !ok {
+			t.Errorf("%s: could not find entry %s within the dir: %v", tt.name, tt.inEntryPath, dir)
+		}
+	}
+}
