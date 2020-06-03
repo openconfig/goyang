@@ -241,7 +241,7 @@ check:
 	switch {
 	case isDecimal64 && y.FractionDigits != 0:
 		if t.FractionDigits != nil {
-			return append(errs, fmt.Errorf("%s: fraction-digits not allowed in this base type", Source(t)))
+			return append(errs, fmt.Errorf("%s: overriding of fraction-digits not allowed", Source(t)))
 		}
 		// FractionDigits already set via type inheritance.
 	case isDecimal64:

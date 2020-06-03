@@ -2808,7 +2808,7 @@ func TestLeafEntryTypes(t *testing.T) {
 			}
 			`,
 		},
-		wantErrSubstr: "fraction-digits not allowed in this base type",
+		wantErrSubstr: "overriding of fraction-digits not allowed",
 	}}
 
 	for _, tt := range tests {
