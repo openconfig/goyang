@@ -2734,3 +2734,134 @@ func TestDeviation(t *testing.T) {
 		})
 	}
 }
+
+func TestLeafEntryTypes(t *testing.T) {
+	tests := []struct {
+		name                string
+		inModules           map[string]string
+		wantEntryPath       string
+		wantEntryCustomTest func(t *testing.T, e *Entry)
+		wantErrSubstr       string
+	}{{
+		name: "direct decimal64 type",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				leaf "gain-adjustment" {
+					type "decimal64" {
+						fraction-digits "1";
+						range "-12.0..12.0";
+					}
+					default "0.0";
+				}
+			}
+			`,
+		},
+		wantEntryPath: "/test/gain-adjustment",
+		wantEntryCustomTest: func(t *testing.T, e *Entry) {
+			if got, want := e.Type.FractionDigits, 1; got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+			if diff := cmp.Diff(e.Type.Range, YangRange{Rf(-120, 120, 1)}); diff != "" {
+				t.Errorf("Range (-got, +want):\n%s", diff)
+			}
+		},
+	}, {
+		name: "typedef decimal64 type",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				typedef "optical-dB" {
+					type "decimal64" {
+						fraction-digits "1";
+					}
+				}
+
+				leaf "gain-adjustment" {
+					type "optical-dB" {
+						range "-12.0..12.0";
+					}
+					default "0.0";
+				}
+			}
+			`,
+		},
+		wantEntryPath: "/test/gain-adjustment",
+		wantEntryCustomTest: func(t *testing.T, e *Entry) {
+			if got, want := e.Type.FractionDigits, 1; got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+			if diff := cmp.Diff(e.Type.Range, YangRange{Rf(-120, 120, 1)}); diff != "" {
+				t.Errorf("Range (-got, +want):\n%s", diff)
+			}
+		},
+	}, {
+		name: "typedef decimal64 type with overriding fraction-digits",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				typedef "optical-dB" {
+					type "decimal64" {
+						fraction-digits "1";
+					}
+				}
+
+				leaf "gain-adjustment" {
+					type "optical-dB" {
+						fraction-digits "2";
+						range "-12.0..12.0";
+					}
+					default "0.0";
+				}
+			}
+			`,
+		},
+		wantErrSubstr: "overriding of fraction-digits not allowed",
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ms := NewModules()
+			var errs []error
+			for n, m := range tt.inModules {
+				if err := ms.Parse(m, n); err != nil {
+					errs = append(errs, err)
+				}
+			}
+
+			if len(errs) > 0 {
+				t.Fatalf("ms.Parse(), got unexpected error parsing input modules: %v", errs)
+			}
+
+			if errs := ms.Process(); len(errs) > 0 {
+				if len(errs) == 1 {
+					if diff := errdiff.Substring(errs[0], tt.wantErrSubstr); diff != "" {
+						t.Fatalf("did not get expected error, %s", diff)
+					}
+					return
+				}
+				t.Fatalf("ms.Process(), got too many errors processing entries: %v", errs)
+			}
+
+			dir := map[string]*Entry{}
+			for _, m := range ms.Modules {
+				addTreeE(ToEntry(m), dir)
+			}
+
+			e, ok := dir[tt.wantEntryPath]
+			if !ok {
+				t.Fatalf("could not find entry %s within the dir: %v", tt.wantEntryPath, dir)
+			}
+			tt.wantEntryCustomTest(t, e)
+		})
+	}
+}
