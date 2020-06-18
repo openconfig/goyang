@@ -1801,6 +1801,339 @@ func TestActionRPC(t *testing.T) {
 	}
 }
 
+var testIfFeatureModules = []struct {
+	name string
+	in   string
+}{
+	{
+		name: "if-feature.yang",
+		in: `module if-feature {
+  namespace "urn:if-feature";
+  prefix "feat";
+
+  feature ft-container;
+  feature ft-action;
+  feature ft-anydata1;
+  feature ft-anydata2;
+  feature ft-anyxml;
+  feature ft-choice;
+  feature ft-case;
+  feature ft-feature;
+  feature ft-leaf;
+  feature ft-bit;
+  feature ft-leaf-list;
+  feature ft-enum;
+  feature ft-list;
+  feature ft-notification;
+  feature ft-rpc;
+  feature ft-augment;
+  feature ft-identity;
+  feature ft-uses;
+  feature ft-refine;
+
+  container cont {
+    if-feature ft-container;
+    action act {
+      if-feature ft-action;
+    }
+  }
+
+  anydata data {
+    if-feature ft-anydata1;
+    if-feature ft-anydata2;
+  }
+
+  anyxml xml {
+    if-feature ft-anyxml;
+  }
+
+  choice ch {
+    if-feature ft-choice;
+    case cs {
+      if-feature ft-case;
+    }
+  }
+
+  feature f {
+    if-feature ft-feature;
+  }
+
+  leaf l {
+    if-feature ft-leaf;
+    type bits {
+      bit A {
+        if-feature ft-bit;
+      }
+    }
+  }
+
+  leaf-list ll {
+    if-feature ft-leaf-list;
+    type enumeration {
+      enum zero {
+        if-feature ft-enum;
+      }
+    }
+  }
+
+  list ls {
+    if-feature ft-list;
+  }
+
+  notification n {
+    if-feature ft-notification;
+  }
+
+  rpc r {
+    if-feature ft-rpc;
+  }
+
+  augment "/cont" {
+    if-feature ft-augment;
+  }
+
+  identity id {
+    if-feature ft-identity;
+  }
+
+  uses g {
+    if-feature ft-uses;
+    refine rf {
+      if-feature ft-refine;
+    }
+  }
+  grouping g {}
+}
+`,
+	},
+}
+
+func TestIfFeature(t *testing.T) {
+	entryIfFeatures := func(e *Entry) []*Value {
+		extra := e.Extra["if-feature"]
+		if len(extra) == 0 {
+			return nil
+		}
+		return extra[0].([]*Value)
+	}
+
+	featureByName := func(e *Entry, name string) *Feature {
+		for _, f := range e.Extra["feature"][0].([]*Feature) {
+			if f.Name == name {
+				return f
+			}
+		}
+		return nil
+	}
+
+	ms := NewModules()
+	for _, tt := range testIfFeatureModules {
+		if err := ms.Parse(tt.in, tt.name); err != nil {
+			t.Fatalf("could not parse module %s: %v", tt.name, err)
+		}
+	}
+
+	if errs := ms.Process(); len(errs) > 0 {
+		t.Fatalf("could not process modules: %v", errs)
+	}
+
+	mod, _ := ms.GetModule("if-feature")
+
+	testcases := []struct {
+		name           string
+		inIfFeatures   []*Value
+		wantIfFeatures []string
+	}{
+		// Node statements
+		{
+			name:           "action",
+			inIfFeatures:   entryIfFeatures(mod.Dir["cont"].Dir["act"]),
+			wantIfFeatures: []string{"ft-action"},
+		},
+		{
+			name:           "anydata",
+			inIfFeatures:   entryIfFeatures(mod.Dir["data"]),
+			wantIfFeatures: []string{"ft-anydata1", "ft-anydata2"},
+		},
+		{
+			name:           "anyxml",
+			inIfFeatures:   entryIfFeatures(mod.Dir["xml"]),
+			wantIfFeatures: []string{"ft-anyxml"},
+		},
+		{
+			name:           "case",
+			inIfFeatures:   entryIfFeatures(mod.Dir["ch"].Dir["cs"]),
+			wantIfFeatures: []string{"ft-case"},
+		},
+		{
+			name:           "choice",
+			inIfFeatures:   entryIfFeatures(mod.Dir["ch"]),
+			wantIfFeatures: []string{"ft-choice"},
+		},
+		{
+			name:           "container",
+			inIfFeatures:   entryIfFeatures(mod.Dir["cont"]),
+			wantIfFeatures: []string{"ft-container"},
+		},
+		{
+			name:           "feature",
+			inIfFeatures:   featureByName(mod, "f").IfFeature,
+			wantIfFeatures: []string{"ft-feature"},
+		},
+		{
+			name:           "leaf",
+			inIfFeatures:   entryIfFeatures(mod.Dir["l"]),
+			wantIfFeatures: []string{"ft-leaf"},
+		},
+		{
+			name:           "leaf-list",
+			inIfFeatures:   entryIfFeatures(mod.Dir["ll"]),
+			wantIfFeatures: []string{"ft-leaf-list"},
+		},
+		{
+			name:           "list",
+			inIfFeatures:   entryIfFeatures(mod.Dir["ls"]),
+			wantIfFeatures: []string{"ft-list"},
+		},
+		{
+			name:           "notification",
+			inIfFeatures:   entryIfFeatures(mod.Dir["n"]),
+			wantIfFeatures: []string{"ft-notification"},
+		},
+		{
+			name:           "rpc",
+			inIfFeatures:   entryIfFeatures(mod.Dir["r"]),
+			wantIfFeatures: []string{"ft-rpc"},
+		},
+		// Other statements
+		{
+			name:           "augment",
+			inIfFeatures:   entryIfFeatures(mod.Dir["cont"].Augmented[0]),
+			wantIfFeatures: []string{"ft-augment"},
+		},
+		{
+			name:           "bit",
+			inIfFeatures:   mod.Dir["l"].Node.(*Leaf).Type.Bit[0].IfFeature,
+			wantIfFeatures: []string{"ft-bit"},
+		},
+		{
+			name:           "enum",
+			inIfFeatures:   mod.Dir["ll"].Node.(*Leaf).Type.Enum[0].IfFeature,
+			wantIfFeatures: []string{"ft-enum"},
+		},
+		{
+			name:           "identity",
+			inIfFeatures:   mod.Identities[0].IfFeature,
+			wantIfFeatures: []string{"ft-identity"},
+		},
+		{
+			name:           "refine",
+			inIfFeatures:   ms.Modules["if-feature"].Uses[0].Refine[0].IfFeature,
+			wantIfFeatures: []string{"ft-refine"},
+		},
+		{
+			name:           "uses",
+			inIfFeatures:   ms.Modules["if-feature"].Uses[0].IfFeature,
+			wantIfFeatures: []string{"ft-uses"},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			var names []string
+			for _, f := range tc.inIfFeatures {
+				names = append(names, f.Name)
+			}
+
+			if !reflect.DeepEqual(names, tc.wantIfFeatures) {
+				t.Errorf("%s: did not get expected if-features, got %v, want %v", tc.name, names, tc.wantIfFeatures)
+			}
+		})
+	}
+}
+
+var testNotificationModules = []struct {
+	name string
+	in   string
+}{
+	{
+		name: "notification.yang",
+		in: `module notification {
+  namespace "urn:notification";
+  prefix "n";
+
+  notification n {}
+
+  grouping g {
+    notification g-n {}
+  }
+
+  container cont {
+    notification cont-n {}
+  }
+
+  list ls {
+    notification ls-n {}
+    uses g;
+  }
+
+  augment "/cont" {
+    notification aug-n {}
+  }
+}
+`,
+	},
+}
+
+func TestNotification(t *testing.T) {
+	ms := NewModules()
+	for _, tt := range testNotificationModules {
+		if err := ms.Parse(tt.in, tt.name); err != nil {
+			t.Fatalf("could not parse module %s: %v", tt.name, err)
+		}
+	}
+
+	if errs := ms.Process(); len(errs) > 0 {
+		t.Fatalf("could not process modules: %v", errs)
+	}
+
+	mod, _ := ms.GetModule("notification")
+
+	testcases := []struct {
+		name     string
+		wantPath []string
+	}{
+		{
+			name:     "module",
+			wantPath: []string{"n"},
+		},
+		{
+			name:     "container",
+			wantPath: []string{"cont", "cont-n"},
+		},
+		{
+			name:     "list",
+			wantPath: []string{"ls", "ls-n"},
+		},
+		{
+			name:     "grouping",
+			wantPath: []string{"ls", "g-n"},
+		},
+		{
+			name:     "augment",
+			wantPath: []string{"cont", "aug-n"},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if e := getEntry(mod, tc.wantPath); e == nil || e.Node.Kind() != "notification" {
+				t.Errorf("%s: want notification entry at: %v, got: %+v", tc.name, tc.wantPath, e)
+			}
+		})
+	}
+}
+
 // addTreeE takes an input Entry and appends it to a directory, keyed by path, to the Entry.
 // If the Entry has children, they are appended to the directory recursively. Used in test
 // cases where a path is to be referred to.
