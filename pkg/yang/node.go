@@ -132,7 +132,7 @@ func MatchingExtensions(n Node, module, identifier string) ([]*Statement, error)
 		names := strings.SplitN(ext.Keyword, ":", 2)
 		mod := FindModuleByPrefix(n, names[0])
 		if mod == nil {
-			return nil, fmt.Errorf("MatchingExtensions: module %s not found", module)
+			return nil, fmt.Errorf("MatchingExtensions: module prefix %q not found", names[0])
 		}
 		if len(names) == 2 && names[1] == identifier && mod.Name == module {
 			matchingExtensions = append(matchingExtensions, ext)

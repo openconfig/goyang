@@ -318,6 +318,31 @@ func TestPattern(t *testing.T) {
 		},
 		wantPatternsRegular: []string{"alpha", "bravo", "charlie"},
 		wantPatternsPOSIX:   []string{"delta", "echo", "foxtrot"},
+	}, {
+		desc: "invalid POSIX pattern",
+		leafNode: `
+			leaf test-leaf {
+				type leaf-type;
+			}
+
+			typedef leaf-type {
+				type string {
+					o:posix-pattern '?';
+				}
+			}
+		} // end module`,
+		inGetFn: func(ms *Modules) (*YangType, error) {
+			m, err := ms.FindModuleByPrefix("t")
+			if err != nil {
+				return nil, fmt.Errorf("can't find module in %v", ms)
+			}
+			if len(m.Leaf) == 0 {
+				return nil, fmt.Errorf("node %v is missing imports", m)
+			}
+			e := ToEntry(m)
+			return e.Dir["test-leaf"].Type, nil
+		},
+		wantErrSubstr: "bad pattern",
 	}}
 
 	for _, tt := range tests {
