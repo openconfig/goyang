@@ -140,8 +140,6 @@ type Module struct {
 	// typedefs is a list of all top level typedefs in this
 	// module.
 	modules *Modules
-
-	typedefs map[string]*Typedef
 }
 
 func (s *Module) Kind() string {
@@ -843,10 +841,7 @@ func (s *Identity) PrefixedName() string {
 // true if an identity with the name is defined within the Values of the
 // identity
 func (s *Identity) IsDefined(name string) bool {
-	if s.GetValue(name) != nil {
-		return true
-	}
-	return false
+	return s.GetValue(name) != nil
 }
 
 // GetValue returns a pointer to the identity with name "name" that is within

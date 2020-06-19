@@ -497,9 +497,7 @@ func ToEntry(n Node) (e *Entry) {
 	// Copy in the extensions from our Node, if any.
 	defer func(n Node) {
 		if e != nil {
-			for _, ext := range n.Exts() {
-				e.Exts = append(e.Exts, ext)
-			}
+			e.Exts = append(e.Exts, n.Exts()...)
 		}
 	}(n)
 

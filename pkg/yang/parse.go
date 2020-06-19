@@ -31,10 +31,9 @@ import (
 
 // a parser is used to parse the contents of a single .yang file.
 type parser struct {
-	lex        *lexer
-	errout     *bytes.Buffer
-	tokens     []*token     // stack of pushed tokens (for backing up)
-	statements []*Statement // list of root statements
+	lex    *lexer
+	errout *bytes.Buffer
+	tokens []*token // stack of pushed tokens (for backing up)
 
 	// hitBrace is returned when we encounter a '}'.  The statement location
 	// is updated with the location of the '}'.  The brace may be legitimate
@@ -101,7 +100,7 @@ func (s *Statement) Location() string {
 	case s.file == "":
 		return fmt.Sprintf("line %d:%d", s.line, s.col)
 	case s.line == 0:
-		return fmt.Sprintf("%s", s.file)
+		return s.file
 	default:
 		return fmt.Sprintf("%s:%d:%d", s.file, s.line, s.col)
 	}
