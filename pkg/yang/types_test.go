@@ -113,8 +113,8 @@ func TestPattern(t *testing.T) {
 		inGetFn             func(*Modules) (*YangType, error)
 		leafNode            string
 		wantPatternsRegular []string
-		wantPatternsPosix   []string
-		wantPosixErrSubstr  string
+		wantPatternsPOSIX   []string
+		wantErrSubstr       string
 	}{{
 		desc: "Only normal patterns",
 		leafNode: `
@@ -139,7 +139,6 @@ func TestPattern(t *testing.T) {
 			return e.Dir["test-leaf"].Type, nil
 		},
 		wantPatternsRegular: []string{"charlie"},
-		wantPosixErrSubstr:  "expecting equal",
 	}, {
 		desc: "Only posix patterns",
 		leafNode: `
@@ -164,10 +163,29 @@ func TestPattern(t *testing.T) {
 			e := ToEntry(m)
 			return e.Dir["test-leaf"].Type, nil
 		},
-		wantPatternsRegular: nil,
-		wantPosixErrSubstr:  "expecting equal",
+		wantPatternsPOSIX: []string{"bravo", "charlie"},
 	}, {
-		desc: "unequal number of patterns",
+		desc: "No patterns",
+		leafNode: `
+			leaf test-leaf {
+				type string;
+			}
+		}`,
+		inGetFn: func(ms *Modules) (*YangType, error) {
+			m, err := ms.FindModuleByPrefix("t")
+			if err != nil {
+				return nil, fmt.Errorf("can't find module in %v", ms)
+			}
+			if len(m.Leaf) == 0 {
+				return nil, fmt.Errorf("node %v is missing imports", m)
+			}
+			e := ToEntry(m)
+			return e.Dir["test-leaf"].Type, nil
+		},
+		wantPatternsRegular: nil,
+		wantPatternsPOSIX:   nil,
+	}, {
+		desc: "Both patterns",
 		leafNode: `
 			leaf test-leaf {
 				type string {
@@ -191,15 +209,17 @@ func TestPattern(t *testing.T) {
 			return e.Dir["test-leaf"].Type, nil
 		},
 		wantPatternsRegular: []string{"alpha"},
-		wantPosixErrSubstr:  "expecting equal",
+		wantPatternsPOSIX:   []string{"bravo", "charlie", "delta"},
 	}, {
-		desc: "Equal number of patterns",
+		desc: "Both patterns, but with non-openconfig-extensions pretenders",
 		leafNode: `
 			leaf test-leaf {
 				type string {
 					pattern 'alpha';
 					o:bar 'coo';
 					o:posix-pattern 'delta';
+
+					n:posix-pattern 'golf';
 
 					pattern 'bravo';
 					o:bar 'foo';
@@ -208,6 +228,8 @@ func TestPattern(t *testing.T) {
 					pattern 'charlie';
 					o:bar 'goo';
 					o:posix-pattern 'foxtrot';
+
+					n:posix-pattern 'hotel';
 				}
 			}
 		} // end module`,
@@ -223,27 +245,7 @@ func TestPattern(t *testing.T) {
 			return e.Dir["test-leaf"].Type, nil
 		},
 		wantPatternsRegular: []string{"alpha", "bravo", "charlie"},
-		wantPatternsPosix:   []string{"delta", "echo", "foxtrot"},
-	}, {
-		desc: "No patterns",
-		leafNode: `
-			leaf test-leaf {
-				type string;
-			}
-		}`,
-		inGetFn: func(ms *Modules) (*YangType, error) {
-			m, err := ms.FindModuleByPrefix("t")
-			if err != nil {
-				return nil, fmt.Errorf("can't find module in %v", ms)
-			}
-			if len(m.Leaf) == 0 {
-				return nil, fmt.Errorf("node %v is missing imports", m)
-			}
-			e := ToEntry(m)
-			return e.Dir["test-leaf"].Type, nil
-		},
-		wantPatternsRegular: nil,
-		wantPatternsPosix:   nil,
+		wantPatternsPOSIX:   []string{"delta", "echo", "foxtrot"},
 	}, {
 		desc: "Union type",
 		leafNode: `
@@ -257,6 +259,7 @@ func TestPattern(t *testing.T) {
 						pattern 'bravo';
 						o:bar 'foo';
 						o:posix-pattern 'echo';
+						n:posix-pattern 'echo2';
 
 						pattern 'charlie';
 						o:bar 'goo';
@@ -278,7 +281,7 @@ func TestPattern(t *testing.T) {
 			return e.Dir["test-leaf"].Type.Type[0], nil
 		},
 		wantPatternsRegular: []string{"alpha", "bravo", "charlie"},
-		wantPatternsPosix:   []string{"delta", "echo", "foxtrot"},
+		wantPatternsPOSIX:   []string{"delta", "echo", "foxtrot"},
 	}, {
 		desc: "typedef",
 		leafNode: `
@@ -314,29 +317,25 @@ func TestPattern(t *testing.T) {
 			return e.Dir["test-leaf"].Type, nil
 		},
 		wantPatternsRegular: []string{"alpha", "bravo", "charlie"},
-		wantPatternsPosix:   []string{"delta", "echo", "foxtrot"},
+		wantPatternsPOSIX:   []string{"delta", "echo", "foxtrot"},
 	}}
 
 	for _, tt := range tests {
-		for _, inUsePosixPatternExt := range []bool{false, true} {
-			wantPatterns := tt.wantPatternsRegular
-			patternType := "regular"
-			if inUsePosixPatternExt {
-				wantPatterns = tt.wantPatternsPosix
-				patternType = "posix"
-			}
-			UsePosixPatternExt = inUsePosixPatternExt
-			inModules := map[string]string{
-				"test": `
+		inModules := map[string]string{
+			"test": `
 				module test {
 					prefix "t";
 					namespace "urn:t";
 
+					import non-openconfig-extensions {
+						prefix "n";
+						description "non-openconfig-extensions module";
+					}
 					import openconfig-extensions {
 						prefix "o";
 						description "openconfig-extensions module";
 					}` + tt.leafNode,
-				"openconfig-extensions": `
+			"openconfig-extensions": `
 				module openconfig-extensions {
 					prefix "o";
 					namespace "urn:o";
@@ -350,45 +349,59 @@ func TestPattern(t *testing.T) {
 					}
 				}
 			`,
+			"non-openconfig-extensions": `
+				module non-openconfig-extensions {
+					prefix "n";
+					namespace "urn:n";
+
+					extension bar {
+						argument "baz";
+					}
+
+					extension posix-pattern {
+						argument "pattern";
+					}
+				}
+			`,
+		}
+
+		t.Run(tt.desc, func(t *testing.T) {
+			ms := NewModules()
+			for n, m := range inModules {
+				if err := ms.Parse(m, n); err != nil {
+					t.Fatalf("error parsing module %s, got: %v, want: nil", n, err)
+				}
+			}
+			errs := ms.Process()
+			var err error
+			if len(errs) > 1 {
+				t.Fatalf("Got more than 1 error: %v", errs)
+			} else if len(errs) == 1 {
+				err = errs[0]
+			}
+			if diff := errdiff.Substring(err, tt.wantErrSubstr); diff != "" {
+				t.Errorf("Did not get expected error: %s", diff)
+			}
+			if err != nil {
+				return
 			}
 
-			t.Run(tt.desc+patternType, func(t *testing.T) {
-				ms := NewModules()
-				for n, m := range inModules {
-					if err := ms.Parse(m, n); err != nil {
-						t.Fatalf("error parsing module %s, got: %v, want: nil", n, err)
-					}
-				}
-				errs := ms.Process()
-				if inUsePosixPatternExt {
-					var err error
-					if len(errs) > 1 {
-						t.Fatalf("Got more than 1 error: %v", errs)
-					} else if len(errs) == 1 {
-						err = errs[0]
-					}
-					if diff := errdiff.Substring(err, tt.wantPosixErrSubstr); diff != "" {
-						t.Errorf("Did not get expected error: %s", diff)
-					}
-					if err != nil {
-						return
-					}
-				} else if errs != nil {
-					t.Fatal(errs)
-				}
+			yangType, err := tt.inGetFn(ms)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-				yangType, err := tt.inGetFn(ms)
-				if err != nil {
-					t.Fatal(err)
-				}
+			sort.Strings(yangType.Pattern)
+			sort.Strings(tt.wantPatternsRegular)
+			if diff := cmp.Diff(yangType.Pattern, tt.wantPatternsRegular, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("Type.resolve() pattern test (-got, +want):\n%s", diff)
+			}
 
-				gotPatterns := yangType.Pattern
-				sort.Strings(gotPatterns)
-				sort.Strings(wantPatterns)
-				if diff := cmp.Diff(gotPatterns, wantPatterns, cmpopts.EquateEmpty()); diff != "" {
-					t.Errorf("%s Pattern (-got, +want):\n%s", patternType, diff)
-				}
-			})
-		}
+			sort.Strings(yangType.POSIXPattern)
+			sort.Strings(tt.wantPatternsPOSIX)
+			if diff := cmp.Diff(yangType.POSIXPattern, tt.wantPatternsPOSIX, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("Type.resolve() posix-pattern test (-got, +want):\n%s", diff)
+			}
+		})
 	}
 }

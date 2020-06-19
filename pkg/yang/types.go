@@ -23,12 +23,6 @@ import (
 	"sync"
 )
 
-// UsePosixPatternExt specifies that openconfig-extensions:posix-pattern should
-// be used in place of the default pattern statement for all string types.  If
-// the number of posix-pattern statements doesn't match the number of pattern
-// statements within each type statement, the parsing will fail.
-var UsePosixPatternExt bool
-
 // A typeDictionary is a dictonary of all Typedefs defined in all Typedefers.
 // A map of Nodes is used rather than a map of Typedefers to simplify usage
 // when traversing up a Node tree.
@@ -352,13 +346,18 @@ check:
 	// Patterns are ANDed according to section 9.4.6.  If all the patterns
 	// declared by t were also declared by the type t is based on, then
 	// no patterns are added.
-	patterns := map[string]bool{}
+	seenPatterns := map[string]bool{}
 	for _, p := range y.Pattern {
-		patterns[p] = true
+		seenPatterns[p] = true
+	}
+	seenPOSIXPatterns := map[string]bool{}
+	for _, p := range y.POSIXPattern {
+		seenPOSIXPatterns[p] = true
 	}
 
-	checkAndAddPattern := func(n Node, p string) {
-		if _, err := syntax.Parse(p, syntax.Perl); err != nil {
+	checkPattern := func(n Node, p string, flags syntax.Flags) {
+		_, err := syntax.Parse(p, flags)
+		if err != nil {
 			if re, ok := err.(*syntax.Error); ok {
 				// Error adds "error parsing regexp" to
 				// the error, re.Code is the real error.
@@ -366,27 +365,28 @@ check:
 			}
 			errs = append(errs, fmt.Errorf("%s: bad pattern: %v: %s", Source(n), err, p))
 		}
-		if !patterns[p] {
-			patterns[p] = true
-			y.Pattern = append(y.Pattern, p)
+	}
+
+	// First parse out the pattern statements.
+	for _, pv := range t.Pattern {
+		checkPattern(pv, pv.Name, syntax.Perl)
+		if !seenPatterns[pv.Name] {
+			seenPatterns[pv.Name] = true
+			y.Pattern = append(y.Pattern, pv.Name)
 		}
 	}
 
-	if UsePosixPatternExt {
-		// Use posix pattern extension in place of the existing patterns.
-		posixPatterns, err := MatchingExtensions(t, "openconfig-extensions", "posix-pattern")
-		if err != nil {
-			return []error{err}
-		}
-		if len(posixPatterns) != len(t.Pattern) {
-			return []error{fmt.Errorf("%s: %d posix pattern(s) and %d regular pattern(s), expecting equal", Source(t), len(posixPatterns), len(t.Pattern))}
-		}
-		for _, ext := range posixPatterns {
-			checkAndAddPattern(ext, ext.Argument)
-		}
-	} else {
-		for _, pv := range t.Pattern {
-			checkAndAddPattern(pv, pv.Name)
+	// Then, parse out the posix-pattern statements, if they exist.
+	// A YANG module could make use of either or both, so we deal with each separately.
+	posixPatterns, err := MatchingExtensions(t, "openconfig-extensions", "posix-pattern")
+	if err != nil {
+		return []error{err}
+	}
+	for _, ext := range posixPatterns {
+		checkPattern(ext, ext.Argument, syntax.POSIX)
+		if !seenPOSIXPatterns[ext.Argument] {
+			seenPOSIXPatterns[ext.Argument] = true
+			y.POSIXPattern = append(y.POSIXPattern, ext.Argument)
 		}
 	}
 
