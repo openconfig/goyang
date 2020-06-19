@@ -497,7 +497,7 @@ func semCheckMaxElements(v *Value) (uint64, error) {
 	return val, nil
 }
 
-// semCheckMaxElements checks whether the min-element argument is valid, and returns the specified value.
+// semCheckMinElements checks whether the min-element argument is valid, and returns the specified value.
 func semCheckMinElements(v *Value) (uint64, error) {
 	if v == nil {
 		return 0, nil
