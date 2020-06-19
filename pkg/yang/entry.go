@@ -65,7 +65,7 @@ func (t TriState) String() string {
 
 // deviationPresence stores whether certain attributes for a DeviateEntry-type
 // Entry have been given deviation values. This is useful when the attribute
-// doesn't have a presence value (e.g. non-pointers).
+// doesn't have a presence indicator (e.g. non-pointers).
 type deviationPresence struct {
 	hasMinElements bool
 	hasMaxElements bool
