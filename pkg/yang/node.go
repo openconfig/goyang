@@ -124,6 +124,23 @@ func FindModuleByPrefix(n Node, prefix string) *Module {
 	return nil
 }
 
+// MatchingExtensions returns the subset of the given node's extensions
+// that match the given module and identifier.
+func MatchingExtensions(n Node, module, identifier string) ([]*Statement, error) {
+	var matchingExtensions []*Statement
+	for _, ext := range n.Exts() {
+		names := strings.SplitN(ext.Keyword, ":", 2)
+		mod := FindModuleByPrefix(n, names[0])
+		if mod == nil {
+			return nil, fmt.Errorf("MatchingExtensions: module prefix %q not found", names[0])
+		}
+		if len(names) == 2 && names[1] == identifier && mod.Name == module {
+			matchingExtensions = append(matchingExtensions, ext)
+		}
+	}
+	return matchingExtensions, nil
+}
+
 // RootNode returns the submodule or module that n was defined in.
 func RootNode(n Node) *Module {
 	for ; n.ParentNode() != nil; n = n.ParentNode() {

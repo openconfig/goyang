@@ -351,23 +351,46 @@ check:
 	// Patterns are ANDed according to section 9.4.6.  If all the patterns
 	// declared by t were also declared by the type t is based on, then
 	// no patterns are added.
-	patterns := map[string]bool{}
+	seenPatterns := map[string]bool{}
 	for _, p := range y.Pattern {
-		patterns[p] = true
+		seenPatterns[p] = true
 	}
+	seenPOSIXPatterns := map[string]bool{}
+	for _, p := range y.POSIXPattern {
+		seenPOSIXPatterns[p] = true
+	}
+
+	// First parse out the pattern statements.
+	// These patterns are not checked because there is no support for W3C regexes by Go.
 	for _, pv := range t.Pattern {
-		p := pv.Name
-		if _, err := syntax.Parse(p, syntax.Perl); err != nil {
+		if !seenPatterns[pv.Name] {
+			seenPatterns[pv.Name] = true
+			y.Pattern = append(y.Pattern, pv.Name)
+		}
+	}
+
+	// Then, parse out the posix-pattern statements, if they exist.
+	// A YANG module could make use of either or both, so we deal with each separately.
+	posixPatterns, err := MatchingExtensions(t, "openconfig-extensions", "posix-pattern")
+	if err != nil {
+		return []error{err}
+	}
+
+	checkPattern := func(n Node, p string, flags syntax.Flags) {
+		if _, err := syntax.Parse(p, flags); err != nil {
 			if re, ok := err.(*syntax.Error); ok {
 				// Error adds "error parsing regexp" to
 				// the error, re.Code is the real error.
 				err = errors.New(re.Code.String())
 			}
-			errs = append(errs, fmt.Errorf("%s: bad pattern: %v: %s", Source(pv), err, p))
+			errs = append(errs, fmt.Errorf("%s: bad pattern: %v: %s", Source(n), err, p))
 		}
-		if !patterns[p] {
-			patterns[p] = true
-			y.Pattern = append(y.Pattern, p)
+	}
+	for _, ext := range posixPatterns {
+		checkPattern(ext, ext.Argument, syntax.POSIX)
+		if !seenPOSIXPatterns[ext.Argument] {
+			seenPOSIXPatterns[ext.Argument] = true
+			y.POSIXPattern = append(y.POSIXPattern, ext.Argument)
 		}
 	}
 

@@ -285,6 +285,7 @@ type YangType struct {
 	OptionalInstance bool        `json:",omitempty"` // !require-instances which defaults to true
 	Path             string      `json:",omitempty"` // the path in a leafref
 	Pattern          []string    `json:",omitempty"` // limiting XSD-TYPES expressions on strings
+	POSIXPattern     []string    `json:",omitempty"` // limiting POSIX ERE on strings (specified by openconfig-extensions:posix-pattern)
 	Range            YangRange   `json:",omitempty"` // range for integers
 	Type             []*YangType `json:",omitempty"` // for unions
 }
