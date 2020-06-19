@@ -360,21 +360,9 @@ check:
 		seenPOSIXPatterns[p] = true
 	}
 
-	checkPattern := func(n Node, p string, flags syntax.Flags) {
-		_, err := syntax.Parse(p, flags)
-		if err != nil {
-			if re, ok := err.(*syntax.Error); ok {
-				// Error adds "error parsing regexp" to
-				// the error, re.Code is the real error.
-				err = errors.New(re.Code.String())
-			}
-			errs = append(errs, fmt.Errorf("%s: bad pattern: %v: %s", Source(n), err, p))
-		}
-	}
-
 	// First parse out the pattern statements.
+	// These patterns are not checked because there is no support for W3C regexes by Go.
 	for _, pv := range t.Pattern {
-		checkPattern(pv, pv.Name, syntax.Perl)
 		if !seenPatterns[pv.Name] {
 			seenPatterns[pv.Name] = true
 			y.Pattern = append(y.Pattern, pv.Name)
@@ -386,6 +374,17 @@ check:
 	posixPatterns, err := MatchingExtensions(t, "openconfig-extensions", "posix-pattern")
 	if err != nil {
 		return []error{err}
+	}
+
+	checkPattern := func(n Node, p string, flags syntax.Flags) {
+		if _, err := syntax.Parse(p, flags); err != nil {
+			if re, ok := err.(*syntax.Error); ok {
+				// Error adds "error parsing regexp" to
+				// the error, re.Code is the real error.
+				err = errors.New(re.Code.String())
+			}
+			errs = append(errs, fmt.Errorf("%s: bad pattern: %v: %s", Source(n), err, p))
+		}
 	}
 	for _, ext := range posixPatterns {
 		checkPattern(ext, ext.Argument, syntax.POSIX)
