@@ -32,10 +32,16 @@ jobs:
       run: go build -v ./...
 
     - name: Test
-      run: go test -v -coverprofile=profile.cov  ./... 
+      run: go test -v -coverprofile=profile.cov ./... 
     
     - name: Race Test
       run: go test -race ./...
+
+    - name: Coveralls
+      if: ${{ matrix.go == '1.14' }}
+      uses: shogo82148/actions-goveralls@v1
+      with:
+        path-to-profile: profile.cov
 
   static_analysis:
     name: Static Analysis
@@ -75,8 +81,3 @@ jobs:
         run: |
           go get -u honnef.co/go/tools/cmd/staticcheck
           staticcheck ./...
-
-      - name: Coveralls
-        uses: coverallsapp/github-action@v1.1.1
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
