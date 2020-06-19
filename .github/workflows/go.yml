@@ -79,5 +79,4 @@ jobs:
 
       - name: Staticcheck
         run: |
-          go get -u honnef.co/go/tools/cmd/staticcheck
           staticcheck ./...
