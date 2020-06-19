@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"reflect"
 	"sort"
 	"strconv"
@@ -60,6 +61,14 @@ func (t TriState) String() string {
 	default:
 		return fmt.Sprintf("ts-%d", t)
 	}
+}
+
+// deviationPresence stores whether certain attributes for a DeviateEntry-type
+// Entry have been given deviation values. This is useful when the attribute
+// doesn't have a presence value (e.g. non-pointers).
+type deviationPresence struct {
+	hasMinElements bool
+	hasMaxElements bool
 }
 
 // An Entry represents a single node (directory or leaf) created from the
@@ -99,7 +108,10 @@ type Entry struct {
 	Augmented  []*Entry                   `json:",omitempty"` // Augments merged into this entry.
 	Deviations []*DeviatedEntry           `json:"-"`          // Deviations associated with this entry.
 	Deviate    map[deviationType][]*Entry `json:"-"`
-	Uses       []*UsesStmt                `json:",omitempty"` // Uses merged into this entry.
+	// deviationPresence tracks whether certain attributes for a DeviateEntry-type
+	// Entry have been given deviation values.
+	deviatePresence deviationPresence
+	Uses            []*UsesStmt `json:",omitempty"` // Uses merged into this entry.
 
 	// Extra maps all the unsupported fields to their values
 	Extra map[string][]interface{} `json:"-"`
@@ -125,8 +137,8 @@ type RPCEntry struct {
 
 // A ListAttr is associated with an Entry that represents a List node
 type ListAttr struct {
-	MinElements *Value // leaf-list or list MUST have at least min-elements
-	MaxElements *Value // leaf-list or list has at most max-elements
+	MinElements uint64 // leaf-list or list MUST have at least min-elements
+	MaxElements uint64 // leaf-list or list has at most max-elements
 	OrderedBy   *Value // order of entries determined by "system" or "user"
 }
 
@@ -473,6 +485,30 @@ type DeviatedEntry struct {
 	*Entry
 }
 
+// semCheckMaxElements checks whether the max-element argument is valid, and returns the specified value.
+func semCheckMaxElements(v *Value) (uint64, error) {
+	if v == nil || v.Name == "unbounded" {
+		return math.MaxUint64, nil
+	}
+	val, err := strconv.ParseUint(v.Name, 10, 64)
+	if err != nil {
+		return val, fmt.Errorf(`invalid max-elements value %q (expect "unbounded" or a non-negative integer): %v`, v.Name, err)
+	}
+	return val, nil
+}
+
+// semCheckMaxElements checks whether the min-element argument is valid, and returns the specified value.
+func semCheckMinElements(v *Value) (uint64, error) {
+	if v == nil {
+		return 0, nil
+	}
+	val, err := strconv.ParseUint(v.Name, 10, 64)
+	if err != nil {
+		return val, fmt.Errorf(`invalid min-elements value %q (expect a non-negative integer): %v`, v.Name, err)
+	}
+	return val, nil
+}
+
 // ToEntry expands node n into a directory Entry.  Expansion is based on the
 // YANG tags in the structure behind n.  ToEntry must only be used
 // with nodes that are directories, such as top level modules and sub-modules.
@@ -562,9 +598,14 @@ func ToEntry(n Node) (e *Entry) {
 
 		e := ToEntry(leaf)
 		e.ListAttr = &ListAttr{
-			MinElements: s.MinElements,
-			MaxElements: s.MaxElements,
-			OrderedBy:   s.OrderedBy,
+			OrderedBy: s.OrderedBy,
+		}
+		var err error
+		if e.ListAttr.MaxElements, err = semCheckMaxElements(s.MaxElements); err != nil {
+			e.addError(fmt.Errorf("%s: %v", Source(n), err))
+		}
+		if e.ListAttr.MinElements, err = semCheckMinElements(s.MinElements); err != nil {
+			e.addError(fmt.Errorf("%s: %v", Source(n), err))
 		}
 		e.Prefix = getRootPrefix(e)
 		return e
@@ -588,9 +629,14 @@ func ToEntry(n Node) (e *Entry) {
 	switch s := n.(type) {
 	case *List:
 		e.ListAttr = &ListAttr{
-			MinElements: s.MinElements,
-			MaxElements: s.MaxElements,
-			OrderedBy:   s.OrderedBy,
+			OrderedBy: s.OrderedBy,
+		}
+		var err error
+		if e.ListAttr.MaxElements, err = semCheckMaxElements(s.MaxElements); err != nil {
+			e.addError(fmt.Errorf("%s: %v", Source(n), err))
+		}
+		if e.ListAttr.MinElements, err = semCheckMinElements(s.MinElements); err != nil {
+			e.addError(fmt.Errorf("%s: %v", Source(n), err))
 		}
 	case *Choice:
 		e.Kind = ChoiceEntry
@@ -880,10 +926,20 @@ func ToEntry(n Node) (e *Entry) {
 				e.ListAttr = &ListAttr{}
 			}
 
-			if name == "max-elements" {
-				e.ListAttr.MaxElements = v
-			} else {
-				e.ListAttr.MinElements = v
+			// Only record the deviation if the statement exists.
+			if v != nil {
+				var err error
+				if name == "max-elements" {
+					e.deviatePresence.hasMaxElements = true
+					if e.ListAttr.MaxElements, err = semCheckMaxElements(v); err != nil {
+						e.addError(fmt.Errorf("%s: %v", Source(n), err))
+					}
+				} else {
+					e.deviatePresence.hasMinElements = true
+					if e.ListAttr.MinElements, err = semCheckMinElements(v); err != nil {
+						e.addError(fmt.Errorf("%s: %v", Source(n), err))
+					}
+				}
 			}
 		case "units":
 			v, ok := fv.Interface().(*Value)
@@ -1006,7 +1062,7 @@ func (e *Entry) ApplyDeviate() []error {
 						deviatedNode.Mandatory = devSpec.Mandatory
 					}
 
-					if devSpec.ListAttr != nil && devSpec.ListAttr.MinElements != nil {
+					if devSpec.deviatePresence.hasMinElements {
 						if !deviatedNode.IsList() && !deviatedNode.IsLeafList() {
 							appendErr(fmt.Errorf("tried to deviate min-elements on a non-list type %s", deviatedNode.Kind))
 							continue
@@ -1014,7 +1070,7 @@ func (e *Entry) ApplyDeviate() []error {
 						deviatedNode.ListAttr.MinElements = devSpec.ListAttr.MinElements
 					}
 
-					if devSpec.ListAttr != nil && devSpec.ListAttr.MaxElements != nil {
+					if devSpec.deviatePresence.hasMaxElements {
 						if !deviatedNode.IsList() && !deviatedNode.IsLeafList() {
 							appendErr(fmt.Errorf("tried to deviate max-elements on a non-list type %s", deviatedNode.Kind))
 							continue
@@ -1049,6 +1105,31 @@ func (e *Entry) ApplyDeviate() []error {
 					if devSpec.Mandatory != TSUnset {
 						devSpec.Mandatory = TSUnset
 					}
+
+					if devSpec.deviatePresence.hasMinElements {
+						if !deviatedNode.IsList() && !deviatedNode.IsLeafList() {
+							appendErr(fmt.Errorf("tried to deviate min-elements on a non-list type %s", deviatedNode.Kind))
+							continue
+						}
+						if deviatedNode.ListAttr.MinElements != devSpec.ListAttr.MinElements {
+							// Argument value must match:
+							// https://tools.ietf.org/html/rfc7950#section-7.20.3.2
+							appendErr(fmt.Errorf("min-element value %d differs from deviation's min-element value %d for entry %v", devSpec.ListAttr.MinElements, deviatedNode.ListAttr.MinElements, d.DeviatedPath))
+						}
+						deviatedNode.ListAttr.MinElements = 0
+					}
+
+					if devSpec.deviatePresence.hasMaxElements {
+						if !deviatedNode.IsList() && !deviatedNode.IsLeafList() {
+							appendErr(fmt.Errorf("tried to deviate max-elements on a non-list type %s", deviatedNode.Kind))
+							continue
+						}
+						if deviatedNode.ListAttr.MaxElements != devSpec.ListAttr.MaxElements {
+							appendErr(fmt.Errorf("max-element value %d differs from deviation's max-element value %d for entry %v", devSpec.ListAttr.MaxElements, deviatedNode.ListAttr.MaxElements, d.DeviatedPath))
+						}
+						deviatedNode.ListAttr.MaxElements = math.MaxUint64
+					}
+
 				default:
 					appendErr(fmt.Errorf("invalid deviation type %s", dt))
 				}
