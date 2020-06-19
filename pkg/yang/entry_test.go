@@ -119,6 +119,37 @@ module base {
 			`bad-augment.yang:6:3: augment erewhon not found`,
 		},
 	},
+	{
+		name: "bad-min-max-elements.yang",
+		in: `
+module base {
+  namespace "urn:mod";
+  prefix "base";
+  list foo {
+    // bad arguments to min-elements and max-elements
+    min-elements bar;
+    max-elements -5;
+  }
+  leaf-list bar {
+    type string;
+    // bad arguments to min-elements and max-elements
+    min-elements unbounded;
+    max-elements 122222222222222222222222222222222222222222222222222222222222;
+  }
+  list baz {
+    // good arguments
+    min-elements 0;
+    max-elements unbounded;
+  }
+}
+`,
+		errors: []string{
+			`bad-min-max-elements.yang:7:5: invalid min-elements value`,
+			`bad-min-max-elements.yang:8:5: invalid max-elements value`,
+			`bad-min-max-elements.yang:13:5: invalid min-elements value`,
+			`bad-min-max-elements.yang:14:5: invalid max-elements value`,
+		},
+	},
 }
 
 func TestBadYang(t *testing.T) {
@@ -134,7 +165,7 @@ func TestBadYang(t *testing.T) {
 		} else {
 			ok := true
 			for x, err := range errs {
-				if err.Error() != tt.errors[x] {
+				if !strings.Contains(err.Error(), tt.errors[x]) {
 					ok = false
 					break
 				}

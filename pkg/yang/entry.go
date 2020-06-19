@@ -492,7 +492,7 @@ func semCheckMaxElements(v *Value) (uint64, error) {
 	}
 	val, err := strconv.ParseUint(v.Name, 10, 64)
 	if err != nil {
-		return val, fmt.Errorf(`invalid max-elements value %q (expect "unbounded" or a non-negative integer): %v`, v.Name, err)
+		return val, fmt.Errorf(`%s: invalid max-elements value %q (expect "unbounded" or a non-negative integer): %v`, Source(v), v.Name, err)
 	}
 	return val, nil
 }
@@ -504,7 +504,7 @@ func semCheckMinElements(v *Value) (uint64, error) {
 	}
 	val, err := strconv.ParseUint(v.Name, 10, 64)
 	if err != nil {
-		return val, fmt.Errorf(`invalid min-elements value %q (expect a non-negative integer): %v`, v.Name, err)
+		return val, fmt.Errorf(`%s: invalid min-elements value %q (expect a non-negative integer): %v`, Source(v), v.Name, err)
 	}
 	return val, nil
 }
@@ -602,10 +602,10 @@ func ToEntry(n Node) (e *Entry) {
 		}
 		var err error
 		if e.ListAttr.MaxElements, err = semCheckMaxElements(s.MaxElements); err != nil {
-			e.addError(fmt.Errorf("%s: %v", Source(n), err))
+			e.addError(err)
 		}
 		if e.ListAttr.MinElements, err = semCheckMinElements(s.MinElements); err != nil {
-			e.addError(fmt.Errorf("%s: %v", Source(n), err))
+			e.addError(err)
 		}
 		e.Prefix = getRootPrefix(e)
 		return e
@@ -633,10 +633,10 @@ func ToEntry(n Node) (e *Entry) {
 		}
 		var err error
 		if e.ListAttr.MaxElements, err = semCheckMaxElements(s.MaxElements); err != nil {
-			e.addError(fmt.Errorf("%s: %v", Source(n), err))
+			e.addError(err)
 		}
 		if e.ListAttr.MinElements, err = semCheckMinElements(s.MinElements); err != nil {
-			e.addError(fmt.Errorf("%s: %v", Source(n), err))
+			e.addError(err)
 		}
 	case *Choice:
 		e.Kind = ChoiceEntry
@@ -932,12 +932,12 @@ func ToEntry(n Node) (e *Entry) {
 				if name == "max-elements" {
 					e.deviatePresence.hasMaxElements = true
 					if e.ListAttr.MaxElements, err = semCheckMaxElements(v); err != nil {
-						e.addError(fmt.Errorf("%s: %v", Source(n), err))
+						e.addError(err)
 					}
 				} else {
 					e.deviatePresence.hasMinElements = true
 					if e.ListAttr.MinElements, err = semCheckMinElements(v); err != nil {
-						e.addError(fmt.Errorf("%s: %v", Source(n), err))
+						e.addError(err)
 					}
 				}
 			}
