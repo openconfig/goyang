@@ -37,29 +37,46 @@ jobs:
     - name: Race Test
       run: go test -race ./...
 
-    - name: Go vet
-      run: go vet ./...
-
-    - name: Staticcheck
-      run: |
-        go get -u honnef.co/go/tools/cmd/staticcheck
-        staticcheck ./...
-
-    - name: Send Coverage
-      uses: shogo82148/actions-goveralls@v1
-      with:
-        path-to-profile: profile.cov
-        parallel: true
-  
-    - name: Check gofmt
-      run: diff -u <(echo -n) <(gofmt -d -s .)
-    
-  finish:
-    needs: build
+  static_analysis:
+    name: Static Analysis
     runs-on: ubuntu-latest
-    steps:
-      - uses: shogo82148/actions-goveralls@v1
-        with:
-          parallel-finished: true
-    
 
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.14'
+        id: go
+
+      - name: Install required static analysis tools
+        run: |
+          go get -u honnef.co/go/tools/cmd/staticcheck
+
+      - name: Check out ygot code
+        uses: actions/checkout@v2
+
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Generate coverage profile
+        run: go test -coverprofile=profile.cov ./... 
+
+      - name: Go vet
+        run: go vet ./...
+
+      - name: Check gofmt
+        run: diff -u <(echo -n) <(gofmt -d -s .)
+
+      - name: Staticcheck
+        run: |
+          go get -u honnef.co/go/tools/cmd/staticcheck
+          staticcheck ./...
+
+      - name: Coveralls
+        uses: coverallsapp/github-action@v1.1.1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
