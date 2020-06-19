@@ -39,12 +39,7 @@ jobs:
 
     - name: Go vet
       run: go vet ./...
-
-    - name: Staticcheck
-      run: |
-        go get -u honnef.co/go/tools/cmd/staticcheck
-        staticcheck ./...
-
+    
     - name: Send Coverage
       uses: shogo82148/actions-goveralls@v1
       with:
