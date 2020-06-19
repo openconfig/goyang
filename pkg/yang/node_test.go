@@ -22,6 +22,47 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestNodePath(t *testing.T) {
+	tests := []struct {
+		desc string
+		in   Node
+		want string
+	}{{
+		desc: "basic",
+		in: &Leaf{
+			Name: "bar",
+			Parent: &Container{
+				Name: "c",
+				Parent: &List{
+					Name: "b",
+					Parent: &Module{
+						Name: "foo",
+					},
+				},
+			},
+		},
+		want: "/foo/b/c/bar",
+	}, {
+		desc: "nil input node",
+		in:   nil,
+		want: "",
+	}, {
+		desc: "single node",
+		in: &Module{
+			Name: "foo",
+		},
+		want: "/foo",
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			if diff := cmp.Diff(NodePath(tt.in), tt.want); diff != "" {
+				t.Errorf("(-got, +want):\n%s", diff)
+			}
+		})
+	}
+}
+
 // TestNode provides a framework for processing tests that can check particular
 // nodes being added to the grammar. It can be used to ensure that particular
 // statement combinations are supported, especially where they are opaque to

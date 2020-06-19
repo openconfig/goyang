@@ -151,6 +151,16 @@ func RootNode(n Node) *Module {
 	return nil
 }
 
+// NodePath returns the full path of the node from the module name.
+func NodePath(n Node) string {
+	var path string
+	for n != nil {
+		path = "/" + n.NName() + path
+		n = n.ParentNode()
+	}
+	return path
+}
+
 // FindNode finds the node referenced by path relative to n.  If path does not
 // reference a node then nil is returned (i.e. path not found).  The path looks
 // similar to an XPath but curently has no wildcarding.  For example:
