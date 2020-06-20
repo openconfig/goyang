@@ -263,7 +263,7 @@ func (l *lexer) next() (rune rune) {
 // not found in the valid set.  It returns true if any runes were accepted.
 func (l *lexer) acceptRun(valid string) bool {
 	ret := false
-	for strings.IndexRune(valid, l.next()) >= 0 {
+	for strings.ContainsRune(valid, l.next()) {
 		ret = true
 	}
 	l.backup()

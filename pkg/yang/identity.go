@@ -94,7 +94,6 @@ func (mod *Module) findIdentityBase(baseStr string) (*resolvedIdentity, []error)
 		if !ok {
 			errs = append(errs, fmt.Errorf("%s: can't resolve the local base %s as %s", source, baseStr, keyName))
 		}
-		break
 	default:
 		// The identity we are looking for is prefix:basename.  If
 		// we already know prefix:basename then just use it.  If not,

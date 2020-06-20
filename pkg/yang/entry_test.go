@@ -37,8 +37,6 @@ func TestNilEntry(t *testing.T) {
 	}
 	errs := e.GetErrors()
 	switch len(errs) {
-	case 0:
-		t.Fatalf("GetErrors returned no error")
 	default:
 		t.Errorf("got %d errors, wanted 1", len(errs))
 		fallthrough
@@ -48,6 +46,8 @@ func TestNilEntry(t *testing.T) {
 		if got != want {
 			t.Fatalf("got error %q, want %q", got, want)
 		}
+	case 0:
+		t.Fatalf("GetErrors returned no error")
 	}
 }
 

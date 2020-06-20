@@ -197,7 +197,6 @@ func FindNode(n Node, path string) (Node, error) {
 				return nil, fmt.Errorf("%s: unknown module %s", m.Name, mod.BelongsTo.Name)
 			}
 			if prefix == "" || prefix == mod.BelongsTo.Prefix.Name {
-				mod = m
 				goto processing
 			}
 			mod = m
