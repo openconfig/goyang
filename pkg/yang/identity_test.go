@@ -128,14 +128,14 @@ func TestIdentityExtract(t *testing.T) {
 			}
 
 			if ti.baseName != "" {
-				if ti.baseName != thisID.Base.Name {
+				if ti.baseName != thisID.Base[0].Name {
 					t.Errorf("Identity %s did not have expected base %s, had %s", ti.name,
-						ti.baseName, thisID.Base.Name)
+						ti.baseName, thisID.Base[0].Name)
 				}
 			} else {
 				if thisID.Base != nil {
 					t.Errorf("Identity %s had an unexpected base %s", thisID.Name,
-						thisID.Base.Name)
+						thisID.Base[0].Name)
 				}
 			}
 		}
@@ -439,9 +439,9 @@ func TestIdentityTree(t *testing.T) {
 			}
 
 			if chkID.baseName != "" {
-				if chkID.baseName != foundID.Base.Name {
+				if chkID.baseName != foundID.Base[0].Name {
 					t.Errorf("Couldn't find base %s for ID %s", chkID.baseName,
-						foundID.Base.Name)
+						foundID.Base[0].Name)
 				}
 			}
 
