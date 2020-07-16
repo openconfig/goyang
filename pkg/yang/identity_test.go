@@ -33,10 +33,11 @@ type idrefOut struct {
 
 // identityOut is the output for a particular identity within the test case.
 type identityOut struct {
-	module   string   // The module that the identity is within.
-	name     string   // The name of the identity.
-	baseName string   // The base of the identity as a string.
-	values   []string // The string names of derived identities.
+	module    string   // The module that the identity is within.
+	name      string   // The name of the identity.
+	baseName  string   // The base of the identity as a string.
+	baseNames []string // The bases of the identity in test cases with multiple bases
+	values    []string // The string names of derived identities.
 }
 
 // identityTestCase is a test case for a module which contains identities.
@@ -94,6 +95,32 @@ var basicTestCases = []identityTestCase{
 		},
 		err: "basic-test-case-2: could not resolve identities",
 	},
+	{
+		name: "basic-test-case-3: Check identity with multiple bases.",
+		in: []inputModule{
+			{
+				name: "idtest-three",
+				content: `
+					module idtest-three {
+					  namespace "urn:idthree";
+					  prefix "idthree";
+
+					  identity BASE_ONE;
+					  identity BASE_TWO;
+					  identity TEST_CHILD_WITH_MULTIPLE_BASES {
+						base BASE_ONE;
+						base BASE_TWO;
+					  }
+					}
+				`},
+		},
+		identities: []identityOut{
+			{module: "idtest-three", name: "BASE_ONE"},
+			{module: "idtest-three", name: "BASE_TWO"},
+			{module: "idtest-three", name: "TEST_CHILD_WITH_MULTIPLE_BASES", baseNames: []string{"BASE_ONE", "BASE_TWO"}},
+		},
+		err: "basic-test-case-3: could not resolve identities",
+	},
 }
 
 // Test the ability to extract identities from a module with the correct base
@@ -131,6 +158,15 @@ func TestIdentityExtract(t *testing.T) {
 				if ti.baseName != thisID.Base[0].Name {
 					t.Errorf("Identity %s did not have expected base %s, had %s", ti.name,
 						ti.baseName, thisID.Base[0].Name)
+				}
+			} else if len(ti.baseNames) >= 1 {
+				actualBaseNames := []string{}
+				for _, base := range thisID.Base {
+					actualBaseNames = append(actualBaseNames, base.Name)
+				}
+				if !reflect.DeepEqual(ti.baseNames, actualBaseNames) {
+					t.Errorf("Identity %s did not have expected base %s, had %s", ti.name,
+						ti.baseNames, actualBaseNames)
 				}
 			} else {
 				if thisID.Base != nil {
