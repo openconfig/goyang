@@ -44,7 +44,7 @@ func AddPath(paths ...string) {
 	}
 }
 
-// PathsWithModules returns all paths  under and including the
+// PathsWithModules returns all paths under and including the
 // root containing files with a ".yang" extension, as well as
 // any error encountered
 func PathsWithModules(root string) (paths []string, err error) {
