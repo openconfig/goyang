@@ -30,7 +30,7 @@
 // to append to the search directory.  If DIR appears as DIR/... then
 // DIR and all direct and indirect subdirectories are checked.
 //
-// FORMAT, which defaults to "tree", specifes the format of output to produce.
+// FORMAT, which defaults to "tree", specifies the format of output to produce.
 // Use "goyang --help" for a list of available formats.
 //
 // FORMAT OPTIONS are flags that apply to a specific format.  They must follow

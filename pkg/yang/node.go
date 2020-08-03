@@ -163,7 +163,7 @@ func NodePath(n Node) string {
 
 // FindNode finds the node referenced by path relative to n.  If path does not
 // reference a node then nil is returned (i.e. path not found).  The path looks
-// similar to an XPath but curently has no wildcarding.  For example:
+// similar to an XPath but currently has no wildcarding.  For example:
 // "/if:interfaces/if:interface" and "../config".
 func FindNode(n Node, path string) (Node, error) {
 	if path == "" {

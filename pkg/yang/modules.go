@@ -72,9 +72,9 @@ func (ms *Modules) Parse(data, name string) error {
 
 // GetModule returns the Entry of the module named by name.  GetModule will
 // search for and read the file named name + ".yang" if it cannot satisfy the
-// request from what it has currntly read.
+// request from what it has currently read.
 //
-// GetModule is a convience function for calling Read and Process, and
+// GetModule is a convenience function for calling Read and Process, and
 // then looking up the module name.  It is safe to call Read and Process prior
 // to calling GetModule.
 func (ms *Modules) GetModule(name string) (*Entry, []error) {
@@ -100,7 +100,7 @@ func (ms *Modules) GetModule(name string) (*Entry, []error) {
 // with the suffix ".yang".  GetModule either returns an Entry or returns
 // one or more errors.
 //
-// GetModule is a convience function for calling NewModules, Read, and Process,
+// GetModule is a convenience function for calling NewModules, Read, and Process,
 // and then looking up the module name.
 func GetModule(name string, sources ...string) (*Entry, []error) {
 	var errs []error

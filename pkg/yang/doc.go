@@ -14,7 +14,7 @@
 
 // Package yang is used to parse .yang files (see RFC 6020).
 //
-// A generic yang statments takes one of the forms:
+// A generic yang statements takes one of the forms:
 //
 //    keyword [argument] ;
 //    keyword [argument] { [statement [...]] }
