@@ -19,8 +19,8 @@ package yang
 // based on the various Node types (see yang.go).
 //
 // The initTypes function generates the functions that actually fill in the
-// various Node structuers defined in yang.go.  BuildAST uses those functions to
-// convert generic Statments into an AST.
+// various Node structures defined in yang.go.  BuildAST uses those functions to
+// convert generic Statements into an AST.
 
 import (
 	"errors"

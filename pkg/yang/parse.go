@@ -14,7 +14,7 @@
 
 package yang
 
-// Thile file implements Parse, which  parses the input as generic YANG and
+// This file implements Parse, which  parses the input as generic YANG and
 // returns a slice of base Statements (which in turn may contain more
 // Statements, i.e., a slice of Statement trees.)
 //
@@ -67,8 +67,6 @@ func FakeStatement(keyword, file string, line, col int) *Statement {
 	}
 }
 
-// Make Statement statisfy Node
-
 func (s *Statement) NName() string         { return s.Argument }
 func (s *Statement) Kind() string          { return s.Keyword }
 func (s *Statement) Statement() *Statement { return s }
@@ -92,7 +90,7 @@ func (s *Statement) String() string {
 	return b.String()
 }
 
-// Location returns the loction in the source where s was defined.
+// Location returns the location in the source where s was defined.
 func (s *Statement) Location() string {
 	switch {
 	case s.file == "" && s.line == 0:

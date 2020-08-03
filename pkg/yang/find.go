@@ -54,7 +54,7 @@ func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 		// always a pointer to a structure,
 		e := reflect.ValueOf(n).Elem()
 		if !e.IsValid() {
-			// TODO(borman): we shoud return an error somehow
+			// TODO(borman): we should return an error somehow
 			fmt.Fprintf(os.Stderr, "%s: unknown grouping\n", name)
 			return nil
 		}

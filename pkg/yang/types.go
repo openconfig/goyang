@@ -23,7 +23,7 @@ import (
 	"sync"
 )
 
-// A typeDictionary is a dictonary of all Typedefs defined in all Typedefers.
+// A typeDictionary is a dictionary of all Typedefs defined in all Typedefers.
 // A map of Nodes is used rather than a map of Typedefers to simplify usage
 // when traversing up a Node tree.
 type typeDictionary struct {

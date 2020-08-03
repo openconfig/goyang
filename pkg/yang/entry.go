@@ -424,7 +424,7 @@ var entryCache = map[Node]*Entry{}
 // the name of the including (sub)module and the included submodule.
 var mergedSubmodule = map[string]bool{}
 
-// deviationType specifies an enumerated value covering the different substmts
+// deviationType specifies an enumerated value covering the different substatements
 // to the deviate statement.
 type deviationType int64
 
@@ -451,7 +451,7 @@ var (
 		DeviationUnset:        "unknown",
 	}
 
-	// toDeviation maps from the YANG keyword to an enumerated deviation typee.
+	// toDeviation maps from the YANG keyword to an enumerated deviation type.
 	toDeviation = map[string]deviationType{
 		"not-supported": DeviationNotSupported,
 		"add":           DeviationAdd,
@@ -1272,7 +1272,7 @@ func (e *Entry) InstantiatingModule() (string, error) {
 }
 
 // shallowDup makes a shallow duplicate of e (only direct children are
-// duplicated; grandchildren and deeper descedents are deleted).
+// duplicated; grandchildren and deeper descendants are deleted).
 func (e *Entry) shallowDup() *Entry {
 	// Warning: if we add any elements to Entry that should not be
 	// copied we will have to explicitly uncopy them.
