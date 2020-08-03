@@ -50,7 +50,7 @@ func (ms *Modules) Read(name string) error {
 	if err != nil {
 		return err
 	}
-	return ms.Parse(string(data), name)
+	return ms.Parse(data, name)
 }
 
 // Parse parses data as YANG source and adds it to ms.  The name should reflect
