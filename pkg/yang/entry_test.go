@@ -1021,6 +1021,39 @@ module defaults {
     uses common;
   }
 
+  grouping leaflist-common {
+    container common-nodefault {
+      leaf string {
+        type string;
+      }
+    }
+    container common-withdefault {
+      leaf-list string {
+        type string;
+        default "default value";
+      }
+    }
+    container common-typedef-withdefault {
+      leaf string {
+        type string-default;
+      }
+    }
+  }
+
+  container leaflist-defaults {
+    leaf-list uint32-withdefault {
+      type uint32;
+      default "13";
+    }
+    leaf-list string-withdefault {
+      type string-default;
+    }
+    leaf-list nodefault {
+      type string;
+    }
+    uses leaflist-common;
+  }
+
 }
 `
 
@@ -1060,6 +1093,30 @@ module defaults {
 		{
 			path: []string{"defaults", "mandatory-default"},
 			want: "",
+		},
+		{
+			path: []string{"leaflist-defaults", "uint32-withdefault"},
+			want: "13",
+		},
+		{
+			path: []string{"leaflist-defaults", "string-withdefault"},
+			want: "typedef default value",
+		},
+		{
+			path: []string{"leaflist-defaults", "nodefault"},
+			want: "",
+		},
+		{
+			path: []string{"leaflist-defaults", "common-nodefault", "string"},
+			want: "",
+		},
+		{
+			path: []string{"leaflist-defaults", "common-withdefault", "string"},
+			want: "default value",
+		},
+		{
+			path: []string{"leaflist-defaults", "common-typedef-withdefault", "string"},
+			want: "typedef default value",
 		},
 	} {
 		tname := strings.Join(tc.path, "/")

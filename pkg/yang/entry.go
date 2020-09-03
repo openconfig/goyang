@@ -565,6 +565,9 @@ func ToEntry(n Node) (e *Entry) {
 			MaxElements: s.MaxElements,
 			OrderedBy:   s.OrderedBy,
 		}
+		if s.Default != nil {
+			e.Default = s.Default.Name
+		}
 		e.Prefix = getRootPrefix(e)
 		addExtraKeywordsToLeafEntry(n, e)
 		return e
