@@ -112,7 +112,7 @@ func findFile(name string) (string, string, error) {
 		if filepath.Base(dir) == "..." {
 			n = scanDir(filepath.Dir(dir), name, true)
 		} else {
-			n = filepath.Join(dir, name)
+			n = scanDir(dir, name, false)
 		}
 		if n == "" {
 			continue
