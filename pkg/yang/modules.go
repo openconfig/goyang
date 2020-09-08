@@ -184,9 +184,12 @@ func (ms *Modules) FindModule(n Node) *Module {
 		return n
 	}
 
-	// Try to read it in.
-	if err := ms.Read(name); err != nil {
-		return nil
+	// Try to read first a module by revision
+	if err := ms.Read(rev); err != nil {
+		// if failed, try to read a module by its bare name
+		if err := ms.Read(name); err != nil {
+			return nil
+		}
 	}
 	if n := m[rev]; n != nil {
 		return n
