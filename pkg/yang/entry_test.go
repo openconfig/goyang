@@ -2204,8 +2204,11 @@ func TestEntryFind(t *testing.T) {
 			"/c/t:d":                "/test/c/d",
 			"../t:rpc1/input":       "/test/rpc1/input",
 			"/t:rpc1/input":         "/test/rpc1/input",
+			"/t:rpc1/t:input":       "/test/rpc1/input",
 			"/t:e/operation/input":  "/test/e/operation/input",
 			"/t:e/operation/output": "/test/e/operation/output",
+			"/t:e/t:operation/t:input": "/test/e/operation/input",
+			"/t:e/t:operation/t:output": "/test/e/operation/output",
 		},
 	}, {
 		name: "inter-module find",
