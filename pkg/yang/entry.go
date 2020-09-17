@@ -1198,6 +1198,7 @@ func (e *Entry) Find(name string) *Entry {
 		case part == "..":
 			e = e.Parent
 		case e.RPC != nil:
+			_, part = getPrefix(part)
 			switch part {
 			case "input":
 				e = e.RPC.Input
