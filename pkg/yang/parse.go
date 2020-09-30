@@ -35,6 +35,8 @@ type parser struct {
 	errout *bytes.Buffer
 	tokens []*token // stack of pushed tokens (for backing up)
 
+	statementDepth int
+
 	// hitBrace is returned when we encounter a '}'.  The statement location
 	// is updated with the location of the '}'.  The brace may be legitimate
 	// but only the caller will know if it is.  That is, the brace may be
@@ -188,6 +190,8 @@ Loop:
 		}
 	}
 
+	p.checkStatementDepth()
+
 	if p.errout.Len() == 0 {
 		return statements, nil
 	}
@@ -270,6 +274,7 @@ func (p *parser) nextStatement() *Statement {
 	case tEOF:
 		return nil
 	case closeBrace:
+		p.statementDepth -= 1
 		p.hitBrace.file = t.File
 		p.hitBrace.line = t.Line
 		p.hitBrace.col = t.Col
@@ -306,6 +311,7 @@ func (p *parser) nextStatement() *Statement {
 	case ';':
 		return s
 	case openBrace:
+		p.statementDepth += 1
 		for {
 			switch ns := p.nextStatement(); ns {
 			case nil:
@@ -319,5 +325,28 @@ func (p *parser) nextStatement() *Statement {
 	default:
 		fmt.Fprintf(p.errout, "%v: syntax error\n", t)
 		return ignoreMe
+	}
+}
+
+// Checks that we have a statement depth of 0. It's an error to exit
+// the parser with a depth of > 0, it means we are missing closing
+// braces. Note: the parser will error out for the case where we
+// start with an unmatched close brace
+//
+// This test is only done if there are no other errors as
+// we may exit early due to those errors -- and therefore there *might*
+// not really be a mismatched brace issue.
+func (p *parser) checkStatementDepth() {
+	// don't check if there are other errors
+	if p.errout.Len() > 0 {
+		return
+	}
+	if p.statementDepth > 0 {
+		plural := ""
+		if p.statementDepth > 1 {
+			plural = "s"
+		}
+		fmt.Fprintf(p.errout, "%s:%d:%d: missing %d closing brace%s\n",
+			p.lex.file, p.lex.line, p.lex.col, p.statementDepth, plural)
 	}
 }
