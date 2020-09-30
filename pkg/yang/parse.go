@@ -331,22 +331,20 @@ func (p *parser) nextStatement() *Statement {
 // Checks that we have a statement depth of 0. It's an error to exit
 // the parser with a depth of > 0, it means we are missing closing
 // braces. Note: the parser will error out for the case where we
-// start with an unmatched close brace
+// start with an unmatched close brace, eg. depth < 0
 //
 // This test is only done if there are no other errors as
 // we may exit early due to those errors -- and therefore there *might*
 // not really be a mismatched brace issue.
 func (p *parser) checkStatementDepth() {
-	// don't check if there are other errors
-	if p.errout.Len() > 0 {
+	if p.errout.Len() > 0 || p.statementDepth < 1 {
 		return
 	}
-	if p.statementDepth > 0 {
-		plural := ""
-		if p.statementDepth > 1 {
-			plural = "s"
-		}
-		fmt.Fprintf(p.errout, "%s:%d:%d: missing %d closing brace%s\n",
-			p.lex.file, p.lex.line, p.lex.col, p.statementDepth, plural)
+
+	plural := ""
+	if p.statementDepth > 1 {
+		plural = "s"
 	}
+	fmt.Fprintf(p.errout, "%s:%d:%d: missing %d closing brace%s\n",
+		p.lex.file, p.lex.line, p.lex.col, p.statementDepth, plural)
 }
