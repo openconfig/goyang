@@ -269,6 +269,25 @@ test.yang:9:9: invalid escape sequence: \3
 test.yang:9:9: missing closing "
 test.yang: unexpected EOF`,
 		},
+		{line: line(), in: `
+module base {
+   container top-missing-close-brace {
+      leaf my-leaf {
+        type string;
+      }
+   }
+`,
+			err: "test.yang:8:0: missing 1 closing brace",
+		},
+		{line: line(), in: `
+module base {
+   container top-missing-close-brace {
+      leaf my-leaf {
+        type string;
+   }
+`,
+			err: "test.yang:7:0: missing 2 closing braces",
+		},
 	} {
 		s, err := Parse(tt.in, "test.yang")
 		if (s == nil) != (tt.out == nil) {
