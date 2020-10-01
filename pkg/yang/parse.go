@@ -35,6 +35,7 @@ type parser struct {
 	errout *bytes.Buffer
 	tokens []*token // stack of pushed tokens (for backing up)
 
+	// Depth of statements in nested braces
 	statementDepth int
 
 	// hitBrace is returned when we encounter a '}'.  The statement location
