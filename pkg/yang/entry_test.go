@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -118,6 +119,37 @@ module base {
 			`bad-augment.yang:6:3: augment erewhon not found`,
 		},
 	},
+	{
+		name: "bad-min-max-elements.yang",
+		in: `
+module base {
+  namespace "urn:mod";
+  prefix "base";
+  list foo {
+    // bad arguments to min-elements and max-elements
+    min-elements bar;
+    max-elements -5;
+  }
+  leaf-list bar {
+    type string;
+    // bad arguments to min-elements and max-elements
+    min-elements unbounded;
+    max-elements 122222222222222222222222222222222222222222222222222222222222;
+  }
+  list baz {
+    // good arguments
+    min-elements 0;
+    max-elements unbounded;
+  }
+}
+`,
+		errors: []string{
+			`bad-min-max-elements.yang:7:5: invalid min-elements value`,
+			`bad-min-max-elements.yang:8:5: invalid max-elements value`,
+			`bad-min-max-elements.yang:13:5: invalid min-elements value`,
+			`bad-min-max-elements.yang:14:5: invalid max-elements value`,
+		},
+	},
 }
 
 func TestBadYang(t *testing.T) {
@@ -133,7 +165,7 @@ func TestBadYang(t *testing.T) {
 		} else {
 			ok := true
 			for x, err := range errs {
-				if err.Error() != tt.errors[x] {
+				if !strings.Contains(err.Error(), tt.errors[x]) {
 					ok = false
 					break
 				}
@@ -2330,7 +2362,7 @@ func TestEntryTypes(t *testing.T) {
 
 	leafListSchema := &Entry{
 		Kind:     LeafEntry,
-		ListAttr: &ListAttr{MinElements: &Value{Name: "0"}},
+		ListAttr: &ListAttr{MinElements: 0},
 		Type:     &YangType{Kind: Ystring},
 		Name:     "leaf-list-schema",
 	}
@@ -2338,7 +2370,7 @@ func TestEntryTypes(t *testing.T) {
 	listSchema := &Entry{
 		Name:     "list-schema",
 		Kind:     DirectoryEntry,
-		ListAttr: &ListAttr{MinElements: &Value{Name: "0"}},
+		ListAttr: &ListAttr{MinElements: 0},
 		Dir: map[string]*Entry{
 			"leaf-name": {
 				Kind: LeafEntry,
@@ -2677,22 +2709,32 @@ func TestDeviation(t *testing.T) {
 				path: "/target/add/min-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MinElements: &Value{Name: "42"},
+						MinElements: 42,
+					},
+					deviatePresence: deviationPresence{
+						hasMinElements: true,
 					},
 				},
 			}, {
 				path: "/target/add/max-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MaxElements: &Value{Name: "42"},
+						MaxElements: 42,
+					},
+					deviatePresence: deviationPresence{
+						hasMaxElements: true,
 					},
 				},
 			}, {
 				path: "/target/add/max-and-min-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MinElements: &Value{Name: "42"},
-						MaxElements: &Value{Name: "42"},
+						MinElements: 42,
+						MaxElements: 42,
+					},
+					deviatePresence: deviationPresence{
+						hasMinElements: true,
+						hasMaxElements: true,
 					},
 				},
 			}, {
@@ -2732,6 +2774,42 @@ func TestDeviation(t *testing.T) {
 
 					deviation /a {
 						deviate add {
+							min-elements 42;
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "tried to deviate min-elements on a non-list type",
+	}, {
+		desc: "error case - deviation delete max-element on non-list",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a { type string; }
+
+					deviation /a {
+						deviate delete {
+							max-elements 42;
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "tried to deviate max-elements on a non-list type",
+	}, {
+		desc: "error case - deviation delete min elements on non-list",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a { type string; }
+
+					deviation /a {
+						deviate delete {
 							min-elements 42;
 						}
 					}
@@ -2819,22 +2897,32 @@ func TestDeviation(t *testing.T) {
 				path: "/target/replace/min-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MinElements: &Value{Name: "42"},
+						MinElements: 42,
+					},
+					deviatePresence: deviationPresence{
+						hasMinElements: true,
 					},
 				},
 			}, {
 				path: "/target/replace/max-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MaxElements: &Value{Name: "42"},
+						MaxElements: 42,
+					},
+					deviatePresence: deviationPresence{
+						hasMaxElements: true,
 					},
 				},
 			}, {
 				path: "/target/replace/max-and-min-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MinElements: &Value{Name: "42"},
-						MaxElements: &Value{Name: "42"},
+						MinElements: 42,
+						MaxElements: 42,
+					},
+					deviatePresence: deviationPresence{
+						hasMinElements: true,
+						hasMaxElements: true,
 					},
 				},
 			}, {
@@ -2870,22 +2958,32 @@ func TestDeviation(t *testing.T) {
 				path: "/target/delete/min-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MinElements: nil,
+						MinElements: 0,
+					},
+					deviatePresence: deviationPresence{
+						hasMinElements: true,
 					},
 				},
 			}, {
 				path: "/target/delete/max-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MaxElements: nil,
+						MaxElements: math.MaxUint64,
+					},
+					deviatePresence: deviationPresence{
+						hasMaxElements: true,
 					},
 				},
 			}, {
 				path: "/target/delete/max-and-min-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MinElements: nil,
-						MaxElements: nil,
+						MinElements: 0,
+						MaxElements: math.MaxUint64,
+					},
+					deviatePresence: deviationPresence{
+						hasMinElements: true,
+						hasMaxElements: true,
 					},
 				},
 			}, {
@@ -2895,6 +2993,45 @@ func TestDeviation(t *testing.T) {
 				},
 			}},
 		},
+	}, {
+		desc: "error case - deviation delete of min-elements has different keyword value",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf-list a { type string; }
+
+					deviation /a {
+						deviate delete {
+							min-elements 42;
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "differs from deviation's min-element value",
+	}, {
+		desc: "error case - deviation delete of max-elements has different keyword value",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf-list a {
+						type string;
+						max-elements 100;
+					}
+
+					deviation /a {
+						deviate delete {
+							max-elements 42;
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "differs from deviation's max-element value",
 	}, {
 		desc: "deviation using locally defined typedef",
 		inFiles: map[string]string{
@@ -3045,9 +3182,14 @@ func TestDeviation(t *testing.T) {
 							t.Errorf("%d (%s): listattr was nil for an entry expected to be a list at %s", idx, want.path, want.path)
 							continue
 						}
-						if want.entry.ListAttr.MinElements != nil {
-							if gotn, wantn := got.ListAttr.MinElements.Name, want.entry.ListAttr.MinElements.Name; gotn != wantn {
-								t.Errorf("%d (%s): min-elements, got: %v, want: %v", idx, want.path, gotn, wantn)
+						if want.entry.deviatePresence.hasMinElements {
+							if gotMin, wantMin := got.ListAttr.MinElements, want.entry.ListAttr.MinElements; gotMin != wantMin {
+								t.Errorf("%d (%s): min-elements, got: %v, want: %v", idx, want.path, gotMin, wantMin)
+							}
+						}
+						if want.entry.deviatePresence.hasMaxElements {
+							if gotMax, wantMax := got.ListAttr.MaxElements, want.entry.ListAttr.MaxElements; gotMax != wantMax {
+								t.Errorf("%d (%s): max-elements, got: %v, want: %v", idx, want.path, gotMax, wantMax)
 							}
 						}
 					}
