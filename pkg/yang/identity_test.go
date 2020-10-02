@@ -17,6 +17,8 @@ package yang
 import (
 	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 // inputModule is a mock input YANG module.
@@ -33,10 +35,10 @@ type idrefOut struct {
 
 // identityOut is the output for a particular identity within the test case.
 type identityOut struct {
-	module   string   // The module that the identity is within.
-	name     string   // The name of the identity.
-	baseName string   // The base of the identity as a string.
-	values   []string // The string names of derived identities.
+	module    string   // The module that the identity is within.
+	name      string   // The name of the identity.
+	baseNames []string // The base(s) of the identity as string(s).
+	values    []string // The string names of derived identities.
 }
 
 // identityTestCase is a test case for a module which contains identities.
@@ -46,6 +48,15 @@ type identityTestCase struct {
 	identities []identityOut // Slice of the identity values expected
 	idrefs     []idrefOut    // Slice of identityref results expected
 	err        string        // Test case error string
+}
+
+// getBaseNamesFrom is a utility function for getting the base name(s) of an identity
+func getBaseNamesFrom(i *Identity) []string {
+	baseNames := []string{}
+	for _, base := range i.Base {
+		baseNames = append(baseNames, base.Name)
+	}
+	return baseNames
 }
 
 // Test cases for basic identity extraction.
@@ -90,9 +101,35 @@ var basicTestCases = []identityTestCase{
 		identities: []identityOut{
 			{module: "idtest-two", name: "TEST_ID"},
 			{module: "idtest-two", name: "TEST_ID_TWO"},
-			{module: "idtest-two", name: "TEST_CHILD", baseName: "TEST_ID"},
+			{module: "idtest-two", name: "TEST_CHILD", baseNames: []string{"TEST_ID"}},
 		},
 		err: "basic-test-case-2: could not resolve identities",
+	},
+	{
+		name: "basic-test-case-3: Check identity with multiple bases.",
+		in: []inputModule{
+			{
+				name: "idtest-three",
+				content: `
+					module idtest-three {
+					  namespace "urn:idthree";
+					  prefix "idthree";
+
+					  identity BASE_ONE;
+					  identity BASE_TWO;
+					  identity TEST_CHILD_WITH_MULTIPLE_BASES {
+						base BASE_ONE;
+						base BASE_TWO;
+					  }
+					}
+				`},
+		},
+		identities: []identityOut{
+			{module: "idtest-three", name: "BASE_ONE"},
+			{module: "idtest-three", name: "BASE_TWO"},
+			{module: "idtest-three", name: "TEST_CHILD_WITH_MULTIPLE_BASES", baseNames: []string{"BASE_ONE", "BASE_TWO"}},
+		},
+		err: "basic-test-case-3: could not resolve identities",
 	},
 }
 
@@ -127,15 +164,15 @@ func TestIdentityExtract(t *testing.T) {
 				t.Errorf("Could not found identity %s in %s", ti.name, ti.module)
 			}
 
-			if ti.baseName != "" {
-				if ti.baseName != thisID.Base.Name {
-					t.Errorf("Identity %s did not have expected base %s, had %s", ti.name,
-						ti.baseName, thisID.Base.Name)
+			actualBaseNames := getBaseNamesFrom(thisID)
+			if len(ti.baseNames) > 0 {
+				if diff := cmp.Diff(actualBaseNames, ti.baseNames); diff != "" {
+					t.Errorf("(-got, +want):\n%s", diff)
 				}
 			} else {
 				if thisID.Base != nil {
-					t.Errorf("Identity %s had an unexpected base %s", thisID.Name,
-						thisID.Base.Name)
+					t.Errorf("Identity %s had unexpected base(s) %s", thisID.Name,
+						actualBaseNames)
 				}
 			}
 		}
@@ -179,9 +216,9 @@ var treeTestCases = []identityTestCase{
 				values: []string{"LOCAL_REMOTE_BASE"},
 			},
 			{
-				module:   "base",
-				name:     "LOCAL_REMOTE_BASE",
-				baseName: "r:REMOTE_BASE",
+				module:    "base",
+				name:      "LOCAL_REMOTE_BASE",
+				baseNames: []string{"r:REMOTE_BASE"},
 			},
 		},
 	},
@@ -231,31 +268,31 @@ var treeTestCases = []identityTestCase{
 				},
 			},
 			{
-				module:   "base",
-				name:     "GRANDFATHER",
-				baseName: "GREATGRANDFATHER",
-				values:   []string{"FATHER", "UNCLE", "SON", "BROTHER"},
+				module:    "base",
+				name:      "GRANDFATHER",
+				baseNames: []string{"GREATGRANDFATHER"},
+				values:    []string{"FATHER", "UNCLE", "SON", "BROTHER"},
 			},
 			{
-				module:   "base",
-				name:     "GREATUNCLE",
-				baseName: "GREATGRANDFATHER",
+				module:    "base",
+				name:      "GREATUNCLE",
+				baseNames: []string{"GREATGRANDFATHER"},
 			},
 			{
-				module:   "base",
-				name:     "FATHER",
-				baseName: "GRANDFATHER",
-				values:   []string{"SON", "BROTHER"},
+				module:    "base",
+				name:      "FATHER",
+				baseNames: []string{"GRANDFATHER"},
+				values:    []string{"SON", "BROTHER"},
 			},
 			{
-				module:   "base",
-				name:     "UNCLE",
-				baseName: "GRANDFATHER",
+				module:    "base",
+				name:      "UNCLE",
+				baseNames: []string{"GRANDFATHER"},
 			},
 			{
-				module:   "base",
-				name:     "BROTHER",
-				baseName: "FATHER",
+				module:    "base",
+				name:      "BROTHER",
+				baseNames: []string{"FATHER"},
 			},
 		},
 	},
@@ -288,9 +325,9 @@ var treeTestCases = []identityTestCase{
 				values: []string{"NOTBASE"},
 			},
 			{
-				module:   "base",
-				name:     "NOTBASE",
-				baseName: "BASE",
+				module:    "base",
+				name:      "NOTBASE",
+				baseNames: []string{"BASE"},
 			},
 		},
 		idrefs: []idrefOut{
@@ -334,9 +371,9 @@ var treeTestCases = []identityTestCase{
 				values: []string{"CHILD4"},
 			},
 			{
-				module:   "base4",
-				name:     "CHILD4",
-				baseName: "BASE4",
+				module:    "base4",
+				name:      "CHILD4",
+				baseNames: []string{"BASE4"},
 			},
 		},
 		idrefs: []idrefOut{
@@ -438,10 +475,10 @@ func TestIdentityTree(t *testing.T) {
 					chkID.module)
 			}
 
-			if chkID.baseName != "" {
-				if chkID.baseName != foundID.Base.Name {
-					t.Errorf("Couldn't find base %s for ID %s", chkID.baseName,
-						foundID.Base.Name)
+			if len(chkID.baseNames) > 0 {
+				actualBaseNames := getBaseNamesFrom(foundID)
+				if diff := cmp.Diff(actualBaseNames, chkID.baseNames); diff != "" {
+					t.Errorf("(-got, +want):\n%s", diff)
 				}
 			}
 
