@@ -142,6 +142,13 @@ type ListAttr struct {
 	OrderedBy   *Value // order of entries determined by "system" or "user"
 }
 
+func NewListAttr() *ListAttr {
+	return &ListAttr{
+		MinElements: 0,
+		MaxElements: math.MaxUint64,
+	}
+}
+
 // A UsesStmt associates a *Uses with its referenced grouping *Entry
 type UsesStmt struct {
 	Uses     *Uses
@@ -596,9 +603,8 @@ func ToEntry(n Node) (e *Entry) {
 		}
 
 		e := ToEntry(leaf)
-		e.ListAttr = &ListAttr{
-			OrderedBy: s.OrderedBy,
-		}
+		e.ListAttr = NewListAttr()
+		e.ListAttr.OrderedBy = s.OrderedBy
 		var err error
 		if e.ListAttr.MaxElements, err = semCheckMaxElements(s.MaxElements); err != nil {
 			e.addError(err)
@@ -630,9 +636,8 @@ func ToEntry(n Node) (e *Entry) {
 	// Nodes of identified special kinds have their Kind set here.
 	switch s := n.(type) {
 	case *List:
-		e.ListAttr = &ListAttr{
-			OrderedBy: s.OrderedBy,
-		}
+		e.ListAttr = NewListAttr()
+		e.ListAttr.OrderedBy = s.OrderedBy
 		var err error
 		if e.ListAttr.MaxElements, err = semCheckMaxElements(s.MaxElements); err != nil {
 			e.addError(err)
@@ -925,7 +930,7 @@ func ToEntry(n Node) (e *Entry) {
 			}
 
 			if e.ListAttr == nil {
-				e.ListAttr = &ListAttr{}
+				e.ListAttr = NewListAttr()
 			}
 
 			// Only record the deviation if the statement exists.
