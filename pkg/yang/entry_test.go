@@ -16,6 +16,7 @@ package yang
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -3341,5 +3342,101 @@ func TestLeafEntryTypes(t *testing.T) {
 			}
 			tt.wantEntryCustomTest(t, e)
 		})
+	}
+}
+
+func TestLess(t *testing.T) {
+	sErrors := sortedErrors{
+		{"testfile0", errors.New("test error0")},
+		{"testfile1", errors.New("test error1")},
+		{"testfile1:1", errors.New("test error2")},
+		{"testfile2:1", errors.New("test error3")},
+		{"testfile2:1:1", errors.New("test error4")},
+		{"testfile3:1:1:error5", errors.New("test error5")},
+		{"testfile3:1:2:error6", errors.New("test error6")},
+	}
+
+	tests := []struct {
+		desc string
+		i    int
+		j    int
+		want bool
+	}{{
+		desc: "compare two different strings without seperator ':'",
+		i:    0,
+		j:    1,
+		want: true,
+	}, {
+		desc: "compare two different strings without seperator ':'",
+		i:    1,
+		j:    0,
+		want: false,
+	}, {
+		desc: "compare one slice in a string with two slices in another string",
+		i:    1,
+		j:    2,
+		want: true,
+	}, {
+		desc: "compare two different strings with two slices each",
+		i:    2,
+		j:    3,
+		want: true,
+	}, {
+		desc: "compare two different strings with two slices each",
+		i:    3,
+		j:    2,
+		want: false,
+	}, {
+		desc: "compare two slices in a string with three slices in another string",
+		i:    3,
+		j:    4,
+		want: true,
+	}, {
+		desc: "compare three slices in a string with two slices in another string",
+		i:    4,
+		j:    3,
+		want: false,
+	}, {
+		desc: "compare two different strings with four slices each",
+		i:    5,
+		j:    6,
+		want: true,
+	}, {
+		desc: "compare two different strings with four slices each",
+		i:    6,
+		j:    5,
+		want: false,
+	}, {
+		desc: "compare two identical strings without separator ':'",
+		i:    1,
+		j:    1,
+		want: false,
+	}, {
+		desc: "compare two identical strings with two slices",
+		i:    2,
+		j:    2,
+		want: false,
+	}, {
+		desc: "compare two identical strings with three slices",
+		i:    4,
+		j:    4,
+		want: false,
+	}, {
+		desc: "compare two identical strings with four slices",
+		i:    5,
+		j:    5,
+		want: false,
+	}}
+	var cmpSymbol byte
+	for _, tt := range tests {
+		want := sErrors.Less(tt.i, tt.j)
+		if want != tt.want {
+			if want {
+				cmpSymbol = '<'
+			} else {
+				cmpSymbol = '>'
+			}
+			t.Errorf("%s: incorrect less comparison: \"%s\" %c \"%s\"", tt.desc, sErrors[tt.i].s, cmpSymbol, sErrors[tt.j].s)
+		}
 	}
 }
