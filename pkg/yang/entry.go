@@ -1464,8 +1464,12 @@ type sortedErrors []sError
 func (s sortedErrors) Len() int      { return len(s) }
 func (s sortedErrors) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func (s sortedErrors) Less(i, j int) bool {
-	fi := strings.SplitN(s[i].s, ":", 4)
-	fj := strings.SplitN(s[j].s, ":", 4)
+	// We expect the error strings to be composed of error messages,
+	// line numbers, etc. delimited by ":".
+	const errorSplitCount = 4
+	fi := strings.SplitN(s[i].s, ":", errorSplitCount)
+	fj := strings.SplitN(s[j].s, ":", errorSplitCount)
+	// First, order the errors by the file name.
 	if fi[0] < fj[0] {
 		return true
 	}
@@ -1475,19 +1479,23 @@ func (s sortedErrors) Less(i, j int) bool {
 
 	// compare compares field x to see which is less.
 	// numbers are compared as numbers.
+	// -1 means less than, 1 means greater or *equal* to and 0 means equal,
+	// thus far, but still undecided and need to see the rest of the elements.
 	compare := func(x int) int {
 		switch {
 		case len(fi) == x && len(fj) > x:
 			return -1
 		case len(fj) == x && len(fi) > x:
 			return 1
-		case len(fj) < x && len(fi) < x:
-			return 0
+		case len(fj) < x && len(fi) < x: // If neither element exist, then they're equal.
+			return 1
 		}
-		return nless(fi[x], fj[x])
+		return nless(fi[x-1], fj[x-1]) // Both slices have this index: compare them.
 	}
-	for x := 1; x < 4; x++ {
-		switch compare(1) {
+	// compare remaining indices of the error string slices
+	// in order to create a total ordering.
+	for x := 1; x < errorSplitCount; x++ {
+		switch compare(x) {
 		case -1:
 			return true
 		case 1:
