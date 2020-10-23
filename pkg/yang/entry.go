@@ -584,6 +584,8 @@ func ToEntry(n Node) (e *Entry) {
 		e.addError(err)
 		e.Prefix = getRootPrefix(e)
 		addExtraKeywordsToLeafEntry(n, e)
+		e.Mandatory, err = tristateValue(s.Mandatory)
+		e.addError(err)
 		return e
 	case *LeafList:
 		// Create the equivalent leaf element that we are a list of.
@@ -1136,7 +1138,7 @@ func (e *Entry) ApplyDeviate() []error {
 					}
 
 					if devSpec.Mandatory != TSUnset {
-						devSpec.Mandatory = TSUnset
+						deviatedNode.Mandatory = TSUnset
 					}
 
 					if devSpec.deviatePresence.hasMinElements {
