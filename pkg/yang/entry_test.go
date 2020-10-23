@@ -3213,7 +3213,7 @@ func TestDeviation(t *testing.T) {
 	}
 }
 
-func TestLeafEntryTypes(t *testing.T) {
+func TestLeafEntry(t *testing.T) {
 	tests := []struct {
 		name                string
 		inModules           map[string]string
@@ -3241,6 +3241,9 @@ func TestLeafEntryTypes(t *testing.T) {
 		wantEntryPath: "/test/gain-adjustment",
 		wantEntryCustomTest: func(t *testing.T, e *Entry) {
 			if got, want := e.Type.FractionDigits, 1; got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+			if got, want := e.Mandatory, TSUnset; got != want {
 				t.Errorf("got %d, want %d", got, want)
 			}
 			if diff := cmp.Diff(e.Type.Range, YangRange{Rf(-120, 120, 1)}); diff != "" {
@@ -3304,6 +3307,50 @@ func TestLeafEntryTypes(t *testing.T) {
 			`,
 		},
 		wantErrSubstr: "overriding of fraction-digits not allowed",
+	}, {
+		name: "leaf mandatory true",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				leaf "mandatory" {
+					type "string" {
+					}
+					mandatory true;
+				}
+			}
+			`,
+		},
+		wantEntryPath: "/test/mandatory",
+		wantEntryCustomTest: func(t *testing.T, e *Entry) {
+			if got, want := e.Mandatory, TSTrue; got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	}, {
+		name: "leaf mandatory false",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				leaf "mandatory" {
+					type "string" {
+					}
+					mandatory false;
+				}
+			}
+			`,
+		},
+		wantEntryPath: "/test/mandatory",
+		wantEntryCustomTest: func(t *testing.T, e *Entry) {
+			if got, want := e.Mandatory, TSFalse; got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
 	}}
 
 	for _, tt := range tests {
