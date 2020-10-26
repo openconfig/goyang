@@ -112,7 +112,7 @@ func printType(w io.Writer, t *yang.YangType, verbose bool) {
 		fmt.Fprintf(w, " range=%s", t.Range)
 	}
 	if len(t.Type) > 0 {
-		fmt.Fprintf(w, "union{\n")
+		fmt.Fprintf(w, "{\n")
 		for _, t := range t.Type {
 			printType(indent.NewWriter(w, "  "), t, verbose)
 		}
