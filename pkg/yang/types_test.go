@@ -43,6 +43,13 @@ func TestTypeResolve(t *testing.T) {
 		},
 		{
 			in: &Type{
+				Name:  "int8",
+				Range: &Range{Name: "-10 .. 128"},
+			},
+			err: "unknown: bad range: -10..128 not within -128..127",
+		},
+		{
+			in: &Type{
 				Name:           "boolean",
 				FractionDigits: &Value{Name: "42"},
 			},
@@ -64,6 +71,14 @@ func TestTypeResolve(t *testing.T) {
 			in: &Type{
 				Name:           "decimal64",
 				FractionDigits: &Value{Name: "42"},
+			},
+			err: "unknown: value 42 out of range [1..18]",
+		},
+		{
+			in: &Type{
+				Name:           "decimal64",
+				FractionDigits: &Value{Name: "42"},
+				Range:          &Range{Name: "-10 .. 10"},
 			},
 			err: "unknown: value 42 out of range [1..18]",
 		},
