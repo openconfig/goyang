@@ -501,7 +501,10 @@ func semCheckMaxElements(v *Value) (uint64, error) {
 	}
 	val, err := strconv.ParseUint(v.Name, 10, 64)
 	if err != nil {
-		return val, fmt.Errorf(`%s: invalid max-elements value %q (expect "unbounded" or a non-negative integer): %v`, Source(v), v.Name, err)
+		return val, fmt.Errorf(`%s: invalid max-elements value %q (expect "unbounded" or a positive integer): %v`, Source(v), v.Name, err)
+	}
+	if val == 0 {
+		return val, fmt.Errorf(`%s: invalid max-elements value 0 (expect "unbounded" or a positive integer)`, Source(v))
 	}
 	return val, nil
 }

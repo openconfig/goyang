@@ -142,6 +142,11 @@ module base {
     min-elements 0;
     max-elements unbounded;
   }
+  list caz {
+    // bad max element: has to be positive.
+    min-elements 0;
+    max-elements 0;
+  }
 }
 `,
 		errors: []string{
@@ -149,6 +154,7 @@ module base {
 			`bad-min-max-elements.yang:8:5: invalid max-elements value`,
 			`bad-min-max-elements.yang:13:5: invalid min-elements value`,
 			`bad-min-max-elements.yang:14:5: invalid max-elements value`,
+			`bad-min-max-elements.yang:24:5: invalid max-elements value`,
 		},
 	},
 }
