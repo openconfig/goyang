@@ -504,7 +504,7 @@ func semCheckMaxElements(v *Value) (uint64, error) {
 		return val, fmt.Errorf(`%s: invalid max-elements value %q (expect "unbounded" or a positive integer): %v`, Source(v), v.Name, err)
 	}
 	if val == 0 {
-		return val, fmt.Errorf(`%s: invalid max-elements value 0 (expect "unbounded" or a positive integer)`, Source(v), v.Name)
+		return val, fmt.Errorf(`%s: invalid max-elements value 0 (expect "unbounded" or a positive integer)`, Source(v))
 	}
 	return val, nil
 }
