@@ -283,6 +283,99 @@ func TestPattern(t *testing.T) {
 		wantPatternsRegular: []string{"alpha", "bravo", "charlie"},
 		wantPatternsPOSIX:   []string{"delta", "echo", "foxtrot"},
 	}, {
+		desc: "Union type -- de-duping string types",
+		leafNode: `
+			leaf test-leaf {
+				type union {
+					type string {
+						pattern 'alpha';
+						o:posix-pattern 'alpha';
+					}
+					type string {
+						pattern 'alpha';
+						o:posix-pattern 'alpha';
+					}
+				}
+			}
+		} // end module`,
+		inGetFn: func(ms *Modules) (*YangType, error) {
+			m, err := ms.FindModuleByPrefix("t")
+			if err != nil {
+				return nil, fmt.Errorf("can't find module in %v", ms)
+			}
+			if len(m.Leaf) == 0 {
+				return nil, fmt.Errorf("node %v is missing imports", m)
+			}
+			e := ToEntry(m)
+			types := e.Dir["test-leaf"].Type.Type
+			if len(types) != 1 {
+				return nil, fmt.Errorf("Want de-duped string entry, got %v types", len(types))
+			}
+			return types[0], nil
+		},
+		wantPatternsRegular: []string{"alpha"},
+		wantPatternsPOSIX:   []string{"alpha"},
+	}, {
+		desc: "Union type -- different string types due to different patterns",
+		leafNode: `
+			leaf test-leaf {
+				type union {
+					type string {
+						pattern 'alpha';
+					}
+					type string {
+						pattern 'bravo';
+					}
+				}
+			}
+		} // end module`,
+		inGetFn: func(ms *Modules) (*YangType, error) {
+			m, err := ms.FindModuleByPrefix("t")
+			if err != nil {
+				return nil, fmt.Errorf("can't find module in %v", ms)
+			}
+			if len(m.Leaf) == 0 {
+				return nil, fmt.Errorf("node %v is missing imports", m)
+			}
+			e := ToEntry(m)
+			types := e.Dir["test-leaf"].Type.Type
+			if len(types) != 2 {
+				return nil, fmt.Errorf("Want 2 string entries, got %v types", len(types))
+			}
+			return types[1], nil
+		},
+		wantPatternsRegular: []string{"bravo"},
+	}, {
+		desc: "Union type -- different string types due to different posix-patterns",
+		leafNode: `
+			leaf test-leaf {
+				type union {
+					type string {
+						o:posix-pattern 'alpha';
+					}
+					type string {
+						o:posix-pattern 'bravo';
+					}
+				}
+			}
+		} // end module`,
+		inGetFn: func(ms *Modules) (*YangType, error) {
+			m, err := ms.FindModuleByPrefix("t")
+			if err != nil {
+				return nil, fmt.Errorf("can't find module in %v", ms)
+			}
+			if len(m.Leaf) == 0 {
+				return nil, fmt.Errorf("node %v is missing imports", m)
+			}
+			e := ToEntry(m)
+			types := e.Dir["test-leaf"].Type.Type
+			if len(types) != 2 {
+				return nil, fmt.Errorf("Want 2 string entries, got %v types", len(types))
+			}
+			return types[1], nil
+		},
+		wantPatternsPOSIX: []string{"bravo"},
+	}, {
 		desc: "typedef",
 		leafNode: `
 			leaf test-leaf {
