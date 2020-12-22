@@ -17,7 +17,6 @@ package yang
 import (
 	"fmt"
 	"reflect"
-	"sort"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -109,12 +108,10 @@ func TestTypeResolve(t *testing.T) {
 
 func TestPattern(t *testing.T) {
 	tests := []struct {
-		desc                string
-		inGetFn             func(*Modules) (*YangType, error)
-		leafNode            string
-		wantPatternsRegular []string
-		wantPatternsPOSIX   []string
-		wantErrSubstr       string
+		desc          string
+		leafNode      string
+		wantType      *YangType
+		wantErrSubstr string
 	}{{
 		desc: "Only normal patterns",
 		leafNode: `
@@ -127,18 +124,9 @@ func TestPattern(t *testing.T) {
 				}
 			}
 		} // end module`,
-		inGetFn: func(ms *Modules) (*YangType, error) {
-			m, err := ms.FindModuleByPrefix("t")
-			if err != nil {
-				return nil, fmt.Errorf("can't find module in %v", ms)
-			}
-			if len(m.Leaf) == 0 {
-				return nil, fmt.Errorf("node %v is missing imports", m)
-			}
-			e := ToEntry(m)
-			return e.Dir["test-leaf"].Type, nil
+		wantType: &YangType{
+			Pattern: []string{"charlie"},
 		},
-		wantPatternsRegular: []string{"charlie"},
 	}, {
 		desc: "Only posix patterns",
 		leafNode: `
@@ -152,18 +140,9 @@ func TestPattern(t *testing.T) {
 				}
 			}
 		} // end module`,
-		inGetFn: func(ms *Modules) (*YangType, error) {
-			m, err := ms.FindModuleByPrefix("t")
-			if err != nil {
-				return nil, fmt.Errorf("can't find module in %v", ms)
-			}
-			if len(m.Leaf) == 0 {
-				return nil, fmt.Errorf("node %v is missing imports", m)
-			}
-			e := ToEntry(m)
-			return e.Dir["test-leaf"].Type, nil
+		wantType: &YangType{
+			POSIXPattern: []string{"bravo", "charlie"},
 		},
-		wantPatternsPOSIX: []string{"bravo", "charlie"},
 	}, {
 		desc: "No patterns",
 		leafNode: `
@@ -171,19 +150,10 @@ func TestPattern(t *testing.T) {
 				type string;
 			}
 		}`,
-		inGetFn: func(ms *Modules) (*YangType, error) {
-			m, err := ms.FindModuleByPrefix("t")
-			if err != nil {
-				return nil, fmt.Errorf("can't find module in %v", ms)
-			}
-			if len(m.Leaf) == 0 {
-				return nil, fmt.Errorf("node %v is missing imports", m)
-			}
-			e := ToEntry(m)
-			return e.Dir["test-leaf"].Type, nil
+		wantType: &YangType{
+			Pattern:      nil,
+			POSIXPattern: nil,
 		},
-		wantPatternsRegular: nil,
-		wantPatternsPOSIX:   nil,
 	}, {
 		desc: "Both patterns",
 		leafNode: `
@@ -197,19 +167,10 @@ func TestPattern(t *testing.T) {
 				}
 			}
 		} // end module`,
-		inGetFn: func(ms *Modules) (*YangType, error) {
-			m, err := ms.FindModuleByPrefix("t")
-			if err != nil {
-				return nil, fmt.Errorf("can't find module in %v", ms)
-			}
-			if len(m.Leaf) == 0 {
-				return nil, fmt.Errorf("node %v is missing imports", m)
-			}
-			e := ToEntry(m)
-			return e.Dir["test-leaf"].Type, nil
+		wantType: &YangType{
+			Pattern:      []string{"alpha"},
+			POSIXPattern: []string{"bravo", "charlie", "delta"},
 		},
-		wantPatternsRegular: []string{"alpha"},
-		wantPatternsPOSIX:   []string{"bravo", "charlie", "delta"},
 	}, {
 		desc: "Both patterns, but with non-openconfig-extensions pretenders",
 		leafNode: `
@@ -233,19 +194,10 @@ func TestPattern(t *testing.T) {
 				}
 			}
 		} // end module`,
-		inGetFn: func(ms *Modules) (*YangType, error) {
-			m, err := ms.FindModuleByPrefix("t")
-			if err != nil {
-				return nil, fmt.Errorf("can't find module in %v", ms)
-			}
-			if len(m.Leaf) == 0 {
-				return nil, fmt.Errorf("node %v is missing imports", m)
-			}
-			e := ToEntry(m)
-			return e.Dir["test-leaf"].Type, nil
+		wantType: &YangType{
+			Pattern:      []string{"alpha", "bravo", "charlie"},
+			POSIXPattern: []string{"delta", "echo", "foxtrot"},
 		},
-		wantPatternsRegular: []string{"alpha", "bravo", "charlie"},
-		wantPatternsPOSIX:   []string{"delta", "echo", "foxtrot"},
 	}, {
 		desc: "Union type",
 		leafNode: `
@@ -269,19 +221,79 @@ func TestPattern(t *testing.T) {
 				}
 			}
 		} // end module`,
-		inGetFn: func(ms *Modules) (*YangType, error) {
-			m, err := ms.FindModuleByPrefix("t")
-			if err != nil {
-				return nil, fmt.Errorf("can't find module in %v", ms)
-			}
-			if len(m.Leaf) == 0 {
-				return nil, fmt.Errorf("node %v is missing imports", m)
-			}
-			e := ToEntry(m)
-			return e.Dir["test-leaf"].Type.Type[0], nil
+		wantType: &YangType{
+			Type: []*YangType{{
+				Pattern:      []string{"alpha", "bravo", "charlie"},
+				POSIXPattern: []string{"delta", "echo", "foxtrot"},
+			}, {
+				Pattern:      nil,
+				POSIXPattern: nil,
+			}},
 		},
-		wantPatternsRegular: []string{"alpha", "bravo", "charlie"},
-		wantPatternsPOSIX:   []string{"delta", "echo", "foxtrot"},
+	}, {
+		desc: "Union type -- de-duping string types",
+		leafNode: `
+			leaf test-leaf {
+				type union {
+					type string {
+						pattern 'alpha';
+						o:posix-pattern 'alpha';
+					}
+					type string {
+						pattern 'alpha';
+						o:posix-pattern 'alpha';
+					}
+				}
+			}
+		} // end module`,
+		wantType: &YangType{
+			Type: []*YangType{{
+				Pattern:      []string{"alpha"},
+				POSIXPattern: []string{"alpha"},
+			}},
+		},
+	}, {
+		desc: "Union type -- different string types due to different patterns",
+		leafNode: `
+			leaf test-leaf {
+				type union {
+					type string {
+						pattern 'alpha';
+					}
+					type string {
+						pattern 'bravo';
+					}
+				}
+			}
+		} // end module`,
+		wantType: &YangType{
+			Type: []*YangType{{
+				Pattern: []string{"alpha"},
+			}, {
+				Pattern: []string{"bravo"},
+			}},
+		},
+	}, {
+		desc: "Union type -- different string types due to different posix-patterns",
+		leafNode: `
+			leaf test-leaf {
+				type union {
+					type string {
+						o:posix-pattern 'alpha';
+					}
+					type string {
+						o:posix-pattern 'bravo';
+					}
+				}
+			}
+		} // end module`,
+		wantType: &YangType{
+			Type: []*YangType{{
+				POSIXPattern: []string{"alpha"},
+			}, {
+				POSIXPattern: []string{"bravo"},
+			}},
+		},
 	}, {
 		desc: "typedef",
 		leafNode: `
@@ -305,19 +317,10 @@ func TestPattern(t *testing.T) {
 				}
 			}
 		} // end module`,
-		inGetFn: func(ms *Modules) (*YangType, error) {
-			m, err := ms.FindModuleByPrefix("t")
-			if err != nil {
-				return nil, fmt.Errorf("can't find module in %v", ms)
-			}
-			if len(m.Leaf) == 0 {
-				return nil, fmt.Errorf("node %v is missing imports", m)
-			}
-			e := ToEntry(m)
-			return e.Dir["test-leaf"].Type, nil
+		wantType: &YangType{
+			Pattern:      []string{"alpha", "bravo", "charlie"},
+			POSIXPattern: []string{"delta", "echo", "foxtrot"},
 		},
-		wantPatternsRegular: []string{"alpha", "bravo", "charlie"},
-		wantPatternsPOSIX:   []string{"delta", "echo", "foxtrot"},
 	}, {
 		desc: "invalid POSIX pattern",
 		leafNode: `
@@ -331,19 +334,20 @@ func TestPattern(t *testing.T) {
 				}
 			}
 		} // end module`,
-		inGetFn: func(ms *Modules) (*YangType, error) {
-			m, err := ms.FindModuleByPrefix("t")
-			if err != nil {
-				return nil, fmt.Errorf("can't find module in %v", ms)
-			}
-			if len(m.Leaf) == 0 {
-				return nil, fmt.Errorf("node %v is missing imports", m)
-			}
-			e := ToEntry(m)
-			return e.Dir["test-leaf"].Type, nil
-		},
 		wantErrSubstr: "bad pattern",
 	}}
+
+	getTestLeaf := func(ms *Modules) (*YangType, error) {
+		m, err := ms.FindModuleByPrefix("t")
+		if err != nil {
+			return nil, fmt.Errorf("can't find module in %v", ms)
+		}
+		if len(m.Leaf) == 0 {
+			return nil, fmt.Errorf("node %v is missing imports", m)
+		}
+		e := ToEntry(m)
+		return e.Dir["test-leaf"].Type, nil
+	}
 
 	for _, tt := range tests {
 		inModules := map[string]string{
@@ -411,22 +415,31 @@ func TestPattern(t *testing.T) {
 				return
 			}
 
-			yangType, err := tt.inGetFn(ms)
+			yangType, err := getTestLeaf(ms)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			sort.Strings(yangType.Pattern)
-			sort.Strings(tt.wantPatternsRegular)
-			if diff := cmp.Diff(yangType.Pattern, tt.wantPatternsRegular, cmpopts.EquateEmpty()); diff != "" {
+			gotType := &YangType{}
+			populatePatterns(yangType, gotType)
+			if diff := cmp.Diff(gotType, tt.wantType, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("Type.resolve() pattern test (-got, +want):\n%s", diff)
 			}
-
-			sort.Strings(yangType.POSIXPattern)
-			sort.Strings(tt.wantPatternsPOSIX)
-			if diff := cmp.Diff(yangType.POSIXPattern, tt.wantPatternsPOSIX, cmpopts.EquateEmpty()); diff != "" {
-				t.Errorf("Type.resolve() posix-pattern test (-got, +want):\n%s", diff)
-			}
 		})
+	}
+}
+
+// populatePatterns populates targetType with only the
+// Pattern/POSIXPattern fields of the given type, preserving
+// the recursive structure of the type, to work around cmp not
+// having an allowlist way of specifying which fields to
+// compare.
+func populatePatterns(ytype *YangType, targetType *YangType) {
+	targetType.Pattern = ytype.Pattern
+	targetType.POSIXPattern = ytype.POSIXPattern
+	for _, subtype := range ytype.Type {
+		targetSubtype := &YangType{}
+		targetType.Type = append(targetType.Type, targetSubtype)
+		populatePatterns(subtype, targetSubtype)
 	}
 }

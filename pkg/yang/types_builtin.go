@@ -352,6 +352,7 @@ func (y *YangType) Equal(t *YangType) bool {
 		y.OptionalInstance != t.OptionalInstance,
 		y.Path != t.Path,
 		!ssEqual(y.Pattern, t.Pattern),
+		!ssEqual(y.POSIXPattern, t.POSIXPattern),
 		len(y.Range) != len(t.Range),
 		!y.Range.Equal(t.Range),
 		!tsEqual(y.Type, t.Type):
