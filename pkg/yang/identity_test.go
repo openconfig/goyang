@@ -131,6 +131,42 @@ var basicTestCases = []identityTestCase{
 		},
 		err: "basic-test-case-3: could not resolve identities",
 	},
+	{
+		name: "basic-test-case-4: Check identity is found in module from submodule.",
+		in: []inputModule{
+			{
+				name: "idtest-one",
+				content: `
+					module idtest-one {
+					  namespace "urn:idone";
+					  prefix "idone";
+
+					  include "idtest-one-sub";
+
+					  identity TEST_ID_DERIVED {
+					    base TEST_ID;
+					  }
+					}
+				`},
+			{
+				name: "idtest-one-sub",
+				content: `
+					submodule idtest-one-sub {
+					  belongs-to idtest-one {
+					    prefix "idone";
+					  }
+
+					  identity TEST_ID;
+					}
+				`},
+		},
+		identities: []identityOut{
+			// TODO(wenbli): Should this show up?
+			// {module: "idtest-one", name: "TEST_ID"},
+			{module: "idtest-one", name: "TEST_ID_DERIVED", baseNames: []string{"TEST_ID"}},
+		},
+		err: "basic-test-case-4: could not resolve identities",
+	},
 }
 
 // Test the ability to extract identities from a module with the correct base
@@ -161,7 +197,8 @@ func TestIdentityExtract(t *testing.T) {
 			}
 
 			if foundIdentity == false {
-				t.Errorf("Could not found identity %s in %s", ti.name, ti.module)
+				t.Errorf("Could not find identity %s in module %s", ti.name, ti.module)
+				continue
 			}
 
 			actualBaseNames := getBaseNamesFrom(thisID)
