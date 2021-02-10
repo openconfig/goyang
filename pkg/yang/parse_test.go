@@ -159,6 +159,11 @@ foo "bar" + baz;
 			err: `test.yang:2:11: +: syntax error, expected ';' or '{'`,
 		},
 		{line: line(), in: `
+foo "bar" +
+`,
+			err: `test.yang:2:11: +: syntax error, expected ';' or '{'`,
+		},
+		{line: line(), in: `
 foo "bar";
 `,
 			out: []*Statement{
@@ -204,6 +209,11 @@ test.yang:2:14: ;: keyword token not an unquoted string`,
 		},
 		{line: line(), in: `
 foo 'bar' + baz;
+`,
+			err: `test.yang:2:11: +: syntax error, expected ';' or '{'`,
+		},
+		{line: line(), in: `
+foo 'bar' +
 `,
 			err: `test.yang:2:11: +: syntax error, expected ';' or '{'`,
 		},
