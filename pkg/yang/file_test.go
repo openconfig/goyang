@@ -112,3 +112,53 @@ func TestScanForPathsAndAddModules(t *testing.T) {
 	}
 
 }
+
+func TestFindInDir(t *testing.T) {
+	testDir := "testdata/find-file-test"
+
+	tests := []struct {
+		desc      string
+		inDir     string
+		inName    string
+		inRecurse bool
+		want      string
+	}{{
+		desc:      "exact match",
+		inDir:     testDir,
+		inName:    "blue.yang",
+		inRecurse: false,
+		want:      filepath.Join(testDir, "blue.yang"),
+	}, {
+		desc:      "exact match, recursive",
+		inDir:     testDir,
+		inName:    "blue.yang",
+		inRecurse: true,
+		want:      filepath.Join(testDir, "blue.yang"),
+	}, {
+		desc:      "exact match with non-standard name",
+		inDir:     testDir,
+		inName:    "crazy.name",
+		inRecurse: false,
+		want:      filepath.Join(testDir, "crazy.name"),
+	}, {
+		desc:      "revision match without recursion, and ignoring invalid revision",
+		inDir:     testDir,
+		inName:    "red.yang",
+		inRecurse: false,
+		want:      filepath.Join(testDir, "red@2010-10-10.yang"),
+	}, {
+		desc:      "revision match with recursion",
+		inDir:     testDir,
+		inName:    "red.yang",
+		inRecurse: true,
+		want:      filepath.Join(testDir, "dir", "dirdir", "red@2022-02-22.yang"),
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			if got, want := findInDir(tt.inDir, tt.inName, tt.inRecurse), tt.want; got != want {
+				t.Errorf("got: %q, want: %q", got, want)
+			}
+		})
+	}
+}
