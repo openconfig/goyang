@@ -123,6 +123,18 @@ func TestFindInDir(t *testing.T) {
 		inRecurse bool
 		want      string
 	}{{
+		desc:      "file not found",
+		inDir:     testDir,
+		inName:    "green.yang",
+		inRecurse: true,
+		want:      "",
+	}, {
+		desc:      "input directory does not exist",
+		inDir:     filepath.Join(testDir, "dne"),
+		inName:    "red.yang",
+		inRecurse: true,
+		want:      "",
+	}, {
 		desc:      "exact match",
 		inDir:     testDir,
 		inName:    "blue.yang",
