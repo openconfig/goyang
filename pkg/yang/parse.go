@@ -77,9 +77,8 @@ func (s *Statement) SubStatements() []*Statement { return s.statements }
 
 // String returns s's tree as a string.
 func (s *Statement) String() string {
-	var b bytes.Buffer
-	s.Write(&b, "")
-	return b.String()
+	// XXX: Unimplemented
+	return ""
 }
 
 // Location returns the location in the source where s was defined.
