@@ -124,6 +124,104 @@ pattern '\\ \S \n';
 			},
 		},
 		{line: line(), in: `
+foo "bar" + "baz";
+`,
+			out: []*Statement{
+				SA("foo", "barbaz"),
+			},
+		},
+		{line: line(), in: `
+foo "bar" + "+" + "baz";
+`,
+			out: []*Statement{
+				SA("foo", "bar+baz"),
+			},
+		},
+		{line: line(), in: `
+foo "bar"
+`,
+			err: `test.yang: unexpected EOF`,
+		},
+		{line: line(), in: `
+foo "bar" + "baz"
+`,
+			err: `test.yang: unexpected EOF`,
+		},
+		{line: line(), in: `
+foo "bar" baz;
+`,
+			err: `test.yang:2:11: baz: syntax error, expected ';' or '{'
+test.yang:2:14: ;: keyword token not an unquoted string`,
+		},
+		{line: line(), in: `
+foo "bar" + baz;
+`,
+			err: `test.yang:2:11: +: syntax error, expected ';' or '{'`,
+		},
+		{line: line(), in: `
+foo "bar";
+`,
+			out: []*Statement{
+				SA("foo", "bar"),
+			},
+		},
+		{line: line(), in: `
+foo "bar" {}
+`,
+			out: []*Statement{
+				SA("foo", "bar"),
+			},
+		},
+		{line: line(), in: `
+foo 'bar' + 'baz';
+`,
+			out: []*Statement{
+				SA("foo", "barbaz"),
+			},
+		},
+		{line: line(), in: `
+foo 'bar' + '+' + 'baz';
+`,
+			out: []*Statement{
+				SA("foo", "bar+baz"),
+			},
+		},
+		{line: line(), in: `
+foo 'bar'
+`,
+			err: `test.yang: unexpected EOF`,
+		},
+		{line: line(), in: `
+foo 'bar' + 'baz'
+`,
+			err: `test.yang: unexpected EOF`,
+		},
+		{line: line(), in: `
+foo 'bar' baz;
+`,
+			err: `test.yang:2:11: baz: syntax error, expected ';' or '{'
+test.yang:2:14: ;: keyword token not an unquoted string`,
+		},
+		{line: line(), in: `
+foo 'bar' + baz;
+`,
+			err: `test.yang:2:11: +: syntax error, expected ';' or '{'`,
+		},
+		{line: line(), in: `
+foo 'bar';
+`,
+			out: []*Statement{
+				SA("foo", "bar"),
+			},
+		},
+		{line: line(), in: `
+foo 'bar' {}
+`,
+			out: []*Statement{
+				SA("foo", "bar"),
+			},
+		},
+		{line: line(), in: `
 foo bar;
 red black;
 `,
@@ -239,7 +337,7 @@ id
 		{line: line(), in: `
 statement one two { }
 `,
-			err: `test.yang:2:15: two: syntax error, expected ';' or nested statements in {}
+			err: `test.yang:2:15: two: syntax error, expected ';' or '{'
 test.yang:2:19: {: keyword token not an unquoted string
 test.yang:2:21: unexpected }`,
 		},

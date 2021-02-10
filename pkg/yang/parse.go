@@ -319,7 +319,7 @@ func (p *parser) nextStatement() *Statement {
 			}
 		}
 	default:
-		fmt.Fprintf(p.errout, "%v: syntax error, expected ';' or nested statements in {}\n", t)
+		fmt.Fprintf(p.errout, "%v: syntax error, expected ';' or '{'\n", t)
 		return ignoreMe
 	}
 }
