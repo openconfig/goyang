@@ -229,18 +229,18 @@ id
 		{line: line(), in: `
    {
 `,
-			err: `test.yang:2:4: {: not an identifier`,
+			err: `test.yang:2:4: {: keyword token not an unquoted string`,
 		},
 		{line: line(), in: `
 ;
 `,
-			err: `test.yang:2:1: ;: not an identifier`,
+			err: `test.yang:2:1: ;: keyword token not an unquoted string`,
 		},
 		{line: line(), in: `
 statement one two { }
 `,
-			err: `test.yang:2:15: two: syntax error
-test.yang:2:19: {: not an identifier
+			err: `test.yang:2:15: two: syntax error, expected ';' or nested statements in {}
+test.yang:2:19: {: keyword token not an unquoted string
 test.yang:2:21: unexpected }`,
 		},
 		{line: line(), in: `
@@ -262,7 +262,7 @@ foo {
 		key3: "value\3;
 	}
 }`,
-			err: `test.yang:2:1: {: not an identifier
+			err: `test.yang:2:1: {: keyword token not an unquoted string
 test.yang:4:1: unexpected }
 test.yang:6:8: invalid escape sequence: \V
 test.yang:9:15: invalid escape sequence: \3
