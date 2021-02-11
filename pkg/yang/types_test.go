@@ -16,7 +16,6 @@ package yang
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -78,6 +77,48 @@ func TestTypeResolve(t *testing.T) {
 				Range:          Decimal64Range,
 			},
 		},
+		{
+			in: &Type{
+				Name:            "instance-identifier",
+				RequireInstance: nil,
+			},
+			out: &YangType{
+				Name: "instance-identifier",
+				Kind: YinstanceIdentifier,
+				// https://tools.ietf.org/html/rfc7950#section-9.9.3
+				// require-instance defaults to true.
+				OptionalInstance: false,
+			},
+		},
+		{
+			in: &Type{
+				Name:            "instance-identifier",
+				RequireInstance: &Value{Name: "true"},
+			},
+			out: &YangType{
+				Name:             "instance-identifier",
+				Kind:             YinstanceIdentifier,
+				OptionalInstance: false,
+			},
+		},
+		{
+			in: &Type{
+				Name:            "instance-identifier",
+				RequireInstance: &Value{Name: "false"},
+			},
+			out: &YangType{
+				Name:             "instance-identifier",
+				Kind:             YinstanceIdentifier,
+				OptionalInstance: true,
+			},
+		},
+		{
+			in: &Type{
+				Name:            "instance-identifier",
+				RequireInstance: &Value{Name: "foo"},
+			},
+			err: "invalid boolean: foo",
+		},
 		// TODO(borman): Add in more tests as we honor more fields
 		// in Type.
 	} {
@@ -100,8 +141,8 @@ func TestTypeResolve(t *testing.T) {
 		case len(errs) == 1 && errs[0].Error() != tt.err:
 			t.Errorf("#%d: got error %v, want %s", x, errs[0], tt.err)
 		case len(errs) != 0:
-		case !reflect.DeepEqual(tt.in.YangType, tt.out):
-			t.Errorf("#%d: got %#v, want %#v", x, tt.in.YangType, tt.out)
+		case !cmp.Equal(tt.in.YangType, tt.out):
+			t.Errorf("#%d: YangType (-got, +want):\n%s", x, cmp.Diff(tt.in.YangType, tt.out))
 		}
 	}
 }
