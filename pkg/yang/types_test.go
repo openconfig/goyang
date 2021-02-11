@@ -24,126 +24,123 @@ import (
 )
 
 func TestTypeResolve(t *testing.T) {
-	for x, tt := range []struct {
-		in  *Type
-		err string
-		out *YangType
-	}{
-		{
-			in: &Type{
-				Name: "int64",
-			},
-			out: &YangType{
-				Name:  "int64",
-				Kind:  Yint64,
-				Range: Int64Range,
-			},
+	tests := []struct {
+		desc string
+		in   *Type
+		err  string
+		out  *YangType
+	}{{
+		in: &Type{
+			Name: "int64",
 		},
-		{
-			in: &Type{
-				Name:           "boolean",
-				FractionDigits: &Value{Name: "42"},
-			},
-			err: "unknown: fraction-digits only allowed for decimal64 values",
+		out: &YangType{
+			Name:  "int64",
+			Kind:  Yint64,
+			Range: Int64Range,
 		},
-		{
-			in: &Type{
-				Name: "decimal64",
-			},
-			err: "unknown: value is required in the range of [1..18]",
+	}, {
+		in: &Type{
+			Name:           "boolean",
+			FractionDigits: &Value{Name: "42"},
 		},
-		{
-			in: &Type{
-				Name: "identityref",
-			},
-			err: "unknown: an identityref must specify a base",
+		err: "unknown: fraction-digits only allowed for decimal64 values",
+	}, {
+		in: &Type{
+			Name: "decimal64",
 		},
-		{
-			in: &Type{
-				Name:           "decimal64",
-				FractionDigits: &Value{Name: "42"},
-			},
-			err: "unknown: value 42 out of range [1..18]",
+		err: "unknown: value is required in the range of [1..18]",
+	}, {
+		in: &Type{
+			Name: "identityref",
 		},
-		{
-			in: &Type{
-				Name:           "decimal64",
-				FractionDigits: &Value{Name: "7"},
-			},
-			out: &YangType{
-				Name:           "decimal64",
-				Kind:           Ydecimal64,
-				FractionDigits: 7,
-				Range:          Decimal64Range,
-			},
+		err: "unknown: an identityref must specify a base",
+	}, {
+		in: &Type{
+			Name:           "decimal64",
+			FractionDigits: &Value{Name: "42"},
 		},
-		{
-			in: &Type{
-				Name:            "instance-identifier",
-				RequireInstance: nil,
-			},
-			out: &YangType{
-				Name: "instance-identifier",
-				Kind: YinstanceIdentifier,
-				// https://tools.ietf.org/html/rfc7950#section-9.9.3
-				// require-instance defaults to true.
-				OptionalInstance: false,
-			},
+		err: "unknown: value 42 out of range [1..18]",
+	}, {
+		in: &Type{
+			Name:           "decimal64",
+			FractionDigits: &Value{Name: "7"},
 		},
-		{
-			in: &Type{
-				Name:            "instance-identifier",
-				RequireInstance: &Value{Name: "true"},
-			},
-			out: &YangType{
-				Name:             "instance-identifier",
-				Kind:             YinstanceIdentifier,
-				OptionalInstance: false,
-			},
+		out: &YangType{
+			Name:           "decimal64",
+			Kind:           Ydecimal64,
+			FractionDigits: 7,
+			Range:          Decimal64Range,
 		},
-		{
-			in: &Type{
-				Name:            "instance-identifier",
-				RequireInstance: &Value{Name: "false"},
-			},
-			out: &YangType{
-				Name:             "instance-identifier",
-				Kind:             YinstanceIdentifier,
-				OptionalInstance: true,
-			},
+	}, {
+		in: &Type{
+			Name:            "instance-identifier",
+			RequireInstance: nil,
 		},
-		{
-			in: &Type{
-				Name:            "instance-identifier",
-				RequireInstance: &Value{Name: "foo"},
-			},
-			err: "invalid boolean: foo",
+		out: &YangType{
+			Name: "instance-identifier",
+			Kind: YinstanceIdentifier,
+			// https://tools.ietf.org/html/rfc7950#section-9.9.3
+			// require-instance defaults to true.
+			OptionalInstance: false,
 		},
+	}, {
+		in: &Type{
+			Name:            "instance-identifier",
+			RequireInstance: &Value{Name: "true"},
+		},
+		out: &YangType{
+			Name:             "instance-identifier",
+			Kind:             YinstanceIdentifier,
+			OptionalInstance: false,
+		},
+	}, {
+		in: &Type{
+			Name:            "instance-identifier",
+			RequireInstance: &Value{Name: "false"},
+		},
+		out: &YangType{
+			Name:             "instance-identifier",
+			Kind:             YinstanceIdentifier,
+			OptionalInstance: true,
+		},
+	}, {
+		in: &Type{
+			Name:            "instance-identifier",
+			RequireInstance: &Value{Name: "foo"},
+		},
+		err: "invalid boolean: foo",
 		// TODO(borman): Add in more tests as we honor more fields
 		// in Type.
-	} {
-		// We can initialize a value to ourself, so to it here.
-		errs := tt.in.resolve()
+	}}
 
-		// TODO(borman):  Do not hack out Root and Base.  These
-		// are hacked out for now because they can be self-referential,
-		// making construction of them difficult.
-		tt.in.YangType.Root = nil
-		tt.in.YangType.Base = nil
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			// We can initialize a value to ourself, so to it here.
+			errs := tt.in.resolve()
 
-		switch {
-		case tt.err == "" && len(errs) > 0:
-			t.Errorf("#%d: unexpected errors: %v", x, errs)
-		case tt.err != "" && len(errs) == 0:
-			t.Errorf("#%d: did not get expected errors: %v", x, tt.err)
-		case len(errs) > 1:
-			t.Errorf("#%d: too many errors: %v", x, errs)
-		case len(errs) == 1 && errs[0].Error() != tt.err:
-			t.Errorf("#%d: got error %v, want %s", x, errs[0], tt.err)
-		case len(errs) != 0:
-		case !cmp.Equal(tt.in.YangType, tt.out):
-			t.Errorf("#%d: YangType (-got, +want):\n%s", x, cmp.Diff(tt.in.YangType, tt.out))
-		}
+			// TODO(borman):  Do not hack out Root and Base.  These
+			// are hacked out for now because they can be self-referential,
+			// making construction of them difficult.
+			tt.in.YangType.Root = nil
+			tt.in.YangType.Base = nil
+
+			switch {
+			case tt.err == "" && len(errs) > 0:
+				t.Errorf("unexpected errors: %v", errs)
+			case tt.err != "" && len(errs) == 0:
+				t.Errorf("did not get expected errors: %v", tt.err)
+			case len(errs) > 1:
+				t.Errorf("too many errors: %v", errs)
+			case len(errs) == 1 && errs[0].Error() != tt.err:
+				t.Errorf("got error %v, want %s", errs[0], tt.err)
+			case len(errs) != 0:
+				return
+			}
+
+			if diff := cmp.Diff(tt.in.YangType, tt.out); diff != "" {
+				t.Errorf("YangType (-got, +want):\n%s", diff)
+			}
+		})
 	}
 }
 
