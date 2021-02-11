@@ -30,6 +30,7 @@ func TestTypeResolve(t *testing.T) {
 		err  string
 		out  *YangType
 	}{{
+		desc: "basic int64",
 		in: &Type{
 			Name: "int64",
 		},
@@ -39,28 +40,94 @@ func TestTypeResolve(t *testing.T) {
 			Range: Int64Range,
 		},
 	}, {
+		desc: "basic int64 with a range",
+		in: &Type{
+			Name:  "int64",
+			Range: &Range{Name: "-42..42"},
+		},
+		out: &YangType{
+			Name:  "int64",
+			Kind:  Yint64,
+			Range: YangRange{{Min: FromInt(-42), Max: FromInt(42)}},
+		},
+	}, {
+		desc: "basic uint64 with an invalid range",
+		in: &Type{
+			Name:  "uint64",
+			Range: &Range{Name: "-42..42"},
+		},
+		err: "unknown: bad range: -42..42 not within 0..18446744073709551615",
+	}, {
+		desc: "basic uint64 with an unparseable range",
+		in: &Type{
+			Name:  "uint64",
+			Range: &Range{Name: "-42..forty-two"},
+		},
+		err: `unknown: bad range: strconv.ParseUint: parsing "forty-two": invalid syntax`,
+	}, {
+		desc: "basic string with a length",
+		in: &Type{
+			Name:   "string",
+			Length: &Length{Name: "24..42"},
+		},
+		out: &YangType{
+			Name:   "string",
+			Kind:   Ystring,
+			Length: YangRange{{Min: FromInt(24), Max: FromInt(42)}},
+		},
+	}, {
+		desc: "basic string with an invalid range",
+		in: &Type{
+			Name:   "string",
+			Length: &Length{Name: "-42..42"},
+		},
+		err: "unknown: negative length: -42..42",
+	}, {
+		desc: "basic binary with a length",
+		in: &Type{
+			Name:   "binary",
+			Length: &Length{Name: "24..42"},
+		},
+		out: &YangType{
+			Name:   "binary",
+			Kind:   Ybinary,
+			Length: YangRange{{Min: FromInt(24), Max: FromInt(42)}},
+		},
+	}, {
+		desc: "basic binary with an unparseable range",
+		in: &Type{
+			Name:   "binary",
+			Length: &Length{Name: "42..forty-two"},
+		},
+		err: `unknown: bad length: strconv.ParseUint: parsing "forty-two": invalid syntax`,
+	}, {
+		desc: "invalid fraction-digits argument for boolean value",
 		in: &Type{
 			Name:           "boolean",
 			FractionDigits: &Value{Name: "42"},
 		},
 		err: "unknown: fraction-digits only allowed for decimal64 values",
 	}, {
+		desc: "required field fraction-digits not supplied for decimal64",
 		in: &Type{
 			Name: "decimal64",
 		},
 		err: "unknown: value is required in the range of [1..18]",
 	}, {
+		desc: "invalid identityref that doesn't have a base identity name",
 		in: &Type{
 			Name: "identityref",
 		},
 		err: "unknown: an identityref must specify a base",
 	}, {
+		desc: "invalid decimal64 having an invalid fraction-digits value",
 		in: &Type{
 			Name:           "decimal64",
 			FractionDigits: &Value{Name: "42"},
 		},
 		err: "unknown: value 42 out of range [1..18]",
 	}, {
+		desc: "decimal64",
 		in: &Type{
 			Name:           "decimal64",
 			FractionDigits: &Value{Name: "7"},
@@ -72,6 +139,7 @@ func TestTypeResolve(t *testing.T) {
 			Range:          Decimal64Range,
 		},
 	}, {
+		desc: "instance-identifier with unspecified require-instance value (default true)",
 		in: &Type{
 			Name:            "instance-identifier",
 			RequireInstance: nil,
@@ -84,6 +152,7 @@ func TestTypeResolve(t *testing.T) {
 			OptionalInstance: false,
 		},
 	}, {
+		desc: "instance-identifier with true require-instance value",
 		in: &Type{
 			Name:            "instance-identifier",
 			RequireInstance: &Value{Name: "true"},
@@ -94,6 +163,7 @@ func TestTypeResolve(t *testing.T) {
 			OptionalInstance: false,
 		},
 	}, {
+		desc: "instance-identifier with false require-instance value",
 		in: &Type{
 			Name:            "instance-identifier",
 			RequireInstance: &Value{Name: "false"},
@@ -104,6 +174,7 @@ func TestTypeResolve(t *testing.T) {
 			OptionalInstance: true,
 		},
 	}, {
+		desc: "instance-identifier with invalid require-instance value",
 		in: &Type{
 			Name:            "instance-identifier",
 			RequireInstance: &Value{Name: "foo"},
@@ -126,13 +197,93 @@ func TestTypeResolve(t *testing.T) {
 
 			switch {
 			case tt.err == "" && len(errs) > 0:
-				t.Errorf("unexpected errors: %v", errs)
+				t.Fatalf("unexpected errors: %v", errs)
 			case tt.err != "" && len(errs) == 0:
-				t.Errorf("did not get expected errors: %v", tt.err)
+				t.Fatalf("did not get expected errors: %v", tt.err)
 			case len(errs) > 1:
-				t.Errorf("too many errors: %v", errs)
+				t.Fatalf("too many errors: %v", errs)
 			case len(errs) == 1 && errs[0].Error() != tt.err:
-				t.Errorf("got error %v, want %s", errs[0], tt.err)
+				t.Fatalf("got error %v, want %s", errs[0], tt.err)
+			case len(errs) != 0:
+				return
+			}
+
+			if diff := cmp.Diff(tt.in.YangType, tt.out); diff != "" {
+				t.Errorf("YangType (-got, +want):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestTypedefResolve(t *testing.T) {
+	tests := []struct {
+		desc string
+		in   *Typedef
+		err  string
+		out  *YangType
+	}{{
+		desc: "basic int64",
+		in: &Typedef{
+			Name:    "time",
+			Parent:  baseTypes["int64"].typedef(),
+			Default: &Value{Name: "42"},
+			Type: &Type{
+				Name: "int64",
+			},
+			Units: &Value{Name: "nanoseconds"},
+		},
+		out: &YangType{
+			Name: "time",
+			Kind: Yint64,
+			Base: &Type{
+				Name: "int64",
+			},
+			Units:   "nanoseconds",
+			Default: "42",
+			Range:   Int64Range,
+		},
+	}, {
+		desc: "uint32 with more specific range",
+		in: &Typedef{
+			Name: "another-counter",
+			Parent: &Typedef{
+				Name:   "counter",
+				Parent: baseTypes["uint32"].typedef(),
+				Type: &Type{
+					Name:  "uint32",
+					Range: &Range{Name: "0..42"},
+				},
+			},
+			Type: &Type{
+				Name:  "uint32",
+				Range: &Range{Name: "10..20"},
+			},
+		},
+		out: &YangType{
+			Name: "another-counter",
+			Kind: Yuint32,
+			Base: &Type{
+				Name: "uint32",
+			},
+			Range: YangRange{{Min: FromInt(10), Max: FromInt(20)}},
+		},
+		// TODO(wenovus): Add tests on range and length inheritance once those are fixed.
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			// We can initialize a value to ourself, so to it here.
+			errs := tt.in.resolve()
+
+			switch {
+			case tt.err == "" && len(errs) > 0:
+				t.Fatalf("unexpected errors: %v", errs)
+			case tt.err != "" && len(errs) == 0:
+				t.Fatalf("did not get expected errors: %v", tt.err)
+			case len(errs) > 1:
+				t.Fatalf("too many errors: %v", errs)
+			case len(errs) == 1 && errs[0].Error() != tt.err:
+				t.Fatalf("got error %v, want %s", errs[0], tt.err)
 			case len(errs) != 0:
 				return
 			}
