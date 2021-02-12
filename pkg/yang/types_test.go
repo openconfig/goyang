@@ -181,6 +181,36 @@ func TestTypeResolve(t *testing.T) {
 		},
 		err: "invalid boolean: foo",
 	}, {
+		desc: "enum with unspecified values",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY"},
+				{Name: "VENUS"},
+				{Name: "EARTH"},
+			},
+		},
+		out: &YangType{
+			Name: "enumeration",
+			Kind: Yenum,
+			Enum: &EnumType{
+				last:   30,
+				min:    MinEnum,
+				max:    MaxEnum,
+				unique: true,
+				toString: map[int64]string{
+					1: "MERCURY",
+					2: "VENUS",
+					3: "EARTH",
+				},
+				toInt: map[string]int64{
+					"MERCURY": 1,
+					"VENUS":   2,
+					"EARTH":   3,
+				},
+			},
+		},
+	}, {
 		desc: "enum with specified values",
 		in: &Type{
 			Name: "enumeration",
@@ -211,12 +241,12 @@ func TestTypeResolve(t *testing.T) {
 			},
 		},
 	}, {
-		desc: "enum with unspecified values",
+		desc: "enum with some values specified",
 		in: &Type{
 			Name: "enumeration",
 			Enum: []*Enum{
-				{Name: "MERCURY"},
-				{Name: "VENUS"},
+				{Name: "MERCURY", Value: &Value{Name: "-1"}},
+				{Name: "VENUS", Value: &Value{Name: "10"}},
 				{Name: "EARTH"},
 			},
 		},
@@ -224,22 +254,77 @@ func TestTypeResolve(t *testing.T) {
 			Name: "enumeration",
 			Kind: Yenum,
 			Enum: &EnumType{
-				last:   30,
+				last:   11,
 				min:    MinEnum,
 				max:    MaxEnum,
 				unique: true,
 				toString: map[int64]string{
-					1: "MERCURY",
-					2: "VENUS",
-					3: "EARTH",
+					-1: "MERCURY",
+					10: "VENUS",
+					11: "EARTH",
 				},
 				toInt: map[string]int64{
-					"MERCURY": 1,
-					"VENUS":   2,
-					"EARTH":   3,
+					"MERCURY": -1,
+					"VENUS":   10,
+					"EARTH":   11,
 				},
 			},
 		},
+	}, {
+		desc: "enum with repeated specified values",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "1"}},
+				{Name: "VENUS", Value: &Value{Name: "10"}},
+				{Name: "EARTH", Value: &Value{Name: "1"}},
+			},
+		},
+		err: "unknown: fields EARTH and MERCURY conflict on value 1",
+	}, {
+		desc: "enum with repeated specified names",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-1"}},
+				{Name: "VENUS", Value: &Value{Name: "10"}},
+				{Name: "MERCURY", Value: &Value{Name: "30"}},
+			},
+		},
+		err: "unknown: field MERCURY already assigned",
+	}, {
+		desc: "enum with last specified value equal to the max enum value",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-2147483648"}},
+				{Name: "VENUS", Value: &Value{Name: "2147483647"}},
+				{Name: "EARTH"},
+			},
+		},
+		err: `unknown: enum "EARTH" must specify a value since previous enum is the maximum value allowed`,
+	}, {
+		desc: "enum value too small",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-2147483649"}},
+				{Name: "VENUS", Value: &Value{Name: "0"}},
+				{Name: "EARTH"},
+			},
+		},
+		err: `unknown: value -2147483649 for MERCURY too small (minimum is -2147483648)`,
+	}, {
+		desc: "enum value too large",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-2147483648"}},
+				{Name: "VENUS", Value: &Value{Name: "2147483648"}},
+				{Name: "EARTH"},
+			},
+		},
+		err: `unknown: value 2147483648 for VENUS too large (maximum is 2147483647)`,
 	}, {
 		desc: "enum with an unparseable value",
 		in: &Type{
