@@ -180,6 +180,77 @@ func TestTypeResolve(t *testing.T) {
 			RequireInstance: &Value{Name: "foo"},
 		},
 		err: "invalid boolean: foo",
+	}, {
+		desc: "enum with specified values",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-1"}},
+				{Name: "VENUS", Value: &Value{Name: "10"}},
+				{Name: "EARTH", Value: &Value{Name: "30"}},
+			},
+		},
+		out: &YangType{
+			Name: "enumeration",
+			Kind: Yenum,
+			Enum: &EnumType{
+				last:   30,
+				min:    MinEnum,
+				max:    MaxEnum,
+				unique: true,
+				toString: map[int64]string{
+					-1: "MERCURY",
+					10: "VENUS",
+					30: "EARTH",
+				},
+				toInt: map[string]int64{
+					"MERCURY": -1,
+					"VENUS":   10,
+					"EARTH":   30,
+				},
+			},
+		},
+	}, {
+		desc: "enum with unspecified values",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY"},
+				{Name: "VENUS"},
+				{Name: "EARTH"},
+			},
+		},
+		out: &YangType{
+			Name: "enumeration",
+			Kind: Yenum,
+			Enum: &EnumType{
+				last:   30,
+				min:    MinEnum,
+				max:    MaxEnum,
+				unique: true,
+				toString: map[int64]string{
+					1: "MERCURY",
+					2: "VENUS",
+					3: "EARTH",
+				},
+				toInt: map[string]int64{
+					"MERCURY": 1,
+					"VENUS":   2,
+					"EARTH":   3,
+				},
+			},
+		},
+	}, {
+		desc: "enum with an unparseable value",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-1"}},
+				{Name: "VENUS", Value: &Value{Name: "10"}},
+				{Name: "EARTH", Value: &Value{Name: "five"}},
+			},
+		},
+		err: `unknown: strconv.ParseUint: parsing "five": invalid syntax`,
 		// TODO(borman): Add in more tests as we honor more fields
 		// in Type.
 	}}
