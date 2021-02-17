@@ -149,9 +149,9 @@ func TestFindInDir(t *testing.T) {
 	}, {
 		desc:      "exact match with non-standard name",
 		inDir:     testDir,
-		inName:    "crazy.name",
+		inName:    "non-standard.name",
 		inRecurse: false,
-		want:      filepath.Join(testDir, "crazy.name"),
+		want:      filepath.Join(testDir, "non-standard.name"),
 	}, {
 		desc:      "revision match without recursion, and ignoring invalid revision",
 		inDir:     testDir,
