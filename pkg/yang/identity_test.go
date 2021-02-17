@@ -579,12 +579,14 @@ func TestIdentityTree(t *testing.T) {
 			switch len(errs) {
 			case 1:
 				err = errs[0]
-				fallthrough
-			case 0:
 				if diff := errdiff.Substring(err, tt.wantErrSubstr); diff != "" {
 					t.Fatalf("%s", diff)
 				}
 				return
+			case 0:
+				if diff := errdiff.Substring(err, tt.wantErrSubstr); diff != "" {
+					t.Fatalf("%s", diff)
+				}
 			default:
 				t.Fatalf("got multiple errors: %v", errs)
 			}
