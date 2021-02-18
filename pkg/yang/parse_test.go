@@ -99,7 +99,7 @@ foo "bar";
 		{line: line(), in: `
 foo "\\ \S \n";
 `,
-			err: `test.yang:2:5: invalid escape sequence: \S`,
+			err: `test.yang:2:9: invalid escape sequence: \S`,
 		},
 		{line: line(), in: `
 pattern "\\ \S \n";
@@ -264,8 +264,8 @@ foo {
 }`,
 			err: `test.yang:2:1: {: not an identifier
 test.yang:4:1: unexpected }
-test.yang:6:7: invalid escape sequence: \V
-test.yang:9:9: invalid escape sequence: \3
+test.yang:6:8: invalid escape sequence: \V
+test.yang:9:15: invalid escape sequence: \3
 test.yang:9:9: missing closing "
 test.yang: unexpected EOF`,
 		},
