@@ -129,7 +129,7 @@ var basicTestCases = []identityTestCase{
 		},
 	},
 	{
-		name: "basic-test-case-4: Check identity is found in module from submodule.",
+		name: "basic-test-case-4: Check identity base is found from submodule.",
 		in: []inputModule{
 			{
 				name: "idtest-one",
