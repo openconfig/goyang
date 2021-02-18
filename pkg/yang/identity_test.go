@@ -162,6 +162,8 @@ var basicTestCases = []identityTestCase{
 		},
 		identities: []identityOut{
 			// TODO(wenbli): Should this show up?
+			//   The reason this doesn't show up is because
+			//   Entry.merge doesn't merge the Identities field.
 			// {module: "idtest-one", name: "TEST_ID"},
 			{module: "idtest-one", name: "TEST_ID_DERIVED", baseNames: []string{"TEST_ID"}},
 		},
