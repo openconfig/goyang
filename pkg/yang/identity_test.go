@@ -132,7 +132,7 @@ var basicTestCases = []identityTestCase{
 		err: "basic-test-case-3: could not resolve identities",
 	},
 	{
-		name: "basic-test-case-4: Check identity is found in module from submodule.",
+		name: "basic-test-case-4: Check identity base is found from submodule.",
 		in: []inputModule{
 			{
 				name: "idtest-one",
@@ -162,6 +162,8 @@ var basicTestCases = []identityTestCase{
 		},
 		identities: []identityOut{
 			// TODO(wenbli): Should this show up?
+			//   The reason this doesn't show up is because
+			//   Entry.merge doesn't merge the Identities field.
 			// {module: "idtest-one", name: "TEST_ID"},
 			{module: "idtest-one", name: "TEST_ID_DERIVED", baseNames: []string{"TEST_ID"}},
 		},
