@@ -25,7 +25,9 @@ import (
 // identityDictionary stores a global set of identities that have been resolved
 // to be identified by their module and name.
 type identityDictionary struct {
-	mu   sync.Mutex
+	mu sync.Mutex
+	// TODO(wenovus): The key should not be prefix:ident-name, but
+	// module-name:ident-name. Prefixes are NOT unique.
 	dict map[string]resolvedIdentity
 }
 
@@ -38,13 +40,13 @@ type resolvedIdentity struct {
 	Identity *Identity
 }
 
-// isEmpty determines whether the resolvedIdentity struct value was defined.
+// isEmpty determines whether the resolvedIdentity struct value is populated.
 func (r resolvedIdentity) isEmpty() bool {
 	return r.Module == nil && r.Identity == nil
 }
 
 // newResolvedIdentity creates a resolved identity from an identity and its
-// associated value, and returns the prefixed name (Prefix:IdentityName)
+// associated module, and returns the prefixed name (Prefix:IdentityName)
 // along with the resolved identity.
 func newResolvedIdentity(m *Module, i *Identity) (string, *resolvedIdentity) {
 	r := &resolvedIdentity{
@@ -63,7 +65,8 @@ func appendIfNotIn(ids []*Identity, chk *Identity) []*Identity {
 	return append(ids, chk)
 }
 
-// addChildren recursively adds the identity r to ids.
+// addChildren adds identity r and all of its children to ids
+// deterministically.
 func addChildren(r *Identity, ids []*Identity) []*Identity {
 	ids = appendIfNotIn(ids, r)
 
@@ -95,13 +98,6 @@ func (mod *Module) findIdentityBase(baseStr string) (*resolvedIdentity, []error)
 			errs = append(errs, fmt.Errorf("%s: can't resolve the local base %s as %s", source, baseStr, keyName))
 		}
 	default:
-		// The identity we are looking for is prefix:basename.  If
-		// we already know prefix:basename then just use it.  If not,
-		// try again within the module identified by prefix.
-		if id, ok := identities.dict[baseStr]; ok {
-			base = id
-			break
-		}
 		// This is an identity which is defined within another module
 		extmod := FindModuleByPrefix(mod, basePrefix)
 		if extmod == nil {
@@ -179,7 +175,7 @@ func (ms *Modules) resolveIdentities() []error {
 					continue
 				}
 
-				// Append this value to the children of the base identity.
+				// Build up a list of direct children of this identity.
 				base.Identity.Values = append(base.Identity.Values, i.Identity)
 			}
 		}
