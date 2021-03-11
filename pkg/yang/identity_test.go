@@ -169,6 +169,44 @@ var basicTestCases = []identityTestCase{
 		},
 		err: "basic-test-case-4: could not resolve identities",
 	},
+	{
+		name: "basic-test-case-5: Check identity base is found from module.",
+		in: []inputModule{
+			{
+				name: "idtest-one",
+				content: `
+					module idtest-one {
+					  namespace "urn:idone";
+					  prefix "idone";
+
+					  include "idtest-one-sub";
+
+					  identity TEST_ID;
+					}
+				`},
+			{
+				name: "idtest-one-sub",
+				content: `
+					submodule idtest-one-sub {
+					  belongs-to idtest-one {
+					    prefix "idone";
+					  }
+
+					  identity TEST_ID_DERIVED {
+					    base TEST_ID;
+					  }
+					}
+				`},
+		},
+		identities: []identityOut{
+			// TODO(wenbli): Should this show up?
+			//   The reason this doesn't show up is because
+			//   Entry.merge doesn't merge the Identities field.
+			// {module: "idtest-one", name: "TEST_ID_DERIVED", baseNames: []string{"TEST_ID"}},
+			{module: "idtest-one", name: "TEST_ID"},
+		},
+		err: "basic-test-case-5: could not resolve identities",
+	},
 }
 
 // Test the ability to extract identities from a module with the correct base
