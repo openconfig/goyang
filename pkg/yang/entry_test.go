@@ -3358,6 +3358,33 @@ func TestLeafEntry(t *testing.T) {
 				t.Errorf("got %d, want %d", got, want)
 			}
 		},
+	}, {
+		name: "leaf YANG source index set correctly",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				leaf "a" {
+					type string;
+				}
+
+				leaf "b" {
+					type string;
+				}
+
+				container "c" {
+				}
+			}
+			`,
+		},
+		wantEntryPath: "/test/b",
+		wantEntryCustomTest: func(t *testing.T, e *Entry) {
+			if got, want := e.YANGSourceIndex, 1; got != want {
+				t.Errorf("did not get expected index, got: %d, want: %d", got, want)
+			}
+		},
 	}}
 
 	for _, tt := range tests {

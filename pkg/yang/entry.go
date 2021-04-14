@@ -127,6 +127,11 @@ type Entry struct {
 	// the augmenting entity per RFC6020 Section 7.15.2. The namespace
 	// of the Entry should be accessed using the Namespace function.
 	namespace *Value
+
+	// YANGSourceIndex stores the index of the entry within a directory, allowing
+	// consumers that care about the underlying ordering of the YANG file to order
+	// entries within a directory.
+	YANGSourceIndex int `json:"-"`
 }
 
 // An RPCEntry contains information related to an RPC Node.
@@ -376,6 +381,7 @@ func (e *Entry) GetErrors() []error {
 // add adds the directory entry key assigned to the provided value.
 func (e *Entry) add(key string, value *Entry) *Entry {
 	value.Parent = e
+	value.YANGSourceIndex = len(e.Dir)
 	if e.Dir[key] != nil {
 		e.errorf("%s: duplicate key from %s: %s", Source(e.Node), Source(value.Node), key)
 		return e
