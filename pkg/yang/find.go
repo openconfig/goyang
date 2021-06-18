@@ -48,10 +48,11 @@ func trimPrefix(n Node, name string) string {
 // by FindGrouping during traversal.  If no parent has the named grouping,
 // nil is returned. Imported and included modules are also checked.
 func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
-	fmt.Printf("looking for %s with seen: %v\n", name, seen)
+	//fmt.Printf("looking for %s in %s with seen: %v\n", name, n.NName(), seen)
 	name = trimPrefix(n, name)
+
 	for n != nil {
-		fmt.Printf("	looking in %s for grouping %s\n", n.NName(), name)
+		//fmt.Printf("	looking in %s for grouping %s\n", n.NName(), name)
 		// Grab the Grouping field of the underlying structure.  n is
 		// always a pointer to a structure,
 		e := reflect.ValueOf(n).Elem()
@@ -64,6 +65,7 @@ func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 		if v.IsValid() {
 			for _, g := range v.Interface().([]*Grouping) {
 				if g.Name == name {
+					//fmt.Printf("-------- COMPLETE -------\n")
 					return g
 				}
 			}
@@ -71,13 +73,17 @@ func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 		v = e.FieldByName("Import")
 		if v.IsValid() {
 			for _, i := range v.Interface().([]*Import) {
+				//fmt.Printf("	looking at import %s\n", i.Module.Name)
 				// TODO(borman): This is arguably wrong.  We
 				// need to do prefix matching.
 				pname := strings.TrimPrefix(name, i.Prefix.Name+":")
-				if pname == name {
+				//fmt.Printf("			the fixed up name is %s\n", pname)
+				/*if pname == name {
 					continue
-				}
+				}*/
+				//fmt.Printf("			from %s calling FindGrouping with %s\n", n.NName(), i.Module.Name)
 				if g := FindGrouping(i.Module, pname, seen); g != nil {
+					//fmt.Printf("-------- COMPLETE -------\n")
 					return g
 				}
 			}
@@ -85,7 +91,7 @@ func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 		v = e.FieldByName("Include")
 		if v.IsValid() {
 			for _, i := range v.Interface().([]*Include) {
-				fmt.Printf("	looking at include %s\n", i.Module.Name)
+				//fmt.Printf("	looking at include %s\n", i.Module.Name)
 				if seen[i.Module.Name] {
 					// Prevent infinite loops in the case that we have already looked at
 					// this submodule. This occurs where submodules have include statements
@@ -94,11 +100,13 @@ func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 				}
 				seen[i.Module.Name] = true
 				if g := FindGrouping(i.Module, name, seen); g != nil {
+					//fmt.Printf("-------- COMPLETE -------\n")
 					return g
 				}
 			}
 		}
 		n = n.ParentNode()
 	}
+	//fmt.Printf("-------- COMPLETE -------\n")
 	return nil
 }
