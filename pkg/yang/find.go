@@ -50,6 +50,7 @@ func trimPrefix(n Node, name string) string {
 func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 	name = trimPrefix(n, name)
 	for n != nil {
+		fmt.Printf("looking in %s for grouping %s\n", n.NName(), name)
 		// Grab the Grouping field of the underlying structure.  n is
 		// always a pointer to a structure,
 		e := reflect.ValueOf(n).Elem()
@@ -75,6 +76,7 @@ func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 				if pname == name {
 					continue
 				}
+				fmt.Printf("now loking at this import %s with %s\n", i.Name, pname)
 				if g := FindGrouping(i.Module, pname, seen); g != nil {
 					return g
 				}
