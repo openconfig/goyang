@@ -48,9 +48,10 @@ func trimPrefix(n Node, name string) string {
 // by FindGrouping during traversal.  If no parent has the named grouping,
 // nil is returned. Imported and included modules are also checked.
 func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
+	fmt.Printf("looking for %s with seen: %v\n", name, seen)
 	name = trimPrefix(n, name)
 	for n != nil {
-		fmt.Printf("looking in %s for grouping %s\n", n.NName(), name)
+		fmt.Printf("	looking in %s for grouping %s\n", n.NName(), name)
 		// Grab the Grouping field of the underlying structure.  n is
 		// always a pointer to a structure,
 		e := reflect.ValueOf(n).Elem()
@@ -84,7 +85,7 @@ func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 		v = e.FieldByName("Include")
 		if v.IsValid() {
 			for _, i := range v.Interface().([]*Include) {
-				fmt.Printf("looking at include %s\n", i.Module.Name)
+				fmt.Printf("	looking at include %s\n", i.Module.Name)
 				if seen[i.Module.Name] {
 					// Prevent infinite loops in the case that we have already looked at
 					// this submodule. This occurs where submodules have include statements
