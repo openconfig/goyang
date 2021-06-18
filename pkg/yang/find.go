@@ -76,7 +76,6 @@ func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 				if pname == name {
 					continue
 				}
-				fmt.Printf("now loking at this import %s with %s\n", i.Name, pname)
 				if g := FindGrouping(i.Module, pname, seen); g != nil {
 					return g
 				}
@@ -85,6 +84,7 @@ func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 		v = e.FieldByName("Include")
 		if v.IsValid() {
 			for _, i := range v.Interface().([]*Include) {
+				fmt.Printf("looking at include %s\n", i.Module.Name)
 				if seen[i.Module.Name] {
 					// Prevent infinite loops in the case that we have already looked at
 					// this submodule. This occurs where submodules have include statements
