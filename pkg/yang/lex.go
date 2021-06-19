@@ -386,8 +386,18 @@ func lexGround(l *lexer) stateFn {
 			l.next()
 			l.next()
 			return lexGround
+		default:
+			return lexIdentifier
 		}
-		fallthrough
+	case '+':
+		l.next()
+		switch l.peek() {
+		case '"', '\'':
+			l.emit(tIdentifier)
+			return lexGround
+		default:
+			return lexIdentifier
+		}
 	default:
 		return lexIdentifier
 	}
