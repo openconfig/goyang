@@ -17,13 +17,12 @@ package yang
 // This file has functions that search the AST for specified nodes.
 
 import (
-	"fmt"
-	"os"
 	"reflect"
 	"strings"
 )
 
-// trimPrefix trims the current module's prefix from name, if present.
+// trimPrefix trims the current module's prefix from the given name. If the
+// name is not prefixed with it, the same string is returned unchanged.
 // TODO(borman): we need to properly handle prefixs and not depend on
 // not having collisions.
 func trimPrefix(n Node, name string) string {
@@ -53,11 +52,6 @@ func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 		// Grab the Grouping field of the underlying structure.  n is
 		// always a pointer to a structure,
 		e := reflect.ValueOf(n).Elem()
-		if !e.IsValid() {
-			// TODO(borman): we should return an error somehow
-			fmt.Fprintf(os.Stderr, "%s: unknown grouping\n", name)
-			return nil
-		}
 		v := e.FieldByName("Grouping")
 		if v.IsValid() {
 			for _, g := range v.Interface().([]*Grouping) {
