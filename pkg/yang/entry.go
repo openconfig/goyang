@@ -71,12 +71,13 @@ type deviationPresence struct {
 	hasMaxElements bool
 }
 
-// An Entry represents a single node (directory or leaf) created from the AST
-// after applying modifications (i.e. uses, augments, deviations).  There are
-// two high-level types of entries: Directory and Leaf entries. They can be
-// distinguished by whether their "Dir" field is nil.  If Errors is not nil
-// then it means semantic errors existed while converting the AST, in which
-// case the only other valid field is Node.
+// Entry represents a single schema tree node, which can be a directory
+// (containing a subtree) or a leaf node (which contains YANG types that have
+// no children, e.g., leaf, leaf-list). They can be distinguished by whether
+// their "Dir" field is nil. This object is created from a corresponding AST
+// node after applying modifications (i.e. uses, augments, deviations). If
+// Errors is not nil then it means semantic errors existed while converting the
+// AST, in which case the only other valid field other than Errors is Node.
 type Entry struct {
 	Parent      *Entry    `json:"-"`
 	Node        Node      `json:"-"` // the base node this Entry was derived from.
