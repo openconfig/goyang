@@ -33,22 +33,13 @@ type Modules struct {
 
 // NewModules returns a newly created and initialized Modules.
 func NewModules() *Modules {
-	d := &typeDictionary{dict: map[Node]map[string]*Typedef{}}
-	// taking the lock should not be needed as this type should only be modified
-	// during init.
-	typeDict.mu.Lock()
-	defer typeDict.mu.Unlock()
-	for k, v := range typeDict.dict {
-		d.dict[k] = v
-	}
-
 	return &Modules{
 		Modules:    map[string]*Module{},
 		SubModules: map[string]*Module{},
 		includes:   map[*Module]bool{},
 		byPrefix:   map[string]*Module{},
 		byNS:       map[string]*Module{},
-		typeDict:   d,
+		typeDict:   &typeDictionary{dict: map[Node]map[string]*Typedef{}},
 	}
 }
 

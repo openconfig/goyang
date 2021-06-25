@@ -535,7 +535,7 @@ func ToEntry(n Node) (e *Entry) {
 			Errors: []error{err},
 		}
 	}
-	ms := getModules(n)
+	ms := RootNode(n).modules
 	if e := entryCache[n]; e != nil {
 		return e
 	}
@@ -1004,13 +1004,6 @@ func ToEntry(n Node) (e *Entry) {
 	}
 
 	return e
-}
-
-func getModules(n Node) *Modules {
-	for n.ParentNode() != nil {
-		n = n.ParentNode()
-	}
-	return n.(*Module).modules
 }
 
 // addExtraKeywordsToLeafEntry stores the values for unimplemented keywords in leaf entries.

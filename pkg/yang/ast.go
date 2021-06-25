@@ -65,10 +65,6 @@ type meta struct {
 	Module []*Module `yang:"module"`
 }
 
-func init() {
-	initTypes(reflect.TypeOf(&meta{}), &typeDict)
-}
-
 // aliases is a map of "aliased" names, that is, two types of statements
 // that parse (nearly) the same.
 var aliases = map[string]string{
@@ -82,6 +78,7 @@ func BuildAST(s *Statement) (Node, error) {
 }
 
 func buildASTWithTypeDict(s *Statement, d *typeDictionary) (Node, error) {
+	initTypes(reflect.TypeOf(&meta{}), d)
 	v, err := build(s, nilValue, d)
 	if err != nil {
 		return nil, err
