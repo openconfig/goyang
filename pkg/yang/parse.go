@@ -14,7 +14,7 @@
 
 package yang
 
-// Thile file implements Parse, which  parses the input as generic YANG and
+// This file implements Parse, which  parses the input as generic YANG and
 // returns a slice of base Statements (which in turn may contain more
 // Statements, i.e., a slice of Statement trees.)
 //
@@ -31,10 +31,12 @@ import (
 
 // a parser is used to parse the contents of a single .yang file.
 type parser struct {
-	lex        *lexer
-	errout     *bytes.Buffer
-	tokens     []*token     // stack of pushed tokens (for backing up)
-	statements []*Statement // list of root statements
+	lex    *lexer
+	errout *bytes.Buffer
+	tokens []*token // stack of pushed tokens (for backing up)
+
+	// Depth of statements in nested braces
+	statementDepth int
 
 	// hitBrace is returned when we encounter a '}'.  The statement location
 	// is updated with the location of the '}'.  The brace may be legitimate
@@ -68,8 +70,6 @@ func FakeStatement(keyword, file string, line, col int) *Statement {
 	}
 }
 
-// Make Statement statisfy Node
-
 func (s *Statement) NName() string         { return s.Argument }
 func (s *Statement) Kind() string          { return s.Keyword }
 func (s *Statement) Statement() *Statement { return s }
@@ -93,7 +93,7 @@ func (s *Statement) String() string {
 	return b.String()
 }
 
-// Location returns the loction in the source where s was defined.
+// Location returns the location in the source where s was defined.
 func (s *Statement) Location() string {
 	switch {
 	case s.file == "" && s.line == 0:
@@ -101,7 +101,7 @@ func (s *Statement) Location() string {
 	case s.file == "":
 		return fmt.Sprintf("line %d:%d", s.line, s.col)
 	case s.line == 0:
-		return fmt.Sprintf("%s", s.file)
+		return s.file
 	default:
 		return fmt.Sprintf("%s:%d:%d", s.file, s.line, s.col)
 	}
@@ -191,6 +191,8 @@ Loop:
 		}
 	}
 
+	p.checkStatementDepth()
+
 	if p.errout.Len() == 0 {
 		return statements, nil
 	}
@@ -273,6 +275,7 @@ func (p *parser) nextStatement() *Statement {
 	case tEOF:
 		return nil
 	case closeBrace:
+		p.statementDepth -= 1
 		p.hitBrace.file = t.File
 		p.hitBrace.line = t.Line
 		p.hitBrace.col = t.Col
@@ -309,6 +312,7 @@ func (p *parser) nextStatement() *Statement {
 	case ';':
 		return s
 	case openBrace:
+		p.statementDepth += 1
 		for {
 			switch ns := p.nextStatement(); ns {
 			case nil:
@@ -323,4 +327,25 @@ func (p *parser) nextStatement() *Statement {
 		fmt.Fprintf(p.errout, "%v: syntax error\n", t)
 		return ignoreMe
 	}
+}
+
+// Checks that we have a statement depth of 0. It's an error to exit
+// the parser with a depth of > 0, it means we are missing closing
+// braces. Note: the parser will error out for the case where we
+// start with an unmatched close brace, eg. depth < 0
+//
+// This test is only done if there are no other errors as
+// we may exit early due to those errors -- and therefore there *might*
+// not really be a mismatched brace issue.
+func (p *parser) checkStatementDepth() {
+	if p.errout.Len() > 0 || p.statementDepth < 1 {
+		return
+	}
+
+	plural := ""
+	if p.statementDepth > 1 {
+		plural = "s"
+	}
+	fmt.Fprintf(p.errout, "%s:%d:%d: missing %d closing brace%s\n",
+		p.lex.file, p.lex.line, p.lex.col, p.statementDepth, plural)
 }

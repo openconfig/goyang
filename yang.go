@@ -30,7 +30,7 @@
 // to append to the search directory.  If DIR appears as DIR/... then
 // DIR and all direct and indirect subdirectories are checked.
 //
-// FORMAT, which defaults to "tree", specifes the format of output to produce.
+// FORMAT, which defaults to "tree", specifies the format of output to produce.
 // Use "goyang --help" for a list of available formats.
 //
 // FORMAT OPTIONS are flags that apply to a specific format.  They must follow
@@ -92,11 +92,11 @@ func main() {
 	var traceP string
 	var help bool
 	var paths []string
-	getopt.ListVarLong(&paths, "path", 0, "comma separated list of directories to add to search path", "DIR[,DIR...]")
-	getopt.StringVarLong(&format, "format", 0, "format to display: "+strings.Join(formats, ", "), "FORMAT")
-	getopt.StringVarLong(&traceP, "trace", 0, "write trace into to TRACEFILE", "TRACEFILE")
-	getopt.BoolVarLong(&help, "help", '?', "display help")
-	getopt.BoolVarLong(&yang.ParseOptions.IgnoreSubmoduleCircularDependencies, "ignore-circdep", 0, "ignore circular dependencies between submodules")
+	getopt.ListVarLong(&paths, "path", 'p', "comma separated list of directories to add to search path", "DIR[,DIR...]")
+	getopt.StringVarLong(&format, "format", 'f', "format to display: "+strings.Join(formats, ", "), "FORMAT")
+	getopt.StringVarLong(&traceP, "trace", 't', "write trace into to TRACEFILE", "TRACEFILE")
+	getopt.BoolVarLong(&help, "help", 'h', "display help")
+	getopt.BoolVarLong(&yang.ParseOptions.IgnoreSubmoduleCircularDependencies, "ignore-circdep", 'g', "ignore circular dependencies between submodules")
 	getopt.SetParameters("[FORMAT OPTIONS] [SOURCE] [...]")
 
 	if err := getopt.Getopt(func(o getopt.Option) bool {

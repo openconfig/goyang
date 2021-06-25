@@ -47,7 +47,7 @@ func (s *Value) asRangeInt(min, max int64) (int64, error) {
 	if s == nil {
 		return 0, fmt.Errorf("value is required in the range of [%d..%d]", min, max)
 	}
-	n, err := ParseNumber(s.Name)
+	n, err := ParseInt(s.Name)
 	if err != nil {
 		return 0, err
 	}
@@ -140,8 +140,6 @@ type Module struct {
 	// typedefs is a list of all top level typedefs in this
 	// module.
 	modules *Modules
-
-	typedefs map[string]*Typedef
 }
 
 func (s *Module) Kind() string {
@@ -339,25 +337,26 @@ type Container struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Anydata     []*AnyData   `yang:"anydata"`
-	Action      []*Action    `yang:"action"`
-	Anyxml      []*AnyXML    `yang:"anyxml"`
-	Choice      []*Choice    `yang:"choice"`
-	Config      *Value       `yang:"config"`
-	Container   []*Container `yang:"container"`
-	Description *Value       `yang:"description"`
-	Grouping    []*Grouping  `yang:"grouping"`
-	IfFeature   []*Value     `yang:"if-feature"`
-	Leaf        []*Leaf      `yang:"leaf"`
-	LeafList    []*LeafList  `yang:"leaf-list"`
-	List        []*List      `yang:"list"`
-	Must        []*Must      `yang:"must"`
-	Presence    *Value       `yang:"presence"`
-	Reference   *Value       `yang:"reference"`
-	Status      *Value       `yang:"status"`
-	Typedef     []*Typedef   `yang:"typedef"`
-	Uses        []*Uses      `yang:"uses"`
-	When        *Value       `yang:"when"`
+	Anydata      []*AnyData      `yang:"anydata"`
+	Action       []*Action       `yang:"action"`
+	Anyxml       []*AnyXML       `yang:"anyxml"`
+	Choice       []*Choice       `yang:"choice"`
+	Config       *Value          `yang:"config"`
+	Container    []*Container    `yang:"container"`
+	Description  *Value          `yang:"description"`
+	Grouping     []*Grouping     `yang:"grouping"`
+	IfFeature    []*Value        `yang:"if-feature"`
+	Leaf         []*Leaf         `yang:"leaf"`
+	LeafList     []*LeafList     `yang:"leaf-list"`
+	List         []*List         `yang:"list"`
+	Must         []*Must         `yang:"must"`
+	Notification []*Notification `yang:"notification"`
+	Presence     *Value          `yang:"presence"`
+	Reference    *Value          `yang:"reference"`
+	Status       *Value          `yang:"status"`
+	Typedef      []*Typedef      `yang:"typedef"`
+	Uses         []*Uses         `yang:"uses"`
+	When         *Value          `yang:"when"`
 }
 
 func (Container) Kind() string              { return "container" }
@@ -449,29 +448,30 @@ type List struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Anydata     []*AnyData   `yang:"anydata"`
-	Action      []*Action    `yang:"action"`
-	Anyxml      []*AnyXML    `yang:"anyxml"`
-	Choice      []*Choice    `yang:"choice"`
-	Config      *Value       `yang:"config"`
-	Container   []*Container `yang:"container"`
-	Description *Value       `yang:"description"`
-	Grouping    []*Grouping  `yang:"grouping"`
-	IfFeature   []*Value     `yang:"if-feature"`
-	Key         *Value       `yang:"key"`
-	Leaf        []*Leaf      `yang:"leaf"`
-	LeafList    []*LeafList  `yang:"leaf-list"`
-	List        []*List      `yang:"list"`
-	MaxElements *Value       `yang:"max-elements"`
-	MinElements *Value       `yang:"min-elements"`
-	Must        []*Must      `yang:"must"`
-	OrderedBy   *Value       `yang:"ordered-by"`
-	Reference   *Value       `yang:"reference"`
-	Status      *Value       `yang:"status"`
-	Typedef     []*Typedef   `yang:"typedef"`
-	Unique      []*Value     `yang:"unique"`
-	Uses        []*Uses      `yang:"uses"`
-	When        *Value       `yang:"when"`
+	Anydata      []*AnyData      `yang:"anydata"`
+	Action       []*Action       `yang:"action"`
+	Anyxml       []*AnyXML       `yang:"anyxml"`
+	Choice       []*Choice       `yang:"choice"`
+	Config       *Value          `yang:"config"`
+	Container    []*Container    `yang:"container"`
+	Description  *Value          `yang:"description"`
+	Grouping     []*Grouping     `yang:"grouping"`
+	IfFeature    []*Value        `yang:"if-feature"`
+	Key          *Value          `yang:"key"`
+	Leaf         []*Leaf         `yang:"leaf"`
+	LeafList     []*LeafList     `yang:"leaf-list"`
+	List         []*List         `yang:"list"`
+	MaxElements  *Value          `yang:"max-elements"`
+	MinElements  *Value          `yang:"min-elements"`
+	Must         []*Must         `yang:"must"`
+	Notification []*Notification `yang:"notification"`
+	OrderedBy    *Value          `yang:"ordered-by"`
+	Reference    *Value          `yang:"reference"`
+	Status       *Value          `yang:"status"`
+	Typedef      []*Typedef      `yang:"typedef"`
+	Unique       []*Value        `yang:"unique"`
+	Uses         []*Uses         `yang:"uses"`
+	When         *Value          `yang:"when"`
 }
 
 func (List) Kind() string              { return "list" }
@@ -597,20 +597,21 @@ type Grouping struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Anydata     []*AnyData   `yang:"anydata"`
-	Action      []*Action    `yang:"action"`
-	Anyxml      []*AnyXML    `yang:"anyxml"`
-	Choice      []*Choice    `yang:"choice"`
-	Container   []*Container `yang:"container"`
-	Description *Value       `yang:"description"`
-	Grouping    []*Grouping  `yang:"grouping"`
-	Leaf        []*Leaf      `yang:"leaf"`
-	LeafList    []*LeafList  `yang:"leaf-list"`
-	List        []*List      `yang:"list"`
-	Reference   *Value       `yang:"reference"`
-	Status      *Value       `yang:"status"`
-	Typedef     []*Typedef   `yang:"typedef"`
-	Uses        []*Uses      `yang:"uses"`
+	Anydata      []*AnyData      `yang:"anydata"`
+	Action       []*Action       `yang:"action"`
+	Anyxml       []*AnyXML       `yang:"anyxml"`
+	Choice       []*Choice       `yang:"choice"`
+	Container    []*Container    `yang:"container"`
+	Description  *Value          `yang:"description"`
+	Grouping     []*Grouping     `yang:"grouping"`
+	Leaf         []*Leaf         `yang:"leaf"`
+	LeafList     []*LeafList     `yang:"leaf-list"`
+	List         []*List         `yang:"list"`
+	Notification []*Notification `yang:"notification"`
+	Reference    *Value          `yang:"reference"`
+	Status       *Value          `yang:"status"`
+	Typedef      []*Typedef      `yang:"typedef"`
+	Uses         []*Uses         `yang:"uses"`
 }
 
 func (Grouping) Kind() string              { return "grouping" }
@@ -650,15 +651,16 @@ type Refine struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Default     *Value  `yang:"default"`
-	Description *Value  `yang:"description"`
-	Reference   *Value  `yang:"reference"`
-	Config      *Value  `yang:"config"`
-	Mandatory   *Value  `yang:"mandatory"`
-	Presence    *Value  `yang:"presence"`
-	Must        []*Must `yang:"must"`
-	MaxElements *Value  `yang:"max-elements"`
-	MinElements *Value  `yang:"min-elements"`
+	Default     *Value   `yang:"default"`
+	Description *Value   `yang:"description"`
+	IfFeature   []*Value `yang:"if-feature"`
+	Reference   *Value   `yang:"reference"`
+	Config      *Value   `yang:"config"`
+	Mandatory   *Value   `yang:"mandatory"`
+	Presence    *Value   `yang:"presence"`
+	Must        []*Must  `yang:"must"`
+	MaxElements *Value   `yang:"max-elements"`
+	MinElements *Value   `yang:"min-elements"`
 }
 
 func (Refine) Kind() string             { return "refine" }
@@ -785,21 +787,22 @@ type Augment struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Anydata     []*AnyData   `yang:"anydata"`
-	Action      []*Action    `yang:"action"`
-	Anyxml      []*AnyXML    `yang:"anyxml"`
-	Case        []*Case      `yang:"case"`
-	Choice      []*Choice    `yang:"choice"`
-	Container   []*Container `yang:"container"`
-	Description *Value       `yang:"description"`
-	IfFeature   []*Value     `yang:"if-feature"`
-	Leaf        []*Leaf      `yang:"leaf"`
-	LeafList    []*LeafList  `yang:"leaf-list"`
-	List        []*List      `yang:"list"`
-	Reference   *Value       `yang:"reference"`
-	Status      *Value       `yang:"status"`
-	Uses        []*Uses      `yang:"uses"`
-	When        *Value       `yang:"when"`
+	Anydata      []*AnyData      `yang:"anydata"`
+	Action       []*Action       `yang:"action"`
+	Anyxml       []*AnyXML       `yang:"anyxml"`
+	Case         []*Case         `yang:"case"`
+	Choice       []*Choice       `yang:"choice"`
+	Container    []*Container    `yang:"container"`
+	Description  *Value          `yang:"description"`
+	IfFeature    []*Value        `yang:"if-feature"`
+	Leaf         []*Leaf         `yang:"leaf"`
+	LeafList     []*LeafList     `yang:"leaf-list"`
+	List         []*List         `yang:"list"`
+	Notification []*Notification `yang:"notification"`
+	Reference    *Value          `yang:"reference"`
+	Status       *Value          `yang:"status"`
+	Uses         []*Uses         `yang:"uses"`
+	When         *Value          `yang:"when"`
 }
 
 func (Augment) Kind() string             { return "augment" }
@@ -815,8 +818,9 @@ type Identity struct {
 	Parent     Node         `yang:"Parent,nomerge" json:"-"`
 	Extensions []*Statement `yang:"Ext" json:"-"`
 
-	Base        *Value      `yang:"base" json:"-"`
+	Base        []*Value    `yang:"base" json:"-"`
 	Description *Value      `yang:"description" json:"-"`
+	IfFeature   []*Value    `yang:"if-feature" json:"-"`
 	Reference   *Value      `yang:"reference" json:"-"`
 	Status      *Value      `yang:"status" json:"-"`
 	Values      []*Identity `json:",omitempty"`
@@ -837,10 +841,7 @@ func (s *Identity) PrefixedName() string {
 // true if an identity with the name is defined within the Values of the
 // identity
 func (s *Identity) IsDefined(name string) bool {
-	if s.GetValue(name) != nil {
-		return true
-	}
-	return false
+	return s.GetValue(name) != nil
 }
 
 // GetValue returns a pointer to the identity with name "name" that is within
@@ -973,10 +974,11 @@ type Enum struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Description *Value `yang:"description"`
-	Reference   *Value `yang:"reference"`
-	Status      *Value `yang:"status"`
-	Value       *Value `yang:"value"`
+	Description *Value   `yang:"description"`
+	IfFeature   []*Value `yang:"if-feature"`
+	Reference   *Value   `yang:"reference"`
+	Status      *Value   `yang:"status"`
+	Value       *Value   `yang:"value"`
 }
 
 func (Enum) Kind() string             { return "enum" }
@@ -992,10 +994,11 @@ type Bit struct {
 	Parent     Node         `yang:"Parent,nomerge"`
 	Extensions []*Statement `yang:"Ext"`
 
-	Description *Value `yang:"description"`
-	Reference   *Value `yang:"reference"`
-	Status      *Value `yang:"status"`
-	Position    *Value `yang:"position"`
+	Description *Value   `yang:"description"`
+	IfFeature   []*Value `yang:"if-feature"`
+	Reference   *Value   `yang:"reference"`
+	Status      *Value   `yang:"status"`
+	Position    *Value   `yang:"position"`
 }
 
 func (Bit) Kind() string             { return "bit" }

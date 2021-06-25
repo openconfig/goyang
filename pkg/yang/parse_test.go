@@ -156,6 +156,19 @@ foo {
 		},
 		{line: line(), in: `
 foo {
+   key "value1     value2
+
+	 value3";
+}
+`,
+			out: []*Statement{
+				S("foo",
+					SA("key", "value1     value2\n\n value3"),
+				),
+			},
+		},
+		{line: line(), in: `
+foo {
    key value;
    key2;
 }
@@ -199,6 +212,27 @@ foo1 {
 					SA("key", "value1"),
 					S("foo2",
 						SA("key", "value2"),
+					),
+				),
+			},
+		},
+		{line: line(), in: `
+foo1 {
+    key value1;
+    foo2 {
+      pattern '[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+'
+            + '(\.[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+)*'
+            + '@'
+            + '[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+'
+            + '(\.[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+)*';
+    }
+}
+`,
+			out: []*Statement{
+				S("foo1",
+					SA("key", "value1"),
+					S("foo2",
+						SA("pattern", "[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(\\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(\\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*"),
 					),
 				),
 			},
@@ -255,6 +289,25 @@ test.yang:6:7: invalid escape sequence: \V
 test.yang:9:9: invalid escape sequence: \3
 test.yang:9:9: missing closing "
 test.yang: unexpected EOF`,
+		},
+		{line: line(), in: `
+module base {
+   container top-missing-close-brace {
+      leaf my-leaf {
+        type string;
+      }
+   }
+`,
+			err: "test.yang:8:0: missing 1 closing brace",
+		},
+		{line: line(), in: `
+module base {
+   container top-missing-close-brace {
+      leaf my-leaf {
+        type string;
+   }
+`,
+			err: "test.yang:7:0: missing 2 closing braces",
 		},
 	} {
 		s, err := Parse(tt.in, "test.yang")

@@ -44,7 +44,7 @@ func AddPath(paths ...string) {
 	}
 }
 
-// PathsWithModules returns all paths  under and including the
+// PathsWithModules returns all paths under and including the
 // root containing files with a ".yang" extension, as well as
 // any error encountered
 func PathsWithModules(root string) (paths []string, err error) {
@@ -112,7 +112,7 @@ func findFile(name string) (string, string, error) {
 		if filepath.Base(dir) == "..." {
 			n = scanDir(filepath.Dir(dir), name, true)
 		} else {
-			n = filepath.Join(dir, name)
+			n = scanDir(dir, name, false)
 		}
 		if n == "" {
 			continue

@@ -94,7 +94,6 @@ func (mod *Module) findIdentityBase(baseStr string) (*resolvedIdentity, []error)
 		if !ok {
 			errs = append(errs, fmt.Errorf("%s: can't resolve the local base %s as %s", source, baseStr, keyName))
 		}
-		break
 	default:
 		// The identity we are looking for is prefix:basename.  If
 		// we already know prefix:basename then just use it.  If not,
@@ -169,18 +168,20 @@ func (ms *Modules) resolveIdentities() []error {
 	// that have a base, so that we can do inheritance of these later.
 	for _, i := range identities.dict {
 		if i.Identity.Base != nil {
-			// This identity inherits from another identity.
+			// This identity inherits from one or more other identities.
 
 			root := RootNode(i.Identity)
-			base, baseErr := root.findIdentityBase(i.Identity.Base.asString())
+			for _, b := range i.Identity.Base {
+				base, baseErr := root.findIdentityBase(b.asString())
 
-			if baseErr != nil {
-				errs = append(errs, baseErr...)
-				continue
+				if baseErr != nil {
+					errs = append(errs, baseErr...)
+					continue
+				}
+
+				// Append this value to the children of the base identity.
+				base.Identity.Values = append(base.Identity.Values, i.Identity)
 			}
-
-			// Append this value to the children of the base identity.
-			base.Identity.Values = append(base.Identity.Values, i.Identity)
 		}
 	}
 

@@ -124,6 +124,35 @@ func FindModuleByPrefix(n Node, prefix string) *Module {
 	return nil
 }
 
+// MatchingExtensions returns the subset of the given node's extensions
+// that match the given module and identifier.
+func MatchingExtensions(n Node, module, identifier string) ([]*Statement, error) {
+	return matchingExtensions(n, n.Exts(), module, identifier)
+}
+
+// MatchingEntryExtensions returns the subset of the given entry's extensions
+// that match the given module and identifier.
+func MatchingEntryExtensions(e *Entry, module, identifier string) ([]*Statement, error) {
+	return matchingExtensions(e.Node, e.Exts, module, identifier)
+}
+
+// matchingEntryExtensions returns the subset of the given node's extensions
+// that match the given module and identifier.
+func matchingExtensions(n Node, exts []*Statement, module, identifier string) ([]*Statement, error) {
+	var matchingExtensions []*Statement
+	for _, ext := range exts {
+		names := strings.SplitN(ext.Keyword, ":", 2)
+		mod := FindModuleByPrefix(n, names[0])
+		if mod == nil {
+			return nil, fmt.Errorf("matchingExtensions: module prefix %q not found", names[0])
+		}
+		if len(names) == 2 && names[1] == identifier && mod.Name == module {
+			matchingExtensions = append(matchingExtensions, ext)
+		}
+	}
+	return matchingExtensions, nil
+}
+
 // RootNode returns the submodule or module that n was defined in.
 func RootNode(n Node) *Module {
 	for ; n.ParentNode() != nil; n = n.ParentNode() {
@@ -134,9 +163,19 @@ func RootNode(n Node) *Module {
 	return nil
 }
 
+// NodePath returns the full path of the node from the module name.
+func NodePath(n Node) string {
+	var path string
+	for n != nil {
+		path = "/" + n.NName() + path
+		n = n.ParentNode()
+	}
+	return path
+}
+
 // FindNode finds the node referenced by path relative to n.  If path does not
 // reference a node then nil is returned (i.e. path not found).  The path looks
-// similar to an XPath but curently has no wildcarding.  For example:
+// similar to an XPath but currently has no wildcarding.  For example:
 // "/if:interfaces/if:interface" and "../config".
 func FindNode(n Node, path string) (Node, error) {
 	if path == "" {
@@ -170,7 +209,6 @@ func FindNode(n Node, path string) (Node, error) {
 				return nil, fmt.Errorf("%s: unknown module %s", m.Name, mod.BelongsTo.Name)
 			}
 			if prefix == "" || prefix == mod.BelongsTo.Prefix.Name {
-				mod = m
 				goto processing
 			}
 			mod = m

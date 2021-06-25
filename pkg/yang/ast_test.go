@@ -53,9 +53,9 @@ func (m *MainNode) checkEqual(n Node) string {
 	}
 	if (m.Field == nil) != (o.Field == nil) {
 		if m.Field == nil {
-			return fmt.Sprintf("unexpected field entry")
+			return "unexpected field entry"
 		}
-		return fmt.Sprintf("missing expected field entry")
+		return "missing expected field entry"
 	}
 	if m.Field != nil {
 		if m.Field.Name != o.Field.Name {
@@ -73,9 +73,9 @@ func (m *MainNode) checkEqual(n Node) string {
 	}
 	if (m.ChildNode == nil) != (o.ChildNode == nil) {
 		if m.ChildNode == nil {
-			return fmt.Sprintf("unexpected child_node entry")
+			return "unexpected child_node entry"
 		}
-		return fmt.Sprintf("missing expected child_node entry")
+		return "missing expected child_node entry"
 	}
 	if m.ChildNode != nil {
 		if s := m.ChildNode.checkEqual(o.ChildNode); s != "" {
@@ -93,9 +93,9 @@ func (m *MainNode) checkEqual(n Node) string {
 	}
 	if (m.ReqNode == nil) != (o.ReqNode == nil) {
 		if m.ReqNode == nil {
-			return fmt.Sprintf("unexpected req_node entry")
+			return "unexpected req_node entry"
 		}
-		return fmt.Sprintf("missing expected req_node entry")
+		return "missing expected req_node entry"
 	}
 	if m.ReqNode != nil {
 		if s := m.ReqNode.checkEqual(o.ReqNode); s != "" {
@@ -129,9 +129,9 @@ func (s *SubNode) checkEqual(o *SubNode) string {
 	}
 	if (s.SubField == nil) != (o.SubField == nil) {
 		if s.SubField == nil {
-			return fmt.Sprintf("unexpected sub_field entry")
+			return "unexpected sub_field entry"
 		}
-		return fmt.Sprintf("missing expected sub_field entry")
+		return "missing expected sub_field entry"
 	}
 	if s.SubField != nil {
 		if s.SubField.Name != o.SubField.Name {
@@ -166,9 +166,9 @@ func (s *ReqNode) checkEqual(o *ReqNode) string {
 	}
 	if (s.ReqField == nil) != (o.ReqField == nil) {
 		if s.ReqField == nil {
-			return fmt.Sprintf("unexpected req_field entry")
+			return "unexpected req_field entry"
 		}
-		return fmt.Sprintf("missing expected req_field entry")
+		return "missing expected req_field entry"
 	}
 	if s.ReqField != nil {
 		if s.ReqField.Name != o.ReqField.Name {
@@ -273,10 +273,10 @@ main_node the_node {
 					Name: "field_value",
 				},
 				Slice: []*Value{
-					&Value{
+					{
 						Name: "sl1",
 					},
-					&Value{
+					{
 						Name: "sl2",
 					},
 				},
@@ -289,7 +289,7 @@ main_node the_node {
 					},
 				},
 				ChildSlice: []*SubNode{
-					&SubNode{
+					{
 						Source: SA("child_slice", "element1",
 							SA("sub_field", "el1")),
 						Name: "element1",
@@ -297,7 +297,7 @@ main_node the_node {
 							Name: "el1",
 						},
 					},
-					&SubNode{
+					{
 						Source: SA("child_slice", "element2",
 							SA("sub_field", "el2")),
 						Name: "element2",

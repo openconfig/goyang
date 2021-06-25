@@ -16,14 +16,18 @@ package yang
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/openconfig/gnmi/errdiff"
 )
 
@@ -35,8 +39,6 @@ func TestNilEntry(t *testing.T) {
 	}
 	errs := e.GetErrors()
 	switch len(errs) {
-	case 0:
-		t.Fatalf("GetErrors returned no error")
 	default:
 		t.Errorf("got %d errors, wanted 1", len(errs))
 		fallthrough
@@ -46,6 +48,8 @@ func TestNilEntry(t *testing.T) {
 		if got != want {
 			t.Fatalf("got error %q, want %q", got, want)
 		}
+	case 0:
+		t.Fatalf("GetErrors returned no error")
 	}
 }
 
@@ -116,6 +120,43 @@ module base {
 			`bad-augment.yang:6:3: augment erewhon not found`,
 		},
 	},
+	{
+		name: "bad-min-max-elements.yang",
+		in: `
+module base {
+  namespace "urn:mod";
+  prefix "base";
+  list foo {
+    // bad arguments to min-elements and max-elements
+    min-elements bar;
+    max-elements -5;
+  }
+  leaf-list bar {
+    type string;
+    // bad arguments to min-elements and max-elements
+    min-elements unbounded;
+    max-elements 122222222222222222222222222222222222222222222222222222222222;
+  }
+  list baz {
+    // good arguments
+    min-elements 0;
+    max-elements unbounded;
+  }
+  list caz {
+    // bad max element: has to be positive.
+    min-elements 0;
+    max-elements 0;
+  }
+}
+`,
+		errors: []string{
+			`bad-min-max-elements.yang:7:5: invalid min-elements value`,
+			`bad-min-max-elements.yang:8:5: invalid max-elements value`,
+			`bad-min-max-elements.yang:13:5: invalid min-elements value`,
+			`bad-min-max-elements.yang:14:5: invalid max-elements value`,
+			`bad-min-max-elements.yang:24:5: invalid max-elements value`,
+		},
+	},
 }
 
 func TestBadYang(t *testing.T) {
@@ -131,7 +172,7 @@ func TestBadYang(t *testing.T) {
 		} else {
 			ok := true
 			for x, err := range errs {
-				if err.Error() != tt.errors[x] {
+				if !strings.Contains(err.Error(), tt.errors[x]) {
 					ok = false
 					break
 				}
@@ -1083,6 +1124,7 @@ func TestFullModuleProcess(t *testing.T) {
 		inModules        map[string]string
 		inIgnoreCircDeps bool
 		wantLeaves       map[string][]string
+		customVerify     func(t *testing.T, module *Entry)
 		wantErr          bool
 	}{{
 		name: "circular import via child",
@@ -1297,6 +1339,142 @@ func TestFullModuleProcess(t *testing.T) {
 		wantLeaves: map[string][]string{
 			"parent": {"s", "d"},
 		},
+	}, {
+		name: "parent with grouping and with extension",
+		inModules: map[string]string{
+			"parent": `
+			module parent {
+				prefix "p";
+				namespace "urn:p";
+
+				import extensions {
+					prefix "ext";
+				}
+
+				container c {
+					ext:c-define "c's extension";
+					uses daughter-group {
+						ext:u-define "uses's extension";
+					}
+				}
+
+				grouping daughter-group {
+					ext:g-define "daughter-group's extension";
+
+					leaf l {
+						ext:l-define "l's extension";
+						type string;
+					}
+
+					container c2 {
+						leaf l2 {
+							type string;
+						}
+					}
+
+					// test nested grouping extensions.
+					uses son-group {
+						ext:sg-define "son-group's extension";
+					}
+				}
+
+				grouping son-group {
+					leaf s {
+						ext:s-define "s's extension";
+						type string;
+					}
+
+				}
+			}
+			`,
+			"extension": `
+			module extensions {
+				prefix "q";
+				namespace "urn:q";
+
+				extension c-define {
+					description
+					"Takes as an argument a name string.
+					c's extension.";
+					argument "name";
+			       }
+				extension g-define {
+					description
+					"Takes as an argument a name string.
+					daughter-group's extension.";
+					argument "name";
+			       }
+				extension sg-define {
+					description
+					"Takes as an argument a name string.
+					son-groups's extension.";
+					argument "name";
+			       }
+				extension s-define {
+					description
+					"Takes as an argument a name string.
+					s's extension.";
+					argument "name";
+			       }
+				extension l-define {
+					description
+					"Takes as an argument a name string.
+					l's extension.";
+					argument "name";
+			       }
+				extension u-define {
+					description
+					"Takes as an argument a name string.
+					uses's extension.";
+					argument "name";
+			       }
+			}
+			`,
+		},
+		wantLeaves: map[string][]string{
+			"parent": {"c"},
+		},
+		customVerify: func(t *testing.T, module *Entry) {
+			// Verify that an extension within the uses statement
+			// and within a grouping's definition is copied to each
+			// of the top-level nodes within the grouping, and no
+			// one else above or below.
+			less := cmpopts.SortSlices(func(l, r *Statement) bool { return l.Keyword < r.Keyword })
+
+			if diff := cmp.Diff([]*Statement{
+				{Keyword: "ext:c-define", HasArgument: true, Argument: "c's extension"},
+			}, module.Dir["c"].Exts, cmpopts.IgnoreUnexported(Statement{}), less); diff != "" {
+				t.Errorf("container c Exts (-want, +got):\n%s", diff)
+			}
+
+			if diff := cmp.Diff([]*Statement{
+				{Keyword: "ext:g-define", HasArgument: true, Argument: "daughter-group's extension"},
+				{Keyword: "ext:l-define", HasArgument: true, Argument: "l's extension"},
+				{Keyword: "ext:u-define", HasArgument: true, Argument: "uses's extension"},
+			}, module.Dir["c"].Dir["l"].Exts, cmpopts.IgnoreUnexported(Statement{}), less); diff != "" {
+				t.Errorf("leaf l Exts (-want, +got):\n%s", diff)
+			}
+
+			if diff := cmp.Diff([]*Statement{
+				{Keyword: "ext:g-define", HasArgument: true, Argument: "daughter-group's extension"},
+				{Keyword: "ext:sg-define", HasArgument: true, Argument: "son-group's extension"},
+				{Keyword: "ext:s-define", HasArgument: true, Argument: "s's extension"},
+				{Keyword: "ext:u-define", HasArgument: true, Argument: "uses's extension"},
+			}, module.Dir["c"].Dir["s"].Exts, cmpopts.IgnoreUnexported(Statement{}), less); diff != "" {
+				t.Errorf("leaf s Exts (-want, +got):\n%s", diff)
+			}
+
+			if diff := cmp.Diff([]*Statement{
+				{Keyword: "ext:g-define", HasArgument: true, Argument: "daughter-group's extension"},
+				{Keyword: "ext:u-define", HasArgument: true, Argument: "uses's extension"},
+			}, module.Dir["c"].Dir["c2"].Exts, cmpopts.IgnoreUnexported(Statement{}), less); diff != "" {
+				t.Errorf("container c2 Exts (-want, +got):\n%s", diff)
+			}
+
+			if diff := cmp.Diff([]*Statement{}, module.Dir["c"].Dir["c2"].Dir["l2"].Exts, cmpopts.IgnoreUnexported(Statement{}), less, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("leaf l2 Exts (-want, +got):\n%s", diff)
+			}
+		},
 	}}
 
 	for _, tt := range tests {
@@ -1339,6 +1517,10 @@ func TestFullModuleProcess(t *testing.T) {
 			sort.Strings(leaves)
 			if !reflect.DeepEqual(l, leaves) {
 				t.Errorf("%s: did not get expected leaves in %s, got: %v, want: %v", tt.name, m, leaves, l)
+			}
+
+			if tt.customVerify != nil {
+				tt.customVerify(t, mod)
 			}
 		}
 	}
@@ -1658,6 +1840,339 @@ func TestActionRPC(t *testing.T) {
 	}
 }
 
+var testIfFeatureModules = []struct {
+	name string
+	in   string
+}{
+	{
+		name: "if-feature.yang",
+		in: `module if-feature {
+  namespace "urn:if-feature";
+  prefix "feat";
+
+  feature ft-container;
+  feature ft-action;
+  feature ft-anydata1;
+  feature ft-anydata2;
+  feature ft-anyxml;
+  feature ft-choice;
+  feature ft-case;
+  feature ft-feature;
+  feature ft-leaf;
+  feature ft-bit;
+  feature ft-leaf-list;
+  feature ft-enum;
+  feature ft-list;
+  feature ft-notification;
+  feature ft-rpc;
+  feature ft-augment;
+  feature ft-identity;
+  feature ft-uses;
+  feature ft-refine;
+
+  container cont {
+    if-feature ft-container;
+    action act {
+      if-feature ft-action;
+    }
+  }
+
+  anydata data {
+    if-feature ft-anydata1;
+    if-feature ft-anydata2;
+  }
+
+  anyxml xml {
+    if-feature ft-anyxml;
+  }
+
+  choice ch {
+    if-feature ft-choice;
+    case cs {
+      if-feature ft-case;
+    }
+  }
+
+  feature f {
+    if-feature ft-feature;
+  }
+
+  leaf l {
+    if-feature ft-leaf;
+    type bits {
+      bit A {
+        if-feature ft-bit;
+      }
+    }
+  }
+
+  leaf-list ll {
+    if-feature ft-leaf-list;
+    type enumeration {
+      enum zero {
+        if-feature ft-enum;
+      }
+    }
+  }
+
+  list ls {
+    if-feature ft-list;
+  }
+
+  notification n {
+    if-feature ft-notification;
+  }
+
+  rpc r {
+    if-feature ft-rpc;
+  }
+
+  augment "/cont" {
+    if-feature ft-augment;
+  }
+
+  identity id {
+    if-feature ft-identity;
+  }
+
+  uses g {
+    if-feature ft-uses;
+    refine rf {
+      if-feature ft-refine;
+    }
+  }
+  grouping g {}
+}
+`,
+	},
+}
+
+func TestIfFeature(t *testing.T) {
+	entryIfFeatures := func(e *Entry) []*Value {
+		extra := e.Extra["if-feature"]
+		if len(extra) == 0 {
+			return nil
+		}
+		return extra[0].([]*Value)
+	}
+
+	featureByName := func(e *Entry, name string) *Feature {
+		for _, f := range e.Extra["feature"][0].([]*Feature) {
+			if f.Name == name {
+				return f
+			}
+		}
+		return nil
+	}
+
+	ms := NewModules()
+	for _, tt := range testIfFeatureModules {
+		if err := ms.Parse(tt.in, tt.name); err != nil {
+			t.Fatalf("could not parse module %s: %v", tt.name, err)
+		}
+	}
+
+	if errs := ms.Process(); len(errs) > 0 {
+		t.Fatalf("could not process modules: %v", errs)
+	}
+
+	mod, _ := ms.GetModule("if-feature")
+
+	testcases := []struct {
+		name           string
+		inIfFeatures   []*Value
+		wantIfFeatures []string
+	}{
+		// Node statements
+		{
+			name:           "action",
+			inIfFeatures:   entryIfFeatures(mod.Dir["cont"].Dir["act"]),
+			wantIfFeatures: []string{"ft-action"},
+		},
+		{
+			name:           "anydata",
+			inIfFeatures:   entryIfFeatures(mod.Dir["data"]),
+			wantIfFeatures: []string{"ft-anydata1", "ft-anydata2"},
+		},
+		{
+			name:           "anyxml",
+			inIfFeatures:   entryIfFeatures(mod.Dir["xml"]),
+			wantIfFeatures: []string{"ft-anyxml"},
+		},
+		{
+			name:           "case",
+			inIfFeatures:   entryIfFeatures(mod.Dir["ch"].Dir["cs"]),
+			wantIfFeatures: []string{"ft-case"},
+		},
+		{
+			name:           "choice",
+			inIfFeatures:   entryIfFeatures(mod.Dir["ch"]),
+			wantIfFeatures: []string{"ft-choice"},
+		},
+		{
+			name:           "container",
+			inIfFeatures:   entryIfFeatures(mod.Dir["cont"]),
+			wantIfFeatures: []string{"ft-container"},
+		},
+		{
+			name:           "feature",
+			inIfFeatures:   featureByName(mod, "f").IfFeature,
+			wantIfFeatures: []string{"ft-feature"},
+		},
+		{
+			name:           "leaf",
+			inIfFeatures:   entryIfFeatures(mod.Dir["l"]),
+			wantIfFeatures: []string{"ft-leaf"},
+		},
+		{
+			name:           "leaf-list",
+			inIfFeatures:   entryIfFeatures(mod.Dir["ll"]),
+			wantIfFeatures: []string{"ft-leaf-list"},
+		},
+		{
+			name:           "list",
+			inIfFeatures:   entryIfFeatures(mod.Dir["ls"]),
+			wantIfFeatures: []string{"ft-list"},
+		},
+		{
+			name:           "notification",
+			inIfFeatures:   entryIfFeatures(mod.Dir["n"]),
+			wantIfFeatures: []string{"ft-notification"},
+		},
+		{
+			name:           "rpc",
+			inIfFeatures:   entryIfFeatures(mod.Dir["r"]),
+			wantIfFeatures: []string{"ft-rpc"},
+		},
+		// Other statements
+		{
+			name:           "augment",
+			inIfFeatures:   entryIfFeatures(mod.Dir["cont"].Augmented[0]),
+			wantIfFeatures: []string{"ft-augment"},
+		},
+		{
+			name:           "bit",
+			inIfFeatures:   mod.Dir["l"].Node.(*Leaf).Type.Bit[0].IfFeature,
+			wantIfFeatures: []string{"ft-bit"},
+		},
+		{
+			name:           "enum",
+			inIfFeatures:   mod.Dir["ll"].Node.(*Leaf).Type.Enum[0].IfFeature,
+			wantIfFeatures: []string{"ft-enum"},
+		},
+		{
+			name:           "identity",
+			inIfFeatures:   mod.Identities[0].IfFeature,
+			wantIfFeatures: []string{"ft-identity"},
+		},
+		{
+			name:           "refine",
+			inIfFeatures:   ms.Modules["if-feature"].Uses[0].Refine[0].IfFeature,
+			wantIfFeatures: []string{"ft-refine"},
+		},
+		{
+			name:           "uses",
+			inIfFeatures:   ms.Modules["if-feature"].Uses[0].IfFeature,
+			wantIfFeatures: []string{"ft-uses"},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			var names []string
+			for _, f := range tc.inIfFeatures {
+				names = append(names, f.Name)
+			}
+
+			if !reflect.DeepEqual(names, tc.wantIfFeatures) {
+				t.Errorf("%s: did not get expected if-features, got %v, want %v", tc.name, names, tc.wantIfFeatures)
+			}
+		})
+	}
+}
+
+var testNotificationModules = []struct {
+	name string
+	in   string
+}{
+	{
+		name: "notification.yang",
+		in: `module notification {
+  namespace "urn:notification";
+  prefix "n";
+
+  notification n {}
+
+  grouping g {
+    notification g-n {}
+  }
+
+  container cont {
+    notification cont-n {}
+  }
+
+  list ls {
+    notification ls-n {}
+    uses g;
+  }
+
+  augment "/cont" {
+    notification aug-n {}
+  }
+}
+`,
+	},
+}
+
+func TestNotification(t *testing.T) {
+	ms := NewModules()
+	for _, tt := range testNotificationModules {
+		if err := ms.Parse(tt.in, tt.name); err != nil {
+			t.Fatalf("could not parse module %s: %v", tt.name, err)
+		}
+	}
+
+	if errs := ms.Process(); len(errs) > 0 {
+		t.Fatalf("could not process modules: %v", errs)
+	}
+
+	mod, _ := ms.GetModule("notification")
+
+	testcases := []struct {
+		name     string
+		wantPath []string
+	}{
+		{
+			name:     "module",
+			wantPath: []string{"n"},
+		},
+		{
+			name:     "container",
+			wantPath: []string{"cont", "cont-n"},
+		},
+		{
+			name:     "list",
+			wantPath: []string{"ls", "ls-n"},
+		},
+		{
+			name:     "grouping",
+			wantPath: []string{"ls", "g-n"},
+		},
+		{
+			name:     "augment",
+			wantPath: []string{"cont", "aug-n"},
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			if e := getEntry(mod, tc.wantPath); e == nil || e.Node.Kind() != "notification" {
+				t.Errorf("%s: want notification entry at: %v, got: %+v", tc.name, tc.wantPath, e)
+			}
+		})
+	}
+}
+
 // addTreeE takes an input Entry and appends it to a directory, keyed by path, to the Entry.
 // If the Entry has children, they are appended to the directory recursively. Used in test
 // cases where a path is to be referred to.
@@ -1724,12 +2239,15 @@ func TestEntryFind(t *testing.T) {
 			"../t:c/d":   "/test/c/d",
 			"../c/t:d":   "/test/c/d",
 			// Find within an absolute directory with prefixes.
-			"/t:c/d":                "/test/c/d",
-			"/c/t:d":                "/test/c/d",
-			"../t:rpc1/input":       "/test/rpc1/input",
-			"/t:rpc1/input":         "/test/rpc1/input",
-			"/t:e/operation/input":  "/test/e/operation/input",
-			"/t:e/operation/output": "/test/e/operation/output",
+			"/t:c/d":                    "/test/c/d",
+			"/c/t:d":                    "/test/c/d",
+			"../t:rpc1/input":           "/test/rpc1/input",
+			"/t:rpc1/input":             "/test/rpc1/input",
+			"/t:rpc1/t:input":           "/test/rpc1/input",
+			"/t:e/operation/input":      "/test/e/operation/input",
+			"/t:e/operation/output":     "/test/e/operation/output",
+			"/t:e/t:operation/t:input":  "/test/e/operation/input",
+			"/t:e/t:operation/t:output": "/test/e/operation/output",
 		},
 	}, {
 		name: "inter-module find",
@@ -1851,7 +2369,7 @@ func TestEntryTypes(t *testing.T) {
 
 	leafListSchema := &Entry{
 		Kind:     LeafEntry,
-		ListAttr: &ListAttr{MinElements: &Value{Name: "0"}},
+		ListAttr: &ListAttr{MinElements: 0},
 		Type:     &YangType{Kind: Ystring},
 		Name:     "leaf-list-schema",
 	}
@@ -1859,7 +2377,7 @@ func TestEntryTypes(t *testing.T) {
 	listSchema := &Entry{
 		Name:     "list-schema",
 		Kind:     DirectoryEntry,
-		ListAttr: &ListAttr{MinElements: &Value{Name: "0"}},
+		ListAttr: &ListAttr{MinElements: 0},
 		Dir: map[string]*Entry{
 			"leaf-name": {
 				Kind: LeafEntry,
@@ -1877,7 +2395,7 @@ func TestEntryTypes(t *testing.T) {
 				Kind: CaseEntry,
 				Name: "case1",
 				Dir: map[string]*Entry{
-					"case1-leaf1": &Entry{
+					"case1-leaf1": {
 						Kind: LeafEntry,
 						Name: "Case1Leaf1",
 						Type: &YangType{Kind: Ystring},
@@ -1977,7 +2495,7 @@ func TestFixChoice(t *testing.T) {
 						statements:  nil,
 					},
 					Extensions: []*Statement{
-						&Statement{
+						{
 							Keyword:     "anyData-extension",
 							HasArgument: true,
 							Argument:    "anyData-extension-arg",
@@ -2001,7 +2519,7 @@ func TestFixChoice(t *testing.T) {
 						statements:  nil,
 					},
 					Extensions: []*Statement{
-						&Statement{
+						{
 							Keyword:     "anyXML-extension",
 							HasArgument: true,
 							Argument:    "anyXML-extension-arg",
@@ -2025,7 +2543,7 @@ func TestFixChoice(t *testing.T) {
 						statements:  nil,
 					},
 					Extensions: []*Statement{
-						&Statement{
+						{
 							Keyword:     "container-extension",
 							HasArgument: true,
 							Argument:    "container-extension-arg",
@@ -2049,7 +2567,7 @@ func TestFixChoice(t *testing.T) {
 						statements:  nil,
 					},
 					Extensions: []*Statement{
-						&Statement{
+						{
 							Keyword:     "leaf-extension",
 							HasArgument: true,
 							Argument:    "leaf-extension-arg",
@@ -2073,7 +2591,7 @@ func TestFixChoice(t *testing.T) {
 						statements:  nil,
 					},
 					Extensions: []*Statement{
-						&Statement{
+						{
 							Keyword:     "leaflist-extension",
 							HasArgument: true,
 							Argument:    "leaflist-extension-arg",
@@ -2097,7 +2615,7 @@ func TestFixChoice(t *testing.T) {
 						statements:  nil,
 					},
 					Extensions: []*Statement{
-						&Statement{
+						{
 							Keyword:     "list-extension",
 							HasArgument: true,
 							Argument:    "list-extension-arg",
@@ -2184,7 +2702,7 @@ func TestDeviation(t *testing.T) {
 		desc:    "deviation with add",
 		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate.yang"))},
 		wants: map[string][]deviationTest{
-			"deviate": []deviationTest{{
+			"deviate": {{
 				path: "/target/add/config",
 				entry: &Entry{
 					Config: TSFalse,
@@ -2198,22 +2716,32 @@ func TestDeviation(t *testing.T) {
 				path: "/target/add/min-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MinElements: &Value{Name: "42"},
+						MinElements: 42,
+					},
+					deviatePresence: deviationPresence{
+						hasMinElements: true,
 					},
 				},
 			}, {
 				path: "/target/add/max-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MaxElements: &Value{Name: "42"},
+						MaxElements: 42,
+					},
+					deviatePresence: deviationPresence{
+						hasMaxElements: true,
 					},
 				},
 			}, {
 				path: "/target/add/max-and-min-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MinElements: &Value{Name: "42"},
-						MaxElements: &Value{Name: "42"},
+						MinElements: 42,
+						MaxElements: 42,
+					},
+					deviatePresence: deviationPresence{
+						hasMinElements: true,
+						hasMaxElements: true,
 					},
 				},
 			}, {
@@ -2260,10 +2788,46 @@ func TestDeviation(t *testing.T) {
 		},
 		wantProcessErrSubstring: "tried to deviate min-elements on a non-list type",
 	}, {
+		desc: "error case - deviation delete max-element on non-list",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a { type string; }
+
+					deviation /a {
+						deviate delete {
+							max-elements 42;
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "tried to deviate max-elements on a non-list type",
+	}, {
+		desc: "error case - deviation delete min elements on non-list",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a { type string; }
+
+					deviation /a {
+						deviate delete {
+							min-elements 42;
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "tried to deviate min-elements on a non-list type",
+	}, {
 		desc:    "deviation - not supported",
 		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate-notsupported.yang"))},
 		wants: map[string][]deviationTest{
-			"deviate": []deviationTest{{
+			"deviate": {{
 				path: "/target",
 			}, {
 				path: "/target-list",
@@ -2315,7 +2879,7 @@ func TestDeviation(t *testing.T) {
 					}`,
 		},
 		wants: map[string][]deviationTest{
-			"source": []deviationTest{{
+			"source": {{
 				path: "/a",
 			}, {
 				path:  "/b",
@@ -2326,7 +2890,7 @@ func TestDeviation(t *testing.T) {
 		desc:    "deviation with replace",
 		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate-replace.yang"))},
 		wants: map[string][]deviationTest{
-			"deviate": []deviationTest{{
+			"deviate": {{
 				path: "/target/replace/config",
 				entry: &Entry{
 					Config: TSFalse,
@@ -2340,22 +2904,32 @@ func TestDeviation(t *testing.T) {
 				path: "/target/replace/min-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MinElements: &Value{Name: "42"},
+						MinElements: 42,
+					},
+					deviatePresence: deviationPresence{
+						hasMinElements: true,
 					},
 				},
 			}, {
 				path: "/target/replace/max-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MaxElements: &Value{Name: "42"},
+						MaxElements: 42,
+					},
+					deviatePresence: deviationPresence{
+						hasMaxElements: true,
 					},
 				},
 			}, {
 				path: "/target/replace/max-and-min-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MinElements: &Value{Name: "42"},
-						MaxElements: &Value{Name: "42"},
+						MinElements: 42,
+						MaxElements: 42,
+					},
+					deviatePresence: deviationPresence{
+						hasMinElements: true,
+						hasMaxElements: true,
 					},
 				},
 			}, {
@@ -2377,7 +2951,7 @@ func TestDeviation(t *testing.T) {
 		desc:    "deviation with delete",
 		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate-delete.yang"))},
 		wants: map[string][]deviationTest{
-			"deviate": []deviationTest{{
+			"deviate": {{
 				path: "/target/delete/config",
 				entry: &Entry{
 					Config: TSUnset,
@@ -2391,22 +2965,32 @@ func TestDeviation(t *testing.T) {
 				path: "/target/delete/min-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MinElements: nil,
+						MinElements: 0,
+					},
+					deviatePresence: deviationPresence{
+						hasMinElements: true,
 					},
 				},
 			}, {
 				path: "/target/delete/max-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MaxElements: nil,
+						MaxElements: math.MaxUint64,
+					},
+					deviatePresence: deviationPresence{
+						hasMaxElements: true,
 					},
 				},
 			}, {
 				path: "/target/delete/max-and-min-elements",
 				entry: &Entry{
 					ListAttr: &ListAttr{
-						MinElements: nil,
-						MaxElements: nil,
+						MinElements: 0,
+						MaxElements: math.MaxUint64,
+					},
+					deviatePresence: deviationPresence{
+						hasMinElements: true,
+						hasMaxElements: true,
 					},
 				},
 			}, {
@@ -2416,6 +3000,45 @@ func TestDeviation(t *testing.T) {
 				},
 			}},
 		},
+	}, {
+		desc: "error case - deviation delete of min-elements has different keyword value",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf-list a { type string; }
+
+					deviation /a {
+						deviate delete {
+							min-elements 42;
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "differs from deviation's min-element value",
+	}, {
+		desc: "error case - deviation delete of max-elements has different keyword value",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf-list a {
+						type string;
+						max-elements 100;
+					}
+
+					deviation /a {
+						deviate delete {
+							max-elements 42;
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "differs from deviation's max-element value",
 	}, {
 		desc: "deviation using locally defined typedef",
 		inFiles: map[string]string{
@@ -2449,7 +3072,7 @@ func TestDeviation(t *testing.T) {
 			`,
 		},
 		wants: map[string][]deviationTest{
-			"source": []deviationTest{{
+			"source": {{
 				path: "/a",
 				entry: &Entry{
 					Type: &YangType{
@@ -2491,7 +3114,7 @@ func TestDeviation(t *testing.T) {
 			}`,
 		},
 		wants: map[string][]deviationTest{
-			"foo": []deviationTest{{
+			"foo": {{
 				path: "/a/b",
 				entry: &Entry{
 					Type: &YangType{
@@ -2566,9 +3189,14 @@ func TestDeviation(t *testing.T) {
 							t.Errorf("%d (%s): listattr was nil for an entry expected to be a list at %s", idx, want.path, want.path)
 							continue
 						}
-						if want.entry.ListAttr.MinElements != nil {
-							if gotn, wantn := got.ListAttr.MinElements.Name, want.entry.ListAttr.MinElements.Name; gotn != wantn {
-								t.Errorf("%d (%s): min-elements, got: %v, want: %v", idx, want.path, gotn, wantn)
+						if want.entry.deviatePresence.hasMinElements {
+							if gotMin, wantMin := got.ListAttr.MinElements, want.entry.ListAttr.MinElements; gotMin != wantMin {
+								t.Errorf("%d (%s): min-elements, got: %v, want: %v", idx, want.path, gotMin, wantMin)
+							}
+						}
+						if want.entry.deviatePresence.hasMaxElements {
+							if gotMax, wantMax := got.ListAttr.MaxElements, want.entry.ListAttr.MaxElements; gotMax != wantMax {
+								t.Errorf("%d (%s): max-elements, got: %v, want: %v", idx, want.path, gotMax, wantMax)
 							}
 						}
 					}
@@ -2589,5 +3217,279 @@ func TestDeviation(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestLeafEntry(t *testing.T) {
+	tests := []struct {
+		name                string
+		inModules           map[string]string
+		wantEntryPath       string
+		wantEntryCustomTest func(t *testing.T, e *Entry)
+		wantErrSubstr       string
+	}{{
+		name: "direct decimal64 type",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				leaf "gain-adjustment" {
+					type "decimal64" {
+						fraction-digits "1";
+						range "-12.0..12.0";
+					}
+					default "0.0";
+				}
+			}
+			`,
+		},
+		wantEntryPath: "/test/gain-adjustment",
+		wantEntryCustomTest: func(t *testing.T, e *Entry) {
+			if got, want := e.Type.FractionDigits, 1; got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+			if got, want := e.Mandatory, TSUnset; got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+			if got, want := e.Type.Range, (YangRange{Rf(-120, 120, 1)}); !cmp.Equal(got, want) {
+				t.Errorf("Range got: %v, want: %v", got, want)
+			}
+		},
+	}, {
+		name: "typedef decimal64 type",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				typedef "optical-dB" {
+					type "decimal64" {
+						fraction-digits "1";
+					}
+				}
+
+				leaf "gain-adjustment" {
+					type "optical-dB" {
+						range "-12.0..12.0";
+					}
+					default "0.0";
+				}
+			}
+			`,
+		},
+		wantEntryPath: "/test/gain-adjustment",
+		wantEntryCustomTest: func(t *testing.T, e *Entry) {
+			if got, want := e.Type.FractionDigits, 1; got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+			if diff := cmp.Diff(e.Type.Range, YangRange{Rf(-120, 120, 1)}); diff != "" {
+				t.Errorf("Range (-got, +want):\n%s", diff)
+			}
+		},
+	}, {
+		name: "typedef decimal64 type with overriding fraction-digits",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				typedef "optical-dB" {
+					type "decimal64" {
+						fraction-digits "1";
+					}
+				}
+
+				leaf "gain-adjustment" {
+					type "optical-dB" {
+						fraction-digits "2";
+						range "-12.0..12.0";
+					}
+					default "0.0";
+				}
+			}
+			`,
+		},
+		wantErrSubstr: "overriding of fraction-digits not allowed",
+	}, {
+		name: "leaf mandatory true",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				leaf "mandatory" {
+					type "string" {
+					}
+					mandatory true;
+				}
+			}
+			`,
+		},
+		wantEntryPath: "/test/mandatory",
+		wantEntryCustomTest: func(t *testing.T, e *Entry) {
+			if got, want := e.Mandatory, TSTrue; got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	}, {
+		name: "leaf mandatory false",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				leaf "mandatory" {
+					type "string" {
+					}
+					mandatory false;
+				}
+			}
+			`,
+		},
+		wantEntryPath: "/test/mandatory",
+		wantEntryCustomTest: func(t *testing.T, e *Entry) {
+			if got, want := e.Mandatory, TSFalse; got != want {
+				t.Errorf("got %d, want %d", got, want)
+			}
+		},
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ms := NewModules()
+			var errs []error
+			for n, m := range tt.inModules {
+				if err := ms.Parse(m, n); err != nil {
+					errs = append(errs, err)
+				}
+			}
+
+			if len(errs) > 0 {
+				t.Fatalf("ms.Parse(), got unexpected error parsing input modules: %v", errs)
+			}
+
+			if errs := ms.Process(); len(errs) > 0 {
+				if len(errs) == 1 {
+					if diff := errdiff.Substring(errs[0], tt.wantErrSubstr); diff != "" {
+						t.Fatalf("did not get expected error, %s", diff)
+					}
+					return
+				}
+				t.Fatalf("ms.Process(), got too many errors processing entries: %v", errs)
+			}
+
+			dir := map[string]*Entry{}
+			for _, m := range ms.Modules {
+				addTreeE(ToEntry(m), dir)
+			}
+
+			e, ok := dir[tt.wantEntryPath]
+			if !ok {
+				t.Fatalf("could not find entry %s within the dir: %v", tt.wantEntryPath, dir)
+			}
+			tt.wantEntryCustomTest(t, e)
+		})
+	}
+}
+
+func TestLess(t *testing.T) {
+	sErrors := sortedErrors{
+		{"testfile0", errors.New("test error0")},
+		{"testfile1", errors.New("test error1")},
+		{"testfile1:1", errors.New("test error2")},
+		{"testfile2:1", errors.New("test error3")},
+		{"testfile2:1:1", errors.New("test error4")},
+		{"testfile3:1:1:error5", errors.New("test error5")},
+		{"testfile3:1:2:error6", errors.New("test error6")},
+	}
+
+	tests := []struct {
+		desc string
+		i    int
+		j    int
+		want bool
+	}{{
+		desc: "compare two different strings without seperator ':'",
+		i:    0,
+		j:    1,
+		want: true,
+	}, {
+		desc: "compare two different strings without seperator ':'",
+		i:    1,
+		j:    0,
+		want: false,
+	}, {
+		desc: "compare one slice in a string with two slices in another string",
+		i:    1,
+		j:    2,
+		want: true,
+	}, {
+		desc: "compare two different strings with two slices each",
+		i:    2,
+		j:    3,
+		want: true,
+	}, {
+		desc: "compare two different strings with two slices each",
+		i:    3,
+		j:    2,
+		want: false,
+	}, {
+		desc: "compare two slices in a string with three slices in another string",
+		i:    3,
+		j:    4,
+		want: true,
+	}, {
+		desc: "compare three slices in a string with two slices in another string",
+		i:    4,
+		j:    3,
+		want: false,
+	}, {
+		desc: "compare two different strings with four slices each",
+		i:    5,
+		j:    6,
+		want: true,
+	}, {
+		desc: "compare two different strings with four slices each",
+		i:    6,
+		j:    5,
+		want: false,
+	}, {
+		desc: "compare two identical strings without separator ':'",
+		i:    1,
+		j:    1,
+		want: false,
+	}, {
+		desc: "compare two identical strings with two slices",
+		i:    2,
+		j:    2,
+		want: false,
+	}, {
+		desc: "compare two identical strings with three slices",
+		i:    4,
+		j:    4,
+		want: false,
+	}, {
+		desc: "compare two identical strings with four slices",
+		i:    5,
+		j:    5,
+		want: false,
+	}}
+	var cmpSymbol byte
+	for _, tt := range tests {
+		want := sErrors.Less(tt.i, tt.j)
+		if want != tt.want {
+			if want {
+				cmpSymbol = '<'
+			} else {
+				cmpSymbol = '>'
+			}
+			t.Errorf("%s: incorrect less comparison: \"%s\" %c \"%s\"", tt.desc, sErrors[tt.i].s, cmpSymbol, sErrors[tt.j].s)
+		}
 	}
 }

@@ -23,7 +23,7 @@ import (
 	"sync"
 )
 
-// A typeDictionary is a dictonary of all Typedefs defined in all Typedefers.
+// A typeDictionary is a dictionary of all Typedefs defined in all Typedefers.
 // A map of Nodes is used rather than a map of Typedefers to simplify usage
 // when traversing up a Node tree.
 type typeDictionary struct {
@@ -144,7 +144,7 @@ func (t *Typedef) resolve(d *typeDictionary) []error {
 		if idBase, err := RootNode(t).findIdentityBase(t.Type.IdentityBase.Name); err == nil {
 			y.IdentityBase = idBase.Identity
 		} else {
-			return []error{fmt.Errorf("Could not resolve identity base for typedef: %s", t.Type.IdentityBase.Name)}
+			return []error{fmt.Errorf("could not resolve identity base for typedef: %s", t.Type.IdentityBase.Name)}
 		}
 	}
 
@@ -237,10 +237,16 @@ check:
 	if v := t.Path; v != nil {
 		y.Path = v.asString()
 	}
-	// If we are directly of type decimal64 then we must specify
-	// fraction-digits.
+	isDecimal64 := y.Kind == Ydecimal64 && (t.Name == "decimal64" || y.FractionDigits != 0)
 	switch {
-	case y.Kind == Ydecimal64 && (t.Name == "decimal64" || t.FractionDigits != nil):
+	case isDecimal64 && y.FractionDigits != 0:
+		if t.FractionDigits != nil {
+			return append(errs, fmt.Errorf("%s: overriding of fraction-digits not allowed", Source(t)))
+		}
+		// FractionDigits already set via type inheritance.
+	case isDecimal64:
+		// If we are directly of type decimal64 then we must specify
+		// fraction-digits in the range from 1-18.
 		i, err := t.FractionDigits.asRangeInt(1, 18)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: %v", Source(t), err))
@@ -275,7 +281,7 @@ check:
 	}
 
 	if t.Range != nil {
-		yr, err := ParseRanges(t.Range.Name)
+		yr, err := parseRanges(t.Range.Name, isDecimal64, uint8(y.FractionDigits))
 		switch {
 		case err != nil:
 			errs = append(errs, fmt.Errorf("%s: bad range: %v", Source(t.Range), err))
@@ -288,7 +294,7 @@ check:
 	}
 
 	if t.Length != nil {
-		yr, err := ParseRanges(t.Length.Name)
+		yr, err := ParseRangesInt(t.Length.Name)
 		switch {
 		case err != nil:
 			errs = append(errs, fmt.Errorf("%s: bad length: %v", Source(t.Length), err))
@@ -310,7 +316,7 @@ check:
 		if value == nil {
 			return e.SetNext(name)
 		}
-		n, err := ParseNumber(value.Name)
+		n, err := ParseInt(value.Name)
 		if err != nil {
 			return err
 		}
@@ -345,23 +351,46 @@ check:
 	// Patterns are ANDed according to section 9.4.6.  If all the patterns
 	// declared by t were also declared by the type t is based on, then
 	// no patterns are added.
-	patterns := map[string]bool{}
+	seenPatterns := map[string]bool{}
 	for _, p := range y.Pattern {
-		patterns[p] = true
+		seenPatterns[p] = true
 	}
+	seenPOSIXPatterns := map[string]bool{}
+	for _, p := range y.POSIXPattern {
+		seenPOSIXPatterns[p] = true
+	}
+
+	// First parse out the pattern statements.
+	// These patterns are not checked because there is no support for W3C regexes by Go.
 	for _, pv := range t.Pattern {
-		p := pv.Name
-		if _, err := syntax.Parse(p, syntax.Perl); err != nil {
+		if !seenPatterns[pv.Name] {
+			seenPatterns[pv.Name] = true
+			y.Pattern = append(y.Pattern, pv.Name)
+		}
+	}
+
+	// Then, parse out the posix-pattern statements, if they exist.
+	// A YANG module could make use of either or both, so we deal with each separately.
+	posixPatterns, err := MatchingExtensions(t, "openconfig-extensions", "posix-pattern")
+	if err != nil {
+		return []error{err}
+	}
+
+	checkPattern := func(n Node, p string, flags syntax.Flags) {
+		if _, err := syntax.Parse(p, flags); err != nil {
 			if re, ok := err.(*syntax.Error); ok {
 				// Error adds "error parsing regexp" to
 				// the error, re.Code is the real error.
 				err = errors.New(re.Code.String())
 			}
-			errs = append(errs, fmt.Errorf("%s: bad pattern: %v: %s", Source(pv), err, p))
+			errs = append(errs, fmt.Errorf("%s: bad pattern: %v: %s", Source(n), err, p))
 		}
-		if !patterns[p] {
-			patterns[p] = true
-			y.Pattern = append(y.Pattern, p)
+	}
+	for _, ext := range posixPatterns {
+		checkPattern(ext, ext.Argument, syntax.POSIX)
+		if !seenPOSIXPatterns[ext.Argument] {
+			seenPOSIXPatterns[ext.Argument] = true
+			y.POSIXPattern = append(y.POSIXPattern, ext.Argument)
 		}
 	}
 
