@@ -55,6 +55,8 @@ func (ms *Modules) Read(name string) error {
 
 // Parse parses data as YANG source and adds it to ms.  The name should reflect
 // the source of data.
+// Note: If an error is returned, valid modules might still have been added to
+// the Modules cache.
 func (ms *Modules) Parse(data, name string) error {
 	ss, err := Parse(data, name)
 	if err != nil {
@@ -65,7 +67,9 @@ func (ms *Modules) Parse(data, name string) error {
 		if err != nil {
 			return err
 		}
-		ms.add(n)
+		if err := ms.add(n); err != nil {
+			return err
+		}
 	}
 	return nil
 }
