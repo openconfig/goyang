@@ -77,6 +77,9 @@ func BuildAST(s *Statement) (Node, error) {
 	return buildASTWithTypeDict(s, &typeDict)
 }
 
+// buildASTWithTypeDict creates an AST for the input statement, and returns its
+// root node. It also takes as input a type dictionary into which any
+// encountered typedefs within the statement are cached.
 func buildASTWithTypeDict(s *Statement, d *typeDictionary) (Node, error) {
 	initTypes(reflect.TypeOf(&meta{}), d)
 	v, err := build(s, nilValue, d)
@@ -86,8 +89,11 @@ func buildASTWithTypeDict(s *Statement, d *typeDictionary) (Node, error) {
 	return v.Interface().(Node), nil
 }
 
-// build builds and returns an AST from the statement s, with parent p, or
-// returns an error.  The type of value returned depends on the keyword in s.
+// build builds and returns an AST from the statement s and with parent p. It
+// also takes as input a type dictionary d into which any encountered typedefs
+// within the statement are cached. The type of value returned depends on the
+// keyword in s. It returns an error if it cannot build the statement into its
+// corresponding Node type.
 func build(s *Statement, p reflect.Value, d *typeDictionary) (v reflect.Value, err error) {
 	defer func() {
 		// If we are returning a real Node then call addTypedefs
@@ -198,7 +204,9 @@ func build(s *Statement, p reflect.Value, d *typeDictionary) (v reflect.Value, e
 }
 
 // initTypes builds up the functions necessary to parse a Statement into the
-// type at.  at must be a of type pointer to structure and that structure should
+// type at. It also builds up the functions to populate the input type
+// dictionary d with any encountered typedefs within the statement. at must be
+// a of type pointer to structure and that structure should
 // implement Node.  For each field of the structure with a yang tag (e.g.,
 // `yang:"command"`), a function is created and "command" is mapped to it.  The
 // complete map is then added to the typeMap map with at as the key.
