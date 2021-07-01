@@ -535,6 +535,7 @@ func ToEntry(n Node) (e *Entry) {
 			Errors: []error{err},
 		}
 	}
+	ms := RootNode(n).modules
 	if e := entryCache[n]; e != nil {
 		return e
 	}
@@ -572,7 +573,7 @@ func ToEntry(n Node) (e *Entry) {
 	switch s := n.(type) {
 	case *Leaf:
 		e := newLeaf(n)
-		if errs := s.Type.resolve(); errs != nil {
+		if errs := s.Type.resolve(ms.typeDict); errs != nil {
 			e.Errors = errs
 		}
 		if s.Description != nil {
@@ -862,7 +863,7 @@ func ToEntry(n Node) (e *Entry) {
 			}
 
 			if n.Type != nil {
-				if errs := n.Type.resolve(); errs != nil {
+				if errs := n.Type.resolve(ms.typeDict); errs != nil {
 					e.addError(fmt.Errorf("deviation has unresolvable type, %v", errs))
 					continue
 				}
@@ -894,7 +895,7 @@ func ToEntry(n Node) (e *Entry) {
 
 					for _, sd := range d.Deviate {
 						if sd.Type != nil {
-							sd.Type.resolve()
+							sd.Type.resolve(ms.typeDict)
 						}
 					}
 				}
