@@ -81,7 +81,6 @@ func BuildAST(s *Statement) (Node, error) {
 // root node. It also takes as input a type dictionary into which any
 // encountered typedefs within the statement are cached.
 func buildASTWithTypeDict(s *Statement, d *typeDictionary) (Node, error) {
-	initTypes(reflect.TypeOf(&meta{}), d)
 	v, err := build(s, nilValue, d)
 	if err != nil {
 		return nil, err

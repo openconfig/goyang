@@ -18,7 +18,10 @@ package yang
 // include and import statements, which must be done prior to turning the
 // module into an Entry tree.
 
-import "fmt"
+import (
+	"fmt"
+	"reflect"
+)
 
 // Modules contains information about all the top level modules and
 // submodules that are read into it via its Read method.
@@ -33,14 +36,16 @@ type Modules struct {
 
 // NewModules returns a newly created and initialized Modules.
 func NewModules() *Modules {
-	return &Modules{
+	ms := &Modules{
 		Modules:    map[string]*Module{},
 		SubModules: map[string]*Module{},
 		includes:   map[*Module]bool{},
 		byPrefix:   map[string]*Module{},
 		byNS:       map[string]*Module{},
-		typeDict:   &typeDictionary{dict: map[Node]map[string]*Typedef{}},
+		typeDict:   newTypeDictionary(),
 	}
+	initTypes(reflect.TypeOf(&meta{}), ms.typeDict)
+	return ms
 }
 
 // Read reads the named yang module into ms.  The name can be the name of an
