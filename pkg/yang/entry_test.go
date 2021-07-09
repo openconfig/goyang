@@ -3253,8 +3253,8 @@ func TestLeafEntry(t *testing.T) {
 			if got, want := e.Mandatory, TSUnset; got != want {
 				t.Errorf("got %d, want %d", got, want)
 			}
-			if diff := cmp.Diff(e.Type.Range, YangRange{Rf(-120, 120, 1)}); diff != "" {
-				t.Errorf("Range (-got, +want):\n%s", diff)
+			if got, want := e.Type.Range, (YangRange{Rf(-120, 120, 1)}); !cmp.Equal(got, want) {
+				t.Errorf("Range got: %v, want: %v", got, want)
 			}
 		},
 	}, {
