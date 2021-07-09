@@ -14,7 +14,10 @@
 
 package yang
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 // TestBGP simply makes sure we are able to parse a version of Anees's
 // BGP model.  We don't actually attempt to validate we got the right
@@ -28,7 +31,9 @@ func TestBGP(t *testing.T) {
 	if len(ss) != 1 {
 		t.Fatalf("got %d results, want 1", len(ss))
 	}
-	_, err = BuildAST(ss[0])
+	typeDict := newTypeDictionary()
+	initTypes(reflect.TypeOf(&meta{}), typeDict)
+	_, err = buildASTWithTypeDict(ss[0], typeDict)
 	if err != nil {
 		t.Fatal(err)
 	}

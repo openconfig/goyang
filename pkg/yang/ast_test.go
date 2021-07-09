@@ -207,7 +207,6 @@ func TestAST(t *testing.T) {
 	type meta struct {
 		MainNode []*MainNode `yang:"main_node"`
 	}
-	initTypes(reflect.TypeOf(&meta{}), &typeDict)
 
 	for _, tt := range []struct {
 		line int
@@ -329,7 +328,11 @@ main_node the_node {
 			t.Errorf("%d: got %d results, want 1", tt.line, len(ss))
 			continue
 		}
-		ast, err := BuildAST(ss[0])
+
+		typeDict := newTypeDictionary()
+		initTypes(reflect.TypeOf(&meta{}), typeDict)
+
+		ast, err := buildASTWithTypeDict(ss[0], typeDict)
 		switch {
 		case err == nil && tt.err == "":
 			if s := tt.out.checkEqual(ast); s != "" {

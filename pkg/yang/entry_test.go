@@ -161,7 +161,6 @@ module base {
 
 func TestBadYang(t *testing.T) {
 	for _, tt := range badInputs {
-		typeDict = typeDictionary{dict: map[Node]map[string]*Typedef{}}
 		ms := NewModules()
 		if err := ms.Parse(tt.in, tt.name); err != nil {
 			t.Fatalf("unexpected error %s", err)
