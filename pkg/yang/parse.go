@@ -151,7 +151,7 @@ func (s *Statement) Write(w io.Writer, indent string) error {
 	return nil
 }
 
-// ignoreMe is an error recovery non-terminal used by the parser in
+// ignoreMe is an error recovery terminal used by the parser in
 // order to continue processing for other errors in the file.
 var ignoreMe = &Statement{}
 
