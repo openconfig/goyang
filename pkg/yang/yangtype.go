@@ -14,7 +14,11 @@
 
 package yang
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/google/go-cmp/cmp"
+)
 
 var (
 	// TypeKindFromName maps the string name used in a YANG file to the enumerated
@@ -266,11 +270,14 @@ func (y *YangType) Equal(t *YangType) bool {
 		!ssEqual(y.POSIXPattern, t.POSIXPattern),
 		len(y.Range) != len(t.Range),
 		!y.Range.Equal(t.Range),
-		!tsEqual(y.Type, t.Type):
+		!tsEqual(y.Type, t.Type),
+		!cmp.Equal(y.Enum, t.Enum, cmp.Comparer(func(t, u EnumType) bool {
+			return cmp.Equal(t.unique, u.unique) && cmp.Equal(t.toInt, u.toInt) && cmp.Equal(t.toString, u.toString)
+		})):
 
 		return false
 	}
-	// TODO(borman): Base, Bit, Enum
+	// TODO(borman): Base, Bit
 	return true
 }
 
