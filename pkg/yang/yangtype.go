@@ -271,11 +271,13 @@ func (y *YangType) Equal(t *YangType) bool {
 		len(y.Range) != len(t.Range),
 		!y.Range.Equal(t.Range),
 		!tsEqual(y.Type, t.Type),
-		!cmp.Equal(y.Enum, t.Enum, cmp.AllowUnexported(EnumType{})):
+		!cmp.Equal(y.Enum, t.Enum, cmp.Comparer(func(t, u EnumType) bool {
+			return cmp.Equal(t.unique, u.unique) && cmp.Equal(t.toInt, u.toInt) && cmp.Equal(t.toString, u.toString)
+		})):
 
 		return false
 	}
-	// TODO(borman): Base, Bit, Enum
+	// TODO(borman): Base, Bit
 	return true
 }
 
