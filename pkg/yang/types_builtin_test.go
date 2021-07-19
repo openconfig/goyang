@@ -22,21 +22,21 @@ import (
 )
 
 const (
-	useMin = -999
-	useMax = 999
+	maxUint64 uint64 = 18446744073709551615
+	maxUint32        = 0xFFFFFFFF
+	maxUint16        = 0xFFFF
+	maxUint8         = 0xFF
+	maxInt32         = 1<<31 - 1
+	minInt32         = -1 << 31
+	maxInt16         = 1<<15 - 1
+	minInt16         = -1 << 15
+	maxInt8          = 1<<7 - 1
+	minInt8          = -1 << 7
 )
 
 // R is a test helper for creating an int-based YRange.
 func R(a, b int64) YRange {
-	n1 := FromInt(a)
-	n2 := FromInt(b)
-	if a == useMin {
-		n1 = minNumber
-	}
-	if b == useMax {
-		n2 = maxNumber
-	}
-	return YRange{n1, n2}
+	return YRange{FromInt(a), FromInt(b)}
 }
 
 // Rf is a test helper for creating a float-based YRange.
@@ -45,17 +45,11 @@ func Rf(a, b int64, fracDig uint8) YRange {
 	n2 := Number{Value: uint64(b), FractionDigits: fracDig}
 	if a < 0 {
 		n1.Value = uint64(-a)
-		n1.Kind = Negative
+		n1.Negative = true
 	}
 	if b < 0 {
 		n2.Value = uint64(-b)
-		n2.Kind = Negative
-	}
-	if a == useMin {
-		n1 = minNumber
-	}
-	if b == useMax {
-		n2 = maxNumber
+		n2.Negative = true
 	}
 	return YRange{n1, n2}
 }
@@ -126,9 +120,11 @@ func TestRangeContains(t *testing.T) {
 		desc: "empty range contained in empty range",
 		want: true,
 	}, {
+		desc:        "empty range contained in non-empty range",
 		inBaseRange: YangRange{R(1, 2)},
 		want:        true,
 	}, {
+		desc:        "non-empty range contained in empty range",
 		inTestRange: YangRange{R(1, 2)},
 		want:        true,
 	}, {
@@ -172,34 +168,36 @@ func TestRangeContains(t *testing.T) {
 		inTestRange: YangRange{R(20, 20)},
 		want:        false,
 	}, {
+		desc:        "smaller range doesn't contain min..max",
 		inBaseRange: YangRange{R(1, 10)},
-		inTestRange: YangRange{R(useMin, useMax)},
-		want:        true,
+		inTestRange: YangRange{R(MinInt64, MaxInt64)},
+		want:        false,
 	}, {
 		desc:        "full range contains any",
-		inBaseRange: YangRange{R(useMin, useMax)},
+		inBaseRange: YangRange{R(MinInt64, MaxInt64)},
 		inTestRange: YangRange{R(1, 10)},
 		want:        true,
 	}, {
+		desc:        "smaller range doesn't contain min..a|b..max",
 		inBaseRange: YangRange{R(1024, 65535)},
-		inTestRange: YangRange{R(useMin, 4096), R(5120, useMax)},
-		want:        true,
+		inTestRange: YangRange{R(MinInt64, 4096), R(5120, MaxInt64)},
+		want:        false,
 	}, {
 		desc:        "ranges don't overlap with max word used",
 		inBaseRange: YangRange{R(1024, 65535)},
-		inTestRange: YangRange{R(-999999, 4096), R(5120, useMax)},
+		inTestRange: YangRange{R(-999999, 4096), R(5120, MaxInt64)},
 		want:        false,
 	}, {
 		desc:        "ranges don't overlap with min word used",
 		inBaseRange: YangRange{R(1024, 65535)},
-		inTestRange: YangRange{R(useMin, 4096), R(5120, 999999)},
+		inTestRange: YangRange{R(MinInt64, 4096), R(5120, 999999)},
 		want:        false,
 	}}
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			if want := tt.inBaseRange.Contains(tt.inTestRange); want != tt.want {
-				t.Errorf("got %v, want %v", want, tt.want)
+			if got := tt.inBaseRange.Contains(tt.inTestRange); got != tt.want {
+				t.Errorf("got %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -208,6 +206,7 @@ func TestRangeContains(t *testing.T) {
 func TestParseRangesInt(t *testing.T) {
 	tests := []struct {
 		desc             string
+		inParentRange    YangRange
 		in               string
 		want             YangRange
 		wantErrSubstring string
@@ -228,19 +227,58 @@ func TestParseRangesInt(t *testing.T) {
 		in:               "0|2..3|5..4",
 		wantErrSubstring: "range boundaries out of order",
 	}, {
-		desc: "range with min",
-		in:   "min..0|2..3|4..5",
-		want: YangRange{R(useMin, 0), R(2, 5)},
+		desc:          "range with min",
+		inParentRange: Int64Range,
+		in:            "min..0|2..3|4..5",
+		want:          YangRange{R(MinInt64, 0), R(2, 5)},
 	}, {
-		desc: "range with max",
-		in:   "min..0|2..3|4..5|7..max",
-		want: YangRange{R(useMin, 0), R(2, 5), R(7, useMax)},
+		desc:          "range with max",
+		inParentRange: Int32Range,
+		in:            "min..0|2..3|4..5|7..max",
+		want:          YangRange{R(minInt32, 0), R(2, 5), R(7, maxInt32)},
 	}, {
-		desc: "coalescing from min to max",
-		in:   "min..0|1..max",
-		want: YangRange{R(useMin, useMax)},
+		desc:          "coalescing from min to max for uint64",
+		inParentRange: Uint64Range,
+		in:            "min..0|1..max",
+		want:          YangRange{YRange{FromInt(0), Number{Value: maxUint64}}},
+	}, {
+		desc:          "coalescing from min to max for uint32",
+		inParentRange: Uint32Range,
+		in:            "min..0|1..max",
+		want:          YangRange{R(0, maxUint32)},
+	}, {
+		desc:          "coalescing from min to max for uint16",
+		inParentRange: Uint16Range,
+		in:            "min..0|1..max",
+		want:          YangRange{R(0, maxUint16)},
+	}, {
+		desc:          "coalescing from min to max for uint8",
+		inParentRange: Uint8Range,
+		in:            "min..0|1..max",
+		want:          YangRange{R(0, maxUint8)},
+	}, {
+		desc:          "coalescing from min to max for int64",
+		inParentRange: Int64Range,
+		in:            "min..0|1..max",
+		want:          YangRange{R(MinInt64, MaxInt64)},
+	}, {
+		desc:          "coalescing from min to max for int32",
+		inParentRange: Int32Range,
+		in:            "min..0|1..max",
+		want:          YangRange{R(minInt32, maxInt32)},
+	}, {
+		desc:          "coalescing from min to max for int16",
+		inParentRange: Int16Range,
+		in:            "min..0|1..max",
+		want:          YangRange{R(minInt16, maxInt16)},
+	}, {
+		desc:          "coalescing from min to max for int8",
+		inParentRange: Int8Range,
+		in:            "min..0|1..max",
+		want:          YangRange{R(minInt8, maxInt8)},
 	}, {
 		desc:             "spelling error",
+		inParentRange:    Int64Range,
 		in:               "mean..0|1..max",
 		wantErrSubstring: "invalid syntax",
 	}, {
@@ -267,7 +305,7 @@ func TestParseRangesInt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			got, err := ParseRangesInt(tt.in)
+			got, err := tt.inParentRange.parseChildRanges(tt.in, false, 0)
 			if err != nil {
 				if diff := errdiff.Substring(err, tt.wantErrSubstring); diff != "" {
 					t.Fatalf("did not get expected error, %s", diff)
@@ -276,7 +314,14 @@ func TestParseRangesInt(t *testing.T) {
 			}
 
 			if diff := cmp.Diff(tt.want, got); diff != "" {
-				t.Errorf("(-want, +got):\n%s", diff)
+				t.Errorf("parseChildRanges (-want, +got):\n%s", diff)
+			}
+
+			if tt.inParentRange == nil {
+				got, err = ParseRangesInt(tt.in)
+				if diff := cmp.Diff(tt.want, got); diff != "" {
+					t.Errorf("ParseRangesInt (-want, +got):\n%s", diff)
+				}
 			}
 		})
 	}
@@ -330,20 +375,35 @@ func TestYangRangeSort(t *testing.T) {
 func TestParseRangesDecimal(t *testing.T) {
 	tests := []struct {
 		desc             string
+		inParentRange    YangRange
 		in               string
 		inFracDig        uint8
 		want             YangRange
 		wantErrSubstring string
 	}{{
-		desc:      "small decimals",
-		in:        "0.0|2.0..30.0|1.34..1.99",
-		inFracDig: 2,
-		want:      YangRange{Rf(0, 0, 2), Rf(134, 3000, 2)},
+		desc:          "min..max",
+		inParentRange: Decimal64Range,
+		in:            "min..max",
+		inFracDig:     1,
+		want:          YangRange{Rf(MinInt64, MaxInt64, 1)},
 	}, {
-		desc:      "small decimals with coalescing",
-		in:        "0.0|2.0..30.0",
-		inFracDig: 1,
-		want:      YangRange{Rf(0, 0, 1), Rf(20, 300, 1)},
+		desc:          "min..max",
+		inParentRange: Decimal64Range,
+		in:            "min..max",
+		inFracDig:     2,
+		want:          YangRange{Rf(MinInt64, MaxInt64, 2)},
+	}, {
+		desc:          "small decimals",
+		inParentRange: Decimal64Range,
+		in:            "0.0|2.0..30.0|1.34..1.99",
+		inFracDig:     2,
+		want:          YangRange{Rf(0, 0, 2), Rf(134, 3000, 2)},
+	}, {
+		desc:          "small decimals with coalescing",
+		inParentRange: Decimal64Range,
+		in:            "0.0|2.0..30.0",
+		inFracDig:     1,
+		want:          YangRange{Rf(0, 0, 1), Rf(20, 300, 1)},
 	}, {
 		desc:             "fractional digit cannot be too high",
 		in:               "0.0|2.0..30.0",
@@ -375,22 +435,26 @@ func TestParseRangesDecimal(t *testing.T) {
 		inFracDig:        3,
 		wantErrSubstring: "range boundaries out of order",
 	}, {
-		desc:      "range with min",
-		in:        "4.0..5.55|min..0|2.32..3.23",
-		inFracDig: 3,
-		want:      YangRange{Rf(useMin, 0, 3), Rf(2320, 3230, 3), Rf(4000, 5550, 3)},
+		desc:          "range with min",
+		inParentRange: Decimal64Range,
+		in:            "4.0..5.55|min..0|2.32..3.23",
+		inFracDig:     3,
+		want:          YangRange{Rf(MinInt64, 0, 3), Rf(2320, 3230, 3), Rf(4000, 5550, 3)},
 	}, {
-		desc:      "range with max",
-		in:        "4.0..max|min..0|2.32..3.23",
-		inFracDig: 3,
-		want:      YangRange{Rf(useMin, 0, 3), Rf(2320, 3230, 3), Rf(4000, useMax, 3)},
+		desc:          "range with max",
+		inParentRange: Decimal64Range,
+		in:            "4.0..max|min..0|2.32..3.23",
+		inFracDig:     3,
+		want:          YangRange{Rf(MinInt64, 0, 3), Rf(2320, 3230, 3), Rf(4000, MaxInt64, 3)},
 	}, {
-		desc:      "coalescing from min to max",
-		in:        "min..0.9|1..max",
-		inFracDig: 1,
-		want:      YangRange{Rf(useMin, useMax, 1)},
+		desc:          "coalescing from min to max",
+		inParentRange: Decimal64Range,
+		in:            "min..0.9|1..max",
+		inFracDig:     1,
+		want:          YangRange{Rf(MinInt64, MaxInt64, 1)},
 	}, {
 		desc:             "spelling error",
+		inParentRange:    Decimal64Range,
 		in:               "min..0.9|1..masks",
 		inFracDig:        1,
 		wantErrSubstring: "invalid syntax",
@@ -418,7 +482,7 @@ func TestParseRangesDecimal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			got, err := ParseRangesDecimal(tt.in, tt.inFracDig)
+			got, err := tt.inParentRange.parseChildRanges(tt.in, true, tt.inFracDig)
 			if err != nil {
 				if diff := errdiff.Substring(err, tt.wantErrSubstring); diff != "" {
 					t.Fatalf("did not get expected error, %s", diff)
@@ -428,6 +492,13 @@ func TestParseRangesDecimal(t *testing.T) {
 
 			if diff := cmp.Diff(tt.want, got); diff != "" {
 				t.Errorf("(-want, +got):\n%s", diff)
+			}
+
+			if tt.inParentRange == nil {
+				got, err = ParseRangesDecimal(tt.in, tt.inFracDig)
+				if diff := cmp.Diff(tt.want, got); diff != "" {
+					t.Errorf("ParseRangesDecimal (-want, +got):\n%s", diff)
+				}
 			}
 		})
 	}
@@ -518,13 +589,13 @@ func TestParseInt(t *testing.T) {
 		inStr: "0",
 		want:  FromInt(0),
 	}, {
-		desc:  "min",
-		inStr: "min",
-		want:  minNumber,
+		desc:             "min",
+		inStr:            "min",
+		wantErrSubstring: "invalid syntax",
 	}, {
-		desc:  "max",
-		inStr: "max",
-		want:  maxNumber,
+		desc:             "max",
+		inStr:            "max",
+		wantErrSubstring: "invalid syntax",
 	}, {
 		desc:             "just a sign",
 		inStr:            "-",
@@ -638,19 +709,19 @@ func TestNumberString(t *testing.T) {
 		want string
 	}{{
 		desc: "min",
-		in:   Number{Kind: MinNumber},
-		want: "min",
+		in:   FromInt(MinInt64),
+		want: "-9223372036854775808",
 	}, {
 		desc: "max",
-		in:   Number{Kind: MaxNumber},
-		want: "max",
+		in:   FromInt(MaxInt64),
+		want: "9223372036854775807",
 	}, {
 		desc: "integer",
 		in:   Number{Value: 1},
 		want: "1",
 	}, {
 		desc: "negative integer",
-		in:   Number{Value: 1, Kind: Negative},
+		in:   Number{Value: 1, Negative: true},
 		want: "-1",
 	}, {
 		desc: "decimal, fractional digits = 1",
@@ -662,7 +733,7 @@ func TestNumberString(t *testing.T) {
 		want: "0.123456789012345678",
 	}, {
 		desc: "negative decimal",
-		in:   Number{Value: 100, FractionDigits: 2, Kind: Negative},
+		in:   Number{Value: 100, FractionDigits: 2, Negative: true},
 		want: "-1.00",
 	}}
 

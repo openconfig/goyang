@@ -443,3 +443,349 @@ func populatePatterns(ytype *YangType, targetType *YangType) {
 		populatePatterns(subtype, targetSubtype)
 	}
 }
+
+func TestTypeLengthRange(t *testing.T) {
+	tests := []struct {
+		desc          string
+		leafNode      string
+		wantType      *testTypeStruct
+		wantErrSubstr string
+	}{{
+		desc: "simple uint32",
+		leafNode: `
+			typedef alpha {
+				type uint32 {
+					range "1..4 | 10..20";
+				}
+			}
+			leaf test-leaf {
+				type alpha;
+			}
+		} // end module`,
+		wantType: &testTypeStruct{
+			Name:  "alpha",
+			Range: YangRange{R(1, 4), R(10, 20)},
+		},
+	}, {
+		desc: "inherited uint32",
+		leafNode: `
+			typedef alpha {
+				type uint32 {
+					range "1..4 | 10..20";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					range "min..3 | 12..max";
+				}
+			}
+			leaf test-leaf {
+				type bravo;
+			}
+		} // end module`,
+		wantType: &testTypeStruct{
+			Name:  "bravo",
+			Range: YangRange{R(1, 3), R(12, 20)},
+		},
+	}, {
+		desc: "inherited uint32 range violation",
+		leafNode: `
+			typedef alpha {
+				type uint32 {
+					range "1..4 | 10..20";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					range "min..max";
+				}
+			}
+			leaf test-leaf {
+				type bravo;
+			}
+		} // end module`,
+		wantErrSubstr: "not within",
+	}, {
+		desc: "simple decimal64",
+		leafNode: `
+			typedef alpha {
+				type decimal64 {
+					fraction-digits 2;
+					range "1 .. 3.14 | 10 | 20..max";
+				}
+			}
+			leaf test-leaf {
+				type alpha;
+			}
+		} // end module`,
+		wantType: &testTypeStruct{
+			Name:  "alpha",
+			Range: YangRange{Rf(100, 314, 2), Rf(1000, 1000, 2), Rf(2000, MaxInt64, 2)},
+		},
+	}, {
+		desc: "simple decimal64 with inherited ranges",
+		leafNode: `
+			typedef alpha {
+				type decimal64 {
+					fraction-digits 3;
+					range "1 .. 3.14 | 10 | 20..max";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					range "min .. 2.72 | 42 .. max";
+				}
+			}
+			leaf test-leaf {
+				type bravo;
+			}
+		} // end module`,
+		wantType: &testTypeStruct{
+			Name:  "bravo",
+			Range: YangRange{Rf(1000, 2720, 3), Rf(42000, MaxInt64, 3)},
+		},
+	}, {
+		desc: "simple decimal64 with inherited ranges",
+		leafNode: `
+			typedef alpha {
+				type decimal64 {
+					fraction-digits 2;
+					range "1 .. 3.14 | 10 | 20..max";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					range "min..max";
+				}
+			}
+			leaf test-leaf {
+				type alpha;
+			}
+		} // end module`,
+		wantErrSubstr: "not within",
+	}, {
+		desc: "simple decimal64 with too few fractional digits",
+		leafNode: `
+			typedef alpha {
+				type decimal64 {
+					fraction-digits 1;
+					range "1 .. 3.14 | 10 | 20..max";
+				}
+			}
+			leaf test-leaf {
+				type alpha;
+			}
+		} // end module`,
+		wantErrSubstr: "has too much precision",
+	}, {
+		desc: "simple decimal64 fractional digit on inherited decimal64 type",
+		leafNode: `
+			typedef alpha {
+				type decimal64 {
+					fraction-digits 2;
+					range "1 .. 3.14 | 10 | 20..max";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					fraction-digits 2;
+					range "25..max";
+				}
+			}
+			leaf test-leaf {
+				type bravo;
+			}
+		} // end module`,
+		wantErrSubstr: "overriding of fraction-digits not allowed",
+	}, {
+		desc: "simple string with length",
+		leafNode: `
+			typedef alpha {
+				type string {
+					length "1..4 | 10..20 | 30..max";
+				}
+			}
+			leaf test-leaf {
+				type alpha;
+			}
+		} // end module`,
+		wantType: &testTypeStruct{
+			Name:   "alpha",
+			Length: YangRange{R(1, 4), R(10, 20), YRange{FromInt(30), Number{Value: maxUint64}}},
+		},
+	}, {
+		desc: "inherited string",
+		leafNode: `
+			typedef alpha {
+				type string {
+					length "1..4 | 10..20 | 30..max";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					length "min..3 | 42..max";
+				}
+			}
+			leaf test-leaf {
+				type bravo;
+			}
+		} // end module`,
+		wantType: &testTypeStruct{
+			Name:   "bravo",
+			Length: YangRange{R(1, 3), YRange{FromInt(42), Number{Value: maxUint64}}},
+		},
+	}, {
+		desc: "inherited binary",
+		leafNode: `
+			typedef alpha {
+				type binary {
+					length "1..4 | 10..20 | 30..max";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					length "min..3 | 42..max";
+				}
+			}
+			leaf test-leaf {
+				type bravo;
+			}
+		} // end module`,
+		wantType: &testTypeStruct{
+			Name:   "bravo",
+			Length: YangRange{R(1, 3), YRange{FromInt(42), Number{Value: maxUint64}}},
+		},
+	}, {
+		desc: "inherited string length violation",
+		leafNode: `
+			typedef alpha {
+				type string {
+					length "1..4 | 10..20 | 30..max";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					length "min..max";
+				}
+			}
+			leaf test-leaf {
+				type bravo;
+			}
+		} // end module`,
+		wantErrSubstr: "not within",
+	}, {
+		desc: "simple union",
+		leafNode: `
+				typedef alpha {
+					type union {
+						type string;
+						type binary {
+							length "min..5|999..max";
+						}
+						type int8 {
+							range "min..-42|42..max";
+						}
+						type enumeration {
+							enum zero;
+							enum one;
+							enum seven {
+								value 7;
+							}
+						}
+					}
+				}
+				leaf test-leaf {
+					type alpha;
+				}
+			} // end module`,
+		wantType: &testTypeStruct{
+			Name: "alpha",
+			Type: []*testTypeStruct{{
+				Name: "string",
+			}, {
+				Name:   "binary",
+				Length: YangRange{R(0, 5), YRange{FromInt(999), Number{Value: maxUint64}}},
+			}, {
+				Name:  "int8",
+				Range: YangRange{R(minInt8, -42), R(42, maxInt8)},
+			}, {
+				Name: "enumeration",
+			}},
+		},
+	}}
+
+	getTestLeaf := func(ms *Modules) (*YangType, error) {
+		m, err := ms.FindModuleByPrefix("t")
+		if err != nil {
+			return nil, fmt.Errorf("can't find module in %v", ms)
+		}
+		if len(m.Leaf) == 0 {
+			return nil, fmt.Errorf("node %v is missing imports", m)
+		}
+		e := ToEntry(m)
+		return e.Dir["test-leaf"].Type, nil
+	}
+
+	for _, tt := range tests {
+		inModules := map[string]string{
+			"test": `
+				module test {
+					prefix "t";
+					namespace "urn:t";
+					` + tt.leafNode,
+		}
+
+		t.Run(tt.desc, func(t *testing.T) {
+			ms := NewModules()
+			for n, m := range inModules {
+				if err := ms.Parse(m, n); err != nil {
+					t.Fatalf("error parsing module %s, got: %v, want: nil", n, err)
+				}
+			}
+			errs := ms.Process()
+			var err error
+			if len(errs) > 1 {
+				t.Fatalf("Got more than 1 error: %v", errs)
+			} else if len(errs) == 1 {
+				err = errs[0]
+			}
+			if diff := errdiff.Substring(err, tt.wantErrSubstr); diff != "" {
+				t.Errorf("Did not get expected error: %s", diff)
+			}
+			if err != nil {
+				return
+			}
+
+			gotType, err := getTestLeaf(ms)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if diff := cmp.Diff(filterRanges(gotType), tt.wantType); diff != "" {
+				t.Errorf("Type.resolve() union types test (-got, +want):\n%s", diff)
+			}
+		})
+	}
+}
+
+type testTypeStruct struct {
+	Name   string
+	Length YangRange
+	Range  YangRange
+	Type   []*testTypeStruct
+}
+
+// filterRanges returns a testTypeStruct with only the
+// YangType.Name fields of the given type, preserving
+// the recursive structure of the type, to work around cmp not
+// having an allowlist way of specifying which fields to
+// compare and YangType having a custom Equal function.
+func filterRanges(ytype *YangType) *testTypeStruct {
+	filteredType := &testTypeStruct{Name: ytype.Name}
+	filteredType.Length = ytype.Length
+	filteredType.Range = ytype.Range
+	for _, subtype := range ytype.Type {
+		filteredType.Type = append(filteredType.Type, filterRanges(subtype))
+	}
+	return filteredType
+}
