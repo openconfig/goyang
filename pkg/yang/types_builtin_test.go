@@ -54,6 +54,47 @@ func Rf(a, b int64, fracDig uint8) YRange {
 	return YRange{n1, n2}
 }
 
+func TestNumberInt(t *testing.T) {
+	tests := []struct {
+		desc    string
+		in      Number
+		want    int64
+		wantErr bool
+	}{{
+		desc: "zero",
+		in:   FromInt(0),
+		want: 0,
+	}, {
+		desc: "positive",
+		in:   FromInt(42),
+		want: 42,
+	}, {
+		desc: "negative",
+		in:   FromInt(-42),
+		want: -42,
+	}, {
+		desc:    "decimal",
+		in:      FromFloat(42),
+		wantErr: true,
+	}, {
+		desc:    "overflow",
+		in:      FromUint(maxUint64),
+		wantErr: true,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			got, err := tt.in.Int()
+			if got != tt.want {
+				t.Errorf("got: %v, want: %v", got, tt.want)
+			}
+			if (err != nil) != tt.wantErr {
+				t.Errorf("gotErr: %v, wantErr: %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestRangeEqual(t *testing.T) {
 	tests := []struct {
 		desc        string
@@ -232,6 +273,10 @@ func TestParseRangesInt(t *testing.T) {
 		in:            "min..0|2..3|4..5",
 		want:          YangRange{R(MinInt64, 0), R(2, 5)},
 	}, {
+		desc:             "range with min but without parent range",
+		in:               "min..0|2..3|4..5",
+		wantErrSubstring: "empty YangRange parent object",
+	}, {
 		desc:          "range with max",
 		inParentRange: Int32Range,
 		in:            "min..0|2..3|4..5|7..max",
@@ -240,7 +285,7 @@ func TestParseRangesInt(t *testing.T) {
 		desc:          "coalescing from min to max for uint64",
 		inParentRange: Uint64Range,
 		in:            "min..0|1..max",
-		want:          YangRange{YRange{FromInt(0), Number{Value: maxUint64}}},
+		want:          YangRange{YRange{FromInt(0), FromUint(maxUint64)}},
 	}, {
 		desc:          "coalescing from min to max for uint32",
 		inParentRange: Uint32Range,
@@ -394,6 +439,12 @@ func TestParseRangesDecimal(t *testing.T) {
 		in:            "min..max",
 		inFracDig:     2,
 		want:          YangRange{Rf(MinInt64, MaxInt64, 2)},
+	}, {
+		desc:             "min..max",
+		in:               "min..max",
+		inFracDig:        2,
+		want:             YangRange{Rf(MinInt64, MaxInt64, 2)},
+		wantErrSubstring: "empty YangRange parent object",
 	}, {
 		desc:          "small decimals",
 		inParentRange: Decimal64Range,
