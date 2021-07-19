@@ -318,7 +318,9 @@ func TestParseRangesInt(t *testing.T) {
 			}
 
 			if tt.inParentRange == nil {
-				got, err = ParseRangesInt(tt.in)
+				if got, err = ParseRangesInt(tt.in); err != nil {
+					t.Fatalf("ParseRangesInt: unexpected error: %v", err)
+				}
 				if diff := cmp.Diff(tt.want, got); diff != "" {
 					t.Errorf("ParseRangesInt (-want, +got):\n%s", diff)
 				}
@@ -495,7 +497,9 @@ func TestParseRangesDecimal(t *testing.T) {
 			}
 
 			if tt.inParentRange == nil {
-				got, err = ParseRangesDecimal(tt.in, tt.inFracDig)
+				if got, err = ParseRangesDecimal(tt.in, tt.inFracDig); err != nil {
+					t.Fatalf("ParseRangesDecimal: unexpected error: %v", err)
+				}
 				if diff := cmp.Diff(tt.want, got); diff != "" {
 					t.Errorf("ParseRangesDecimal (-want, +got):\n%s", diff)
 				}
