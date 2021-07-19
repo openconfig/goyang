@@ -371,6 +371,20 @@ func ParseInt(s string) (Number, error) {
 	return n, err
 }
 
+// ParseDecimal returns s as a Number with a non-zero FractionDigits.
+// octal, or hexadecimal using the standard prefix notations (e.g., 0 and 0x)
+func ParseDecimal(s string, fracDigRequired uint8) (n Number, err error) {
+	s = strings.TrimSpace(s)
+	switch s {
+	case "":
+		return n, errors.New("converting empty string to number")
+	case "+", "-":
+		return n, errors.New("sign with no value")
+	}
+
+	return decimalValueFromString(s, fracDigRequired)
+}
+
 // decimalValueFromString returns a decimal Number representation of numStr.
 // fracDigRequired is used to set the number of fractional digits, which must
 // be at least the greatest precision seen in numStr.
