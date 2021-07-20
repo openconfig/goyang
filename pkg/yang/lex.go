@@ -191,12 +191,21 @@ func (l *lexer) emitText(c code, text string) {
 	if l.debug {
 		fmt.Fprintf(os.Stderr, "%v: %q\n", c, text)
 	}
-	l.items <- &token{
+	select {
+	case l.items <- &token{
 		code: c,
 		Text: text,
 		File: l.file,
 		Line: l.sline,
 		Col:  l.scol + 1,
+	}:
+	default:
+		if c == tError {
+			panic(tooMany)
+		}
+		// regular tokens should never over-fill the items channel,
+		// so reaching here implies a library bug
+		panic("goyang bug: lexer items channel not being consumed")
 	}
 	l.consume()
 }
