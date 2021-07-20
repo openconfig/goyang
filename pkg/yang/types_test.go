@@ -611,7 +611,7 @@ func TestTypeLengthRange(t *testing.T) {
 		} // end module`,
 		wantType: &testTypeStruct{
 			Name:   "alpha",
-			Length: YangRange{R(1, 4), R(10, 20), YRange{FromInt(30), Number{Value: maxUint64}}},
+			Length: YangRange{R(1, 4), R(10, 20), YRange{FromInt(30), FromUint(maxUint64)}},
 		},
 	}, {
 		desc: "inherited string",
@@ -632,7 +632,7 @@ func TestTypeLengthRange(t *testing.T) {
 		} // end module`,
 		wantType: &testTypeStruct{
 			Name:   "bravo",
-			Length: YangRange{R(1, 3), YRange{FromInt(42), Number{Value: maxUint64}}},
+			Length: YangRange{R(1, 3), YRange{FromInt(42), FromUint(maxUint64)}},
 		},
 	}, {
 		desc: "inherited binary",
@@ -653,7 +653,7 @@ func TestTypeLengthRange(t *testing.T) {
 		} // end module`,
 		wantType: &testTypeStruct{
 			Name:   "bravo",
-			Length: YangRange{R(1, 3), YRange{FromInt(42), Number{Value: maxUint64}}},
+			Length: YangRange{R(1, 3), YRange{FromInt(42), FromUint(maxUint64)}},
 		},
 	}, {
 		desc: "inherited string length violation",
@@ -704,7 +704,7 @@ func TestTypeLengthRange(t *testing.T) {
 				Name: "string",
 			}, {
 				Name:   "binary",
-				Length: YangRange{R(0, 5), YRange{FromInt(999), Number{Value: maxUint64}}},
+				Length: YangRange{R(0, 5), YRange{FromInt(999), FromUint(maxUint64)}},
 			}, {
 				Name:  "int8",
 				Range: YangRange{R(minInt8, -42), R(42, maxInt8)},
@@ -768,6 +768,8 @@ func TestTypeLengthRange(t *testing.T) {
 	}
 }
 
+// testTypeStruct is a filtered-down version of YangType where only certain
+// fields are preserved for targeted testing.
 type testTypeStruct struct {
 	Name   string
 	Length YangRange
@@ -775,11 +777,10 @@ type testTypeStruct struct {
 	Type   []*testTypeStruct
 }
 
-// filterRanges returns a testTypeStruct with only the
-// YangType.Name fields of the given type, preserving
-// the recursive structure of the type, to work around cmp not
-// having an allowlist way of specifying which fields to
-// compare and YangType having a custom Equal function.
+// filterRanges returns a testTypeStruct with only the Name, Length, and Range
+// fields of the given YangType, preserving the recursive structure of the
+// type, to work around cmp not having an allowlist way of specifying which
+// fields to compare and YangType having a custom Equal function.
 func filterRanges(ytype *YangType) *testTypeStruct {
 	filteredType := &testTypeStruct{Name: ytype.Name}
 	filteredType.Length = ytype.Length
