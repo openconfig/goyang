@@ -75,7 +75,7 @@ func TestTypeResolve(t *testing.T) {
 				Name:           "decimal64",
 				Kind:           Ydecimal64,
 				FractionDigits: 7,
-				Range:          Decimal64Range,
+				Range:          YangRange{Rf(MinInt64, MaxInt64, 7)},
 			},
 		},
 		// TODO(borman): Add in more tests as we honor more fields
@@ -506,7 +506,23 @@ func TestTypeLengthRange(t *testing.T) {
 		} // end module`,
 		wantErrSubstr: "not within",
 	}, {
-		desc: "simple decimal64",
+		desc: "unrestricted decimal64",
+		leafNode: `
+			typedef alpha {
+				type decimal64 {
+					fraction-digits 2;
+				}
+			}
+			leaf test-leaf {
+				type alpha;
+			}
+		} // end module`,
+		wantType: &testTypeStruct{
+			Name:  "alpha",
+			Range: YangRange{Rf(MinInt64, MaxInt64, 2)},
+		},
+	}, {
+		desc: "simple restricted decimal64",
 		leafNode: `
 			typedef alpha {
 				type decimal64 {
@@ -543,6 +559,32 @@ func TestTypeLengthRange(t *testing.T) {
 		wantType: &testTypeStruct{
 			Name:  "bravo",
 			Range: YangRange{Rf(1000, 2720, 3), Rf(42000, MaxInt64, 3)},
+		},
+	}, {
+		desc: "triple-inherited decimal64",
+		leafNode: `
+			typedef alpha {
+				type decimal64 {
+					fraction-digits 2;
+				}
+			}
+			typedef bravo {
+				type alpha {
+					range "1 .. 3.14 | 10 | 20..max";
+				}
+			}
+			typedef charlie {
+				type bravo {
+					range "min .. 2.72 | 42 .. max";
+				}
+			}
+			leaf test-leaf {
+				type charlie;
+			}
+		} // end module`,
+		wantType: &testTypeStruct{
+			Name:  "charlie",
+			Range: YangRange{Rf(100, 272, 2), Rf(4200, MaxInt64, 2)},
 		},
 	}, {
 		desc: "simple decimal64 with inherited ranges",

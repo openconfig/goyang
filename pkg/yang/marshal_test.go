@@ -555,12 +555,12 @@ func TestParseAndMarshal(t *testing.T) {
               {
                 "Min": {
                   "Value": 9223372036854775808,
-                  "FractionDigits": 1,
+                  "FractionDigits": 8,
                   "Negative": true
                 },
                 "Max": {
                   "Value": 9223372036854775807,
-                  "FractionDigits": 1,
+                  "FractionDigits": 8,
                   "Negative": false
                 }
               }

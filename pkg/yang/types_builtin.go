@@ -39,8 +39,6 @@ var (
 	Uint16Range = mustParseRangesInt("0..65535")
 	Uint32Range = mustParseRangesInt("0..4294967295")
 	Uint64Range = mustParseRangesInt("0..18446744073709551615")
-
-	Decimal64Range = mustParseRangesDecimal("-922337203685477580.8..922337203685477580.7", 1)
 )
 
 const (

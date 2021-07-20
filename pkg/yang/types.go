@@ -252,6 +252,12 @@ check:
 			errs = append(errs, fmt.Errorf("%s: %v", Source(t), err))
 		}
 		y.FractionDigits = int(i)
+		// We only know to how to populate Range after knowing the
+		// fractional digit value.
+		y.Range = YangRange{{
+			Number{Value: AbsMinInt64, Negative: true, FractionDigits: uint8(i)},
+			Number{Value: MaxInt64, FractionDigits: uint8(i)},
+		}}
 	case t.FractionDigits != nil:
 		errs = append(errs, fmt.Errorf("%s: fraction-digits only allowed for decimal64 values", Source(t)))
 	case y.Kind == Yidentityref:

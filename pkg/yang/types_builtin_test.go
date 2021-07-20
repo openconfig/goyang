@@ -420,6 +420,9 @@ func TestYangRangeSort(t *testing.T) {
 }
 
 func TestParseRangesDecimal(t *testing.T) {
+	rangeMax := mustParseRangesDecimal("-922337203685477580.8..922337203685477580.7", 1)
+	rangeRestricted := mustParseRangesDecimal("-42..42|100", 5)
+
 	tests := []struct {
 		desc             string
 		inParentRange    YangRange
@@ -428,32 +431,44 @@ func TestParseRangesDecimal(t *testing.T) {
 		want             YangRange
 		wantErrSubstring string
 	}{{
-		desc:          "min..max",
-		inParentRange: Decimal64Range,
+		desc:          "min..max fraction-digits 1",
+		inParentRange: rangeMax,
 		in:            "min..max",
 		inFracDig:     1,
 		want:          YangRange{Rf(MinInt64, MaxInt64, 1)},
 	}, {
-		desc:          "min..max",
-		inParentRange: Decimal64Range,
+		desc:          "min..max fraction-digits 2",
+		inParentRange: rangeMax,
 		in:            "min..max",
 		inFracDig:     2,
 		want:          YangRange{Rf(MinInt64, MaxInt64, 2)},
 	}, {
-		desc:             "min..max",
+		desc:             "min..max no parent range",
 		in:               "min..max",
 		inFracDig:        2,
 		want:             YangRange{Rf(MinInt64, MaxInt64, 2)},
 		wantErrSubstring: "empty YangRange parent object",
 	}, {
+		desc:             "min..max on fragmented range",
+		inParentRange:    rangeRestricted,
+		in:               "min..max",
+		inFracDig:        5,
+		wantErrSubstring: "not within",
+	}, {
 		desc:          "small decimals",
-		inParentRange: Decimal64Range,
+		inParentRange: rangeMax,
 		in:            "0.0|2.0..30.0|1.34..1.99",
 		inFracDig:     2,
 		want:          YangRange{Rf(0, 0, 2), Rf(134, 3000, 2)},
 	}, {
+		desc:          "small decimals on restricted range",
+		inParentRange: rangeRestricted,
+		in:            "0.0|2.0..30.0|1.34..1.99999",
+		inFracDig:     5,
+		want:          YangRange{Rf(0, 0, 5), Rf(134000, 3000000, 5)},
+	}, {
 		desc:          "small decimals with coalescing",
-		inParentRange: Decimal64Range,
+		inParentRange: rangeMax,
 		in:            "0.0|2.0..30.0",
 		inFracDig:     1,
 		want:          YangRange{Rf(0, 0, 1), Rf(20, 300, 1)},
@@ -489,25 +504,25 @@ func TestParseRangesDecimal(t *testing.T) {
 		wantErrSubstring: "range boundaries out of order",
 	}, {
 		desc:          "range with min",
-		inParentRange: Decimal64Range,
+		inParentRange: rangeMax,
 		in:            "4.0..5.55|min..0|2.32..3.23",
 		inFracDig:     3,
 		want:          YangRange{Rf(MinInt64, 0, 3), Rf(2320, 3230, 3), Rf(4000, 5550, 3)},
 	}, {
 		desc:          "range with max",
-		inParentRange: Decimal64Range,
+		inParentRange: rangeMax,
 		in:            "4.0..max|min..0|2.32..3.23",
 		inFracDig:     3,
 		want:          YangRange{Rf(MinInt64, 0, 3), Rf(2320, 3230, 3), Rf(4000, MaxInt64, 3)},
 	}, {
 		desc:          "coalescing from min to max",
-		inParentRange: Decimal64Range,
+		inParentRange: rangeMax,
 		in:            "min..0.9|1..max",
 		inFracDig:     1,
 		want:          YangRange{Rf(MinInt64, MaxInt64, 1)},
 	}, {
 		desc:             "spelling error",
-		inParentRange:    Decimal64Range,
+		inParentRange:    rangeMax,
 		in:               "min..0.9|1..masks",
 		inFracDig:        1,
 		wantErrSubstring: "invalid syntax",
