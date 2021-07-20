@@ -620,6 +620,9 @@ func ToEntry(n Node) (e *Entry) {
 		if e.ListAttr.MinElements, err = semCheckMinElements(s.MinElements); err != nil {
 			e.addError(err)
 		}
+		if s.Default != nil {
+			e.Default = s.Default.Name
+		}
 		e.Prefix = getRootPrefix(e)
 		addExtraKeywordsToLeafEntry(n, e)
 		return e

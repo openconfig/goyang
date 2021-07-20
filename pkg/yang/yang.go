@@ -412,7 +412,9 @@ func (s *Leaf) NName() string         { return s.Name }
 func (s *Leaf) Statement() *Statement { return s.Source }
 func (s *Leaf) Exts() []*Statement    { return s.Extensions }
 
-// A LeafList is defined in: http://tools.ietf.org/html/rfc6020#section-7.7
+// A LeafList is defined in:
+// YANG 1:   http://tools.ietf.org/html/rfc6020#section-7.7
+// YANG 1.1: https://tools.ietf.org/html/rfc7950#section-7.7
 // It this is supposed to be an array of nodes..
 type LeafList struct {
 	Name       string       `yang:"Name,nomerge"`
@@ -421,6 +423,7 @@ type LeafList struct {
 	Extensions []*Statement `yang:"Ext"`
 
 	Config      *Value   `yang:"config"`
+	Default     *Value   `yang:"default"`
 	Description *Value   `yang:"description"`
 	IfFeature   []*Value `yang:"if-feature"`
 	MaxElements *Value   `yang:"max-elements"`
