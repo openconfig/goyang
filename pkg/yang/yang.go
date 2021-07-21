@@ -51,12 +51,6 @@ func (s *Value) asRangeInt(min, max int64) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	switch n.Kind {
-	case MinNumber:
-		return min, nil
-	case MaxNumber:
-		return max, nil
-	}
 	i, err := n.Int()
 	if err != nil {
 		return 0, err
