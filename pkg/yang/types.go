@@ -280,7 +280,8 @@ check:
 		y.IdentityBase = resolvedBase.Identity
 	}
 
-	if t.Range != nil {
+	// If parsing fraction-digits of type decimal64 fails, the range should not be parsed
+	if t.Range != nil && (!isDecimal64 || (isDecimal64 && y.FractionDigits != 0)) {
 		yr, err := parseRanges(t.Range.Name, isDecimal64, uint8(y.FractionDigits))
 		switch {
 		case err != nil:

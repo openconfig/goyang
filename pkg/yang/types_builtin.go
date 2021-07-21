@@ -454,7 +454,7 @@ func ParseDecimal(s string, fracDigRequired uint8) (n Number, err error) {
 // numStr must conform to Section 9.3.4.
 func decimalValueFromString(numStr string, fracDigRequired uint8) (n Number, err error) {
 	if fracDigRequired > MaxFractionDigits || fracDigRequired < 1 {
-		return n, fmt.Errorf("invalid number of fraction digits %d > max of %d, minimum 1", fracDigRequired, MaxFractionDigits)
+		return n, fmt.Errorf("invalid number of fraction digits %d: out of range [1..%d]", fracDigRequired, MaxFractionDigits)
 	}
 
 	s := numStr
