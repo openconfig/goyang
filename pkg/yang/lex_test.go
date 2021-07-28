@@ -127,11 +127,11 @@ Tests:
 		{line(), `
 pattern '[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+';
 `, []*token{
-			T(tIdentifier, "pattern"),
+			T(tUnquoted, "pattern"),
 			T(tString, "[a-zA-Z0-9!#$%&"),
-			T(tIdentifier, "+"),
+			T(tUnquoted, "+"),
 			T(tString, "'"),
-			T(tIdentifier, "+"),
+			T(tUnquoted, "+"),
 			T(tString, "*+/=?^_`{|}~-]+"),
 			T(';', ";"),
 		}},
