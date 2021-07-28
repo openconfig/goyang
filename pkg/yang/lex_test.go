@@ -46,64 +46,64 @@ Tests:
 	}{
 		{line(), "", nil},
 		{line(), "bob", []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 		}},
 		{line(), "bob //bob", []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 		}},
 		{line(), "/the/path", []*token{
-			T(tIdentifier, "/the/path"),
+			T(tUnquoted, "/the/path"),
 		}},
 		{line(), "+the/path", []*token{
-			T(tIdentifier, "+the/path"),
+			T(tUnquoted, "+the/path"),
 		}},
 		{line(), "+the+path", []*token{
-			T(tIdentifier, "+the+path"),
+			T(tUnquoted, "+the+path"),
 		}},
 		{line(), "+ the/path", []*token{
-			T(tIdentifier, "+"),
-			T(tIdentifier, "the/path"),
+			T(tUnquoted, "+"),
+			T(tUnquoted, "the/path"),
 		}},
 		{line(), "{bob}", []*token{
 			T('{', "{"),
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T('}', "}"),
 		}},
 		{line(), "bob;fred", []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T(';', ";"),
-			T(tIdentifier, "fred"),
+			T(tUnquoted, "fred"),
 		}},
 		{line(), "\t bob\t; fred ", []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T(';', ";"),
-			T(tIdentifier, "fred"),
+			T(tUnquoted, "fred"),
 		}},
 		{line(), `
 	bob;
 	fred
 `, []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T(';', ";"),
-			T(tIdentifier, "fred"),
+			T(tUnquoted, "fred"),
 		}},
 		{line(), `
 	// This is a comment
 	bob;
 	fred
 `, []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T(';', ";"),
-			T(tIdentifier, "fred"),
+			T(tUnquoted, "fred"),
 		}},
 		{line(), `
 	/* This is a comment */
 	bob;
 	fred
 `, []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T(';', ";"),
-			T(tIdentifier, "fred"),
+			T(tUnquoted, "fred"),
 		}},
 		{line(), `
 	/*
@@ -112,17 +112,17 @@ Tests:
 	bob;
 	fred
 `, []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T(';', ";"),
-			T(tIdentifier, "fred"),
+			T(tUnquoted, "fred"),
 		}},
 		{line(), `
 	bob; // This is bob
 	fred // This is fred
 `, []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T(';', ";"),
-			T(tIdentifier, "fred"),
+			T(tUnquoted, "fred"),
 		}},
 		{line(), `
 pattern '[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+';

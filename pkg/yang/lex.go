@@ -20,7 +20,7 @@ package yang
 //    tError       // an error was encountered
 //    tEOF         // end-of-file
 //    tString      // A de-quoted string (e.g., "\"bob\"" becomes "bob")
-//    tIdentifier  // An un-quoted string
+//    tUnquoted    // An un-quoted string
 //    '{'
 //    ';'
 //    '}'
@@ -40,9 +40,6 @@ const (
 	eof       = 0x7fffffff // end of file, also an invalid rune
 	maxErrors = 8
 	tooMany   = "too many errors...\n"
-
-	openBrace  = '{'
-	closeBrace = '}'
 )
 
 // stateFn represents a state in the lexer as a function, returning the next
@@ -76,10 +73,10 @@ type lexer struct {
 type code int
 
 const (
-	tEOF        = code(-1 - iota) // Reached end of file
-	tError                        // An error
-	tString                       // A dequoted string
-	tIdentifier                   // A non-quoted string
+	tEOF      = code(-1 - iota) // Reached end of file
+	tError                      // An error
+	tString                     // A dequoted string
+	tUnquoted                   // A non-quoted string
 )
 
 // String returns c as a string.
@@ -89,8 +86,8 @@ func (c code) String() string {
 		return "Error"
 	case tString:
 		return "String"
-	case tIdentifier:
-		return "Identifier"
+	case tUnquoted:
+		return "Unquoted"
 	}
 	if c < 0 || c > '~' {
 		return fmt.Sprintf("%d", c)
@@ -358,7 +355,7 @@ func lexGround(l *lexer) stateFn {
 	switch c := l.peek(); c {
 	case eof:
 		return nil
-	case ';', openBrace, closeBrace:
+	case ';', '{', '}':
 		l.next()
 		l.emit(code(c))
 		return lexGround
@@ -410,7 +407,7 @@ func lexGround(l *lexer) stateFn {
 			return lexIdentifier
 		}
 	default:
-		return lexIdentifier
+		return lexUnquoted
 	}
 }
 
@@ -496,21 +493,21 @@ func lexQString(l *lexer) stateFn {
 	}
 }
 
-// lexIdentifier reads one identifier/number/un-quoted-string/...
+// lexUnquoted reads one identifier/number/un-quoted-string/...
 //
 // From https://tools.ietf.org/html/rfc7950#section-6.1.3:
 // An unquoted string is any sequence of characters that does not
 // contain any space, tab, carriage return, or line feed characters, a
 // single or double quote character, a semicolon (";"), braces ("{" or
 // "}"), or comment sequences ("//", "/*", or "*/").
-func lexIdentifier(l *lexer) stateFn {
+func lexUnquoted(l *lexer) stateFn {
 	for {
 		switch c := l.peek(); c {
 		// TODO: Support detection of comment immediately following an
-		// identifier, likely through supporting two peeks instead of
-		// just one.
-		case ' ', '\r', '\n', '\t', ';', '"', '\'', openBrace, closeBrace, eof:
-			l.emit(tIdentifier)
+		// unquoted string, likely through supporting two peeks instead
+		// of just one.
+		case ' ', '\r', '\n', '\t', ';', '"', '\'', '{', '}', eof:
+			l.emit(tUnquoted)
 			return lexGround
 		default:
 			l.next()
