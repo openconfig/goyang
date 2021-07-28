@@ -48,6 +48,9 @@ Tests:
 		{line(), "bob", []*token{
 			T(tIdentifier, "bob"),
 		}},
+		{line(), "bob //bob", []*token{
+			T(tIdentifier, "bob"),
+		}},
 		{line(), "/the/path", []*token{
 			T(tIdentifier, "/the/path"),
 		}},
@@ -141,7 +144,7 @@ pattern '[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+';
 		}},
 		{line(), `
 // tab indent both lines, trailing spaces and tabs
-	"Broken 	 
+	"Broken
 	 line"
 `, []*token{
 			T(tString, "Broken\nline"),
@@ -180,6 +183,13 @@ pattern '[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+';
   space"
 `, []*token{
 			T(tString, "Broken\nspace"),
+		}},
+		{line(), `
+// Odd indenting
+   "Broken  \t
+  space with trailing space"
+`, []*token{
+			T(tString, "Broken\nspace with trailing space"),
 		}},
 	} {
 		l := newLexer(tt.in, "")
@@ -239,6 +249,32 @@ func TestLexErrors(t *testing.T) {
 `,
 			1,
 			`test.yang:4:26: missing closing "
+`,
+		},
+		{line(),
+			`1:
+2: 'Quoted string'
+3: 'Missing quote
+4: 'Another quoted string'
+`,
+			1,
+			`test.yang:4:26: missing closing '
+`,
+		},
+		{line(),
+			`1: "Quoted string\"
+2: Missing end-quote\q`,
+			2,
+			`test.yang:2:21: invalid escape sequence: \q
+test.yang:1:4: missing closing "
+`,
+		},
+		{line(),
+			`/* This is a comment
+without an ending.
+`,
+			1,
+			`test.yang:1:1: missing closing */
 `,
 		},
 	} {

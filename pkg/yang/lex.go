@@ -137,8 +137,7 @@ func (t *token) String() string {
 // in a single Write call.  The test code makes this assumption for testing
 // expected errors.
 
-// newLexer imports the provided input into the lexer l at its the current
-// location, returning the lexer.  If l is nil then a new lexer is returned.
+// newLexer returns a new lexer, importing into it the provided input and path.
 // The provided path should indicate where the source originated.
 func newLexer(input, path string) *lexer {
 	// Force input to be newline terminated.
@@ -237,7 +236,7 @@ func (l *lexer) peek() rune {
 // next returns the next rune in the input.  If next encounters the end of input
 // then it will return eof.
 func (l *lexer) next() (rune rune) {
-	for l.pos >= len(l.input) {
+	if l.pos >= len(l.input) {
 		l.width = 0
 		return eof
 	}
@@ -271,6 +270,7 @@ func (l *lexer) acceptRun(valid string) bool {
 }
 
 // skipTo moves the cursor up to, but not including, s.
+// Returns whether s was found in the remaining input.
 func (l *lexer) skipTo(s string) bool {
 	if x := strings.Index(l.input[l.pos:], s); x >= 0 {
 		l.updateCursor(x)
@@ -280,7 +280,7 @@ func (l *lexer) skipTo(s string) bool {
 }
 
 // updateCursor moves the cursor forward n bytes.  updateCursor does not
-// correctly handle tabs.  This is okay as it is only used by skipTo and skipTo
+// correctly handle tabs.  This is okay as it is only used by skipTo, and skipTo
 // is never used to skip to an initial " (which is the only time that tcol is
 // necessary, as per YANG's multi-line quoted string requirement).
 func (l *lexer) updateCursor(n int) {
@@ -365,7 +365,10 @@ func lexGround(l *lexer) stateFn {
 	case '\'':
 		l.next()
 		l.consume() // Toss the leading '
-		l.skipTo("'")
+		if !l.skipTo("'") {
+			l.ErrorfAt(l.line, l.col-1, `missing closing '`)
+			return nil
+		}
 		l.emit(tString)
 		l.next() // Either EOF or the matching '
 		return lexGround
@@ -377,11 +380,19 @@ func lexGround(l *lexer) stateFn {
 		switch l.peek() {
 		case '/':
 			// Start of a // comment
-			l.skipTo("\n")
+			if !l.skipTo("\n") {
+				// Here "\n" should always be found, since we force all
+				// input to be "\n" terminated.
+				l.ErrorfAt(l.line, l.col-1, `lexer internal error: all lines should be newline-terminated.`)
+				return nil
+			}
 			return lexGround
 		case '*':
 			// Start of a /* comment
-			l.skipTo("*/")
+			if !l.skipTo("*/") {
+				l.ErrorfAt(l.line, l.col-1, `missing closing */`)
+				return nil
+			}
 			// Now actually skip the */
 			l.next()
 			l.next()
@@ -459,8 +470,6 @@ func lexQString(l *lexer) stateFn {
 			text = append(text, []byte(string(c))...)
 		case '\\':
 			switch c = l.next(); c {
-			case eof:
-				l.ErrorfAt(line, col, `missing closing "`)
 			case 'n':
 				c = '\n'
 			case 't':
@@ -475,7 +484,7 @@ func lexQString(l *lexer) stateFn {
 				// (e..g., \{) or to be part of of a special
 				// sequence such as \S.
 				if !l.inPattern {
-					l.ErrorfAt(line, col, `invalid escape sequence: \`+string(c))
+					l.ErrorfAt(l.line, l.col-2, `invalid escape sequence: \`+string(c))
 				}
 				text = append(text, '\\')
 			}
@@ -488,10 +497,19 @@ func lexQString(l *lexer) stateFn {
 }
 
 // lexIdentifier reads one identifier/number/un-quoted-string/...
+//
+// From https://tools.ietf.org/html/rfc7950#section-6.1.3:
+// An unquoted string is any sequence of characters that does not
+// contain any space, tab, carriage return, or line feed characters, a
+// single or double quote character, a semicolon (";"), braces ("{" or
+// "}"), or comment sequences ("//", "/*", or "*/").
 func lexIdentifier(l *lexer) stateFn {
 	for {
 		switch c := l.peek(); c {
-		case ' ', '\r', '\n', '\t', ';', '"', openBrace, closeBrace, eof:
+		// TODO: Support detection of comment immediately following an
+		// identifier, likely through supporting two peeks instead of
+		// just one.
+		case ' ', '\r', '\n', '\t', ';', '"', '\'', openBrace, closeBrace, eof:
 			l.emit(tIdentifier)
 			return lexGround
 		default:
