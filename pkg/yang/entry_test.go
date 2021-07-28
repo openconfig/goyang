@@ -2696,7 +2696,7 @@ func TestFixChoice(t *testing.T) {
 			}
 
 			if insertedNode.Statement() != originalNode.Statement() {
-				t.Errorf("Got inserted node's statement %v, expected %s",
+				t.Errorf("Got inserted node's statement %v, expected %v",
 					insertedNode.Statement(), originalNode.Statement())
 			}
 

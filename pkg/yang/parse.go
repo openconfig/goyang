@@ -75,13 +75,6 @@ func (s *Statement) Arg() (string, bool) { return s.Argument, s.HasArgument }
 // SubStatements returns a slice of Statements found in s.
 func (s *Statement) SubStatements() []*Statement { return s.statements }
 
-// String returns s's tree as a string.
-func (s *Statement) String() string {
-	var b bytes.Buffer
-	s.Write(&b, "")
-	return b.String()
-}
-
 // Location returns the location in the source where s was defined.
 func (s *Statement) Location() string {
 	switch {
@@ -319,7 +312,7 @@ func (p *parser) nextStatement() *Statement {
 			}
 		}
 	default:
-		fmt.Fprintf(p.errout, "%v: syntax error, expected ';' or nested statements in {}\n", t)
+		fmt.Fprintf(p.errout, "%v: syntax error, expected ';' or '{'\n", t)
 		return ignoreMe
 	}
 }

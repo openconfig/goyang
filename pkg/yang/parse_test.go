@@ -124,6 +124,114 @@ pattern '\\ \S \n';
 			},
 		},
 		{line: line(), in: `
+foo "bar" + "baz";
+`,
+			out: []*Statement{
+				SA("foo", "barbaz"),
+			},
+		},
+		{line: line(), in: `
+foo "bar" + "+" + "baz";
+`,
+			out: []*Statement{
+				SA("foo", "bar+baz"),
+			},
+		},
+		{line: line(), in: `
+foo "bar"
+`,
+			err: `test.yang: unexpected EOF`,
+		},
+		{line: line(), in: `
+foo "bar" + "baz"
+`,
+			err: `test.yang: unexpected EOF`,
+		},
+		{line: line(), in: `
+foo "bar" baz;
+`,
+			err: `test.yang:2:11: baz: syntax error, expected ';' or '{'
+test.yang:2:14: ;: keyword token not an unquoted string`,
+		},
+		{line: line(), in: `
+foo "bar" + baz;
+`,
+			err: `test.yang:2:11: +: syntax error, expected ';' or '{'`,
+		},
+		{line: line(), in: `
+foo "bar" +
+`,
+			err: `test.yang:2:11: +: syntax error, expected ';' or '{'`,
+		},
+		{line: line(), in: `
+foo "bar";
+`,
+			out: []*Statement{
+				SA("foo", "bar"),
+			},
+		},
+		{line: line(), in: `
+foo "bar" {}
+`,
+			out: []*Statement{
+				SA("foo", "bar"),
+			},
+		},
+		{line: line(), in: `
+foo 'bar' + 'baz';
+`,
+			out: []*Statement{
+				SA("foo", "barbaz"),
+			},
+		},
+		{line: line(), in: `
+foo 'bar' + '+' + 'baz';
+`,
+			out: []*Statement{
+				SA("foo", "bar+baz"),
+			},
+		},
+		{line: line(), in: `
+foo 'bar'
+`,
+			err: `test.yang: unexpected EOF`,
+		},
+		{line: line(), in: `
+foo 'bar' + 'baz'
+`,
+			err: `test.yang: unexpected EOF`,
+		},
+		{line: line(), in: `
+foo 'bar' baz;
+`,
+			err: `test.yang:2:11: baz: syntax error, expected ';' or '{'
+test.yang:2:14: ;: keyword token not an unquoted string`,
+		},
+		{line: line(), in: `
+foo 'bar' + baz;
+`,
+			err: `test.yang:2:11: +: syntax error, expected ';' or '{'`,
+		},
+		{line: line(), in: `
+foo 'bar' +
+`,
+			err: `test.yang:2:11: +: syntax error, expected ';' or '{'`,
+		},
+		{line: line(), in: `
+foo 'bar';
+`,
+			out: []*Statement{
+				SA("foo", "bar"),
+			},
+		},
+		{line: line(), in: `
+foo 'bar' {}
+`,
+			out: []*Statement{
+				SA("foo", "bar"),
+			},
+		},
+		{line: line(), in: `
 foo bar;
 red black;
 `,
@@ -260,7 +368,7 @@ id
 		{line: line(), in: `
 statement one two { }
 `,
-			err: `test.yang:2:15: two: syntax error, expected ';' or nested statements in {}
+			err: `test.yang:2:15: two: syntax error, expected ';' or '{'
 test.yang:2:19: {: keyword token not an unquoted string
 test.yang:2:21: unexpected }`,
 		},
@@ -313,9 +421,9 @@ module base {
 		s, err := Parse(tt.in, "test.yang")
 		if (s == nil) != (tt.out == nil) {
 			if s == nil {
-				t.Errorf("%d: did not get expected statements: %s", tt.line, tt.out)
+				t.Errorf("%d: did not get expected statements: %v", tt.line, tt.out)
 			} else {
-				t.Errorf("%d: get unexpected statements: %s", tt.line, s)
+				t.Errorf("%d: get unexpected statements: %v", tt.line, s)
 			}
 		}
 		switch {
@@ -335,7 +443,7 @@ module base {
 		s1 := &Statement{statements: s}
 		s2 := &Statement{statements: tt.out}
 		if !s1.equal(s2) {
-			t.Errorf("%d: got:\n%s\nwant:\n%s", tt.line, s1, s2)
+			t.Errorf("%d: got:\n%v\nwant:\n%v", tt.line, s1, s2)
 		}
 	}
 }
