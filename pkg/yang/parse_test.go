@@ -421,9 +421,9 @@ module base {
 		s, err := Parse(tt.in, "test.yang")
 		if (s == nil) != (tt.out == nil) {
 			if s == nil {
-				t.Errorf("%d: did not get expected statements: %s", tt.line, tt.out)
+				t.Errorf("%d: did not get expected statements: %v", tt.line, tt.out)
 			} else {
-				t.Errorf("%d: get unexpected statements: %s", tt.line, s)
+				t.Errorf("%d: get unexpected statements: %v", tt.line, s)
 			}
 		}
 		switch {
@@ -443,7 +443,7 @@ module base {
 		s1 := &Statement{statements: s}
 		s2 := &Statement{statements: tt.out}
 		if !s1.equal(s2) {
-			t.Errorf("%d: got:\n%s\nwant:\n%s", tt.line, s1, s2)
+			t.Errorf("%d: got:\n%v\nwant:\n%v", tt.line, s1, s2)
 		}
 	}
 }

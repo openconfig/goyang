@@ -75,12 +75,6 @@ func (s *Statement) Arg() (string, bool) { return s.Argument, s.HasArgument }
 // SubStatements returns a slice of Statements found in s.
 func (s *Statement) SubStatements() []*Statement { return s.statements }
 
-// String returns s's tree as a string.
-func (s *Statement) String() string {
-	// XXX: Unimplemented
-	return ""
-}
-
 // Location returns the location in the source where s was defined.
 func (s *Statement) Location() string {
 	switch {
