@@ -395,16 +395,16 @@ func lexGround(l *lexer) stateFn {
 			l.next()
 			return lexGround
 		default:
-			return lexIdentifier
+			return lexUnquoted
 		}
 	case '+':
 		l.next()
 		switch l.peek() {
 		case '"', '\'':
-			l.emit(tIdentifier)
+			l.emit(tUnquoted)
 			return lexGround
 		default:
-			return lexIdentifier
+			return lexUnquoted
 		}
 	default:
 		return lexUnquoted
