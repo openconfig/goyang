@@ -2708,6 +2708,11 @@ func TestDeviation(t *testing.T) {
 					Config: TSFalse,
 				},
 			}, {
+				path: "/target/add/default",
+				entry: &Entry{
+					Default: "a default value",
+				},
+			}, {
 				path: "/target/add/mandatory",
 				entry: &Entry{
 					Mandatory: TSTrue,
@@ -2751,6 +2756,27 @@ func TestDeviation(t *testing.T) {
 				},
 			}},
 		},
+	}, {
+		desc: "error case - deviation add that already has a default",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a {
+						type string;
+						default "fish";
+					}
+
+					deviation /a {
+						deviate add {
+							default "fishsticks";
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "already exists",
 	}, {
 		desc: "error case - deviation add max-element to non-list",
 		inFiles: map[string]string{
@@ -2896,6 +2922,11 @@ func TestDeviation(t *testing.T) {
 					Config: TSFalse,
 				},
 			}, {
+				path: "/target/replace/default",
+				entry: &Entry{
+					Default: "a default value",
+				},
+			}, {
 				path: "/target/replace/mandatory",
 				entry: &Entry{
 					Mandatory: TSTrue,
@@ -2957,6 +2988,9 @@ func TestDeviation(t *testing.T) {
 					Config: TSUnset,
 				},
 			}, {
+				path:  "/target/delete/default",
+				entry: &Entry{},
+			}, {
 				path: "/target/delete/mandatory",
 				entry: &Entry{
 					Mandatory: TSUnset,
@@ -3000,6 +3034,27 @@ func TestDeviation(t *testing.T) {
 				},
 			}},
 		},
+	}, {
+		desc: "error case - deviation delete of default has different keyword value",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a {
+						type string;
+						default "fish";
+					}
+
+					deviation /a {
+						deviate delete {
+							default "fishsticks";
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "non-matching keyword",
 	}, {
 		desc: "error case - deviation delete of min-elements has different keyword value",
 		inFiles: map[string]string{
