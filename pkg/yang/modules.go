@@ -28,6 +28,7 @@ type Modules struct {
 	includes   map[*Module]bool   // Modules we have already done include on
 	byPrefix   map[string]*Module // Cache of prefix lookup
 	byNS       map[string]*Module // Cache of namespace lookup
+	typeDict   *typeDictionary    // Cache for type definitions.
 }
 
 // NewModules returns a newly created and initialized Modules.
@@ -38,6 +39,7 @@ func NewModules() *Modules {
 		includes:   map[*Module]bool{},
 		byPrefix:   map[string]*Module{},
 		byNS:       map[string]*Module{},
+		typeDict:   &typeDictionary{dict: map[Node]map[string]*Typedef{}},
 	}
 }
 
@@ -61,7 +63,7 @@ func (ms *Modules) Parse(data, name string) error {
 		return err
 	}
 	for _, s := range ss {
-		n, err := BuildAST(s)
+		n, err := buildASTWithTypeDict(s, ms.typeDict)
 		if err != nil {
 			return err
 		}
@@ -283,7 +285,7 @@ func (ms *Modules) process() []error {
 	// has not yet been built.
 	errs = append(errs, ms.resolveIdentities()...)
 	// Append any errors found trying to resolve typedefs
-	errs = append(errs, resolveTypedefs()...)
+	errs = append(errs, ms.typeDict.resolveTypedefs()...)
 
 	return errs
 }

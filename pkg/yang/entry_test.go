@@ -274,6 +274,22 @@ module baz {
 		}
 		`,
 	},
+	{
+		name: "qux-augment.yang",
+		in: `
+		submodule qux-augment {
+		  belongs-to qux {
+		    prefix "qux";
+		  }
+
+		  import foo { prefix "f"; }
+
+		  augment "/f:foo-c" {
+			leaf qux-submod-leaf { type string; }
+		  }
+	    }
+		`,
+	},
 }
 
 func TestUsesParent(t *testing.T) {
@@ -344,10 +360,11 @@ func TestEntryNamespace(t *testing.T) {
 	bar, _ := ms.GetModule("bar")
 
 	for _, tc := range []struct {
-		descr   string
-		entry   *Entry
-		ns      string
-		wantMod string
+		descr        string
+		entry        *Entry
+		ns           string
+		wantMod      string
+		wantModError string
 	}{
 		{
 			descr:   "grouping used in foo always have foo's namespace, even if it was defined in bar",
@@ -380,6 +397,18 @@ func TestEntryNamespace(t *testing.T) {
 			wantMod: "baz",
 		},
 		{
+			descr:   "leaf directly defined within an augment to foo from submodule baz-augment of baz has baz's namespace",
+			entry:   foo.Dir["foo-c"].Dir["baz-submod-leaf"],
+			ns:      "urn:baz",
+			wantMod: "baz",
+		},
+		{
+			descr:        "leaf directly defined within an augment to foo from orphan submodule qux-augment has empty namespace",
+			entry:        foo.Dir["foo-c"].Dir["qux-submod-leaf"],
+			ns:           "",
+			wantModError: `could not find module "" when retrieving namespace for qux-submod-leaf`,
+		},
+		{
 			descr:   "children of a container within an augment to from baz have baz's namespace",
 			entry:   foo.Dir["foo-c"].Dir["baz-dir"].Dir["aardvark"],
 			ns:      "urn:baz",
@@ -395,7 +424,14 @@ func TestEntryNamespace(t *testing.T) {
 
 		m, err := tc.entry.InstantiatingModule()
 		if err != nil {
-			t.Errorf("%s: %s.InstantiatingModule(): got unexpected error: %v", tc.descr, tc.entry.Path(), err)
+			if tc.wantModError == "" {
+				t.Errorf("%s: %s.InstantiatingModule(): got unexpected error: %v", tc.descr, tc.entry.Path(), err)
+			} else if got := err.Error(); got != tc.wantModError {
+				t.Errorf("%s: %s.InstantiatingModule(): got error: %q, want: %q", tc.descr, tc.entry.Path(), got, tc.wantModError)
+			}
+			continue
+		} else if tc.wantModError != "" {
+			t.Errorf("%s: %s.InstantiatingModule(): got no error, want: %q", tc.descr, tc.entry.Path(), tc.wantModError)
 			continue
 		}
 
@@ -3253,8 +3289,8 @@ func TestLeafEntry(t *testing.T) {
 			if got, want := e.Mandatory, TSUnset; got != want {
 				t.Errorf("got %d, want %d", got, want)
 			}
-			if diff := cmp.Diff(e.Type.Range, YangRange{Rf(-120, 120, 1)}); diff != "" {
-				t.Errorf("Range (-got, +want):\n%s", diff)
+			if got, want := e.Type.Range, (YangRange{Rf(-120, 120, 1)}); !cmp.Equal(got, want) {
+				t.Errorf("Range got: %v, want: %v", got, want)
 			}
 		},
 	}, {
