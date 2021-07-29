@@ -15,10 +15,10 @@
 package yang
 
 import (
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/openconfig/gnmi/errdiff"
 )
 
 // inputModule is a mock input YANG module.
@@ -43,11 +43,11 @@ type identityOut struct {
 
 // identityTestCase is a test case for a module which contains identities.
 type identityTestCase struct {
-	name       string
-	in         []inputModule // The set of input modules for the test
-	identities []identityOut // Slice of the identity values expected
-	idrefs     []idrefOut    // Slice of identityref results expected
-	err        string        // Test case error string
+	name          string
+	in            []inputModule // The set of input modules for the test
+	identities    []identityOut // Slice of the identity values expected
+	idrefs        []idrefOut    // Slice of identityref results expected
+	wantErrSubstr string        // wanErrSubstr is a substring of the wanted error.
 }
 
 // getBaseNamesFrom is a utility function for getting the base name(s) of an identity
@@ -78,7 +78,6 @@ var basicTestCases = []identityTestCase{
 		identities: []identityOut{
 			{module: "idtest-one", name: "TEST_ID"},
 		},
-		err: "basic-test-case-1: could not resolve identities",
 	},
 	{
 		name: "basic-test-case-2: Check identity with base is found in module.",
@@ -103,7 +102,6 @@ var basicTestCases = []identityTestCase{
 			{module: "idtest-two", name: "TEST_ID_TWO"},
 			{module: "idtest-two", name: "TEST_CHILD", baseNames: []string{"TEST_ID"}},
 		},
-		err: "basic-test-case-2: could not resolve identities",
 	},
 	{
 		name: "basic-test-case-3: Check identity with multiple bases.",
@@ -129,7 +127,74 @@ var basicTestCases = []identityTestCase{
 			{module: "idtest-three", name: "BASE_TWO"},
 			{module: "idtest-three", name: "TEST_CHILD_WITH_MULTIPLE_BASES", baseNames: []string{"BASE_ONE", "BASE_TWO"}},
 		},
-		err: "basic-test-case-3: could not resolve identities",
+	},
+	{
+		name: "basic-test-case-4: Check identity base is found from submodule.",
+		in: []inputModule{
+			{
+				name: "idtest-one",
+				content: `
+					module idtest-one {
+					  namespace "urn:idone";
+					  prefix "idone";
+
+					  include "idtest-one-sub";
+
+					  identity TEST_ID_DERIVED {
+					    base TEST_ID;
+					  }
+					}
+				`},
+			{
+				name: "idtest-one-sub",
+				content: `
+					submodule idtest-one-sub {
+					  belongs-to idtest-one {
+					    prefix "idone";
+					  }
+
+					  identity TEST_ID;
+					}
+				`},
+		},
+		identities: []identityOut{
+			{module: "idtest-one", name: "TEST_ID"},
+			{module: "idtest-one", name: "TEST_ID_DERIVED", baseNames: []string{"TEST_ID"}},
+		},
+	},
+	{
+		name: "basic-test-case-5: Check identity base is found from module.",
+		in: []inputModule{
+			{
+				name: "idtest-one",
+				content: `
+					module idtest-one {
+					  namespace "urn:idone";
+					  prefix "idone";
+
+					  include "idtest-one-sub";
+
+					  identity TEST_ID;
+					}
+				`},
+			{
+				name: "idtest-one-sub",
+				content: `
+					submodule idtest-one-sub {
+					  belongs-to idtest-one {
+					    prefix "idone";
+					  }
+
+					  identity TEST_ID_DERIVED {
+					    base TEST_ID;
+					  }
+					}
+				`},
+		},
+		identities: []identityOut{
+			{module: "idtest-one", name: "TEST_ID_DERIVED", baseNames: []string{"TEST_ID"}},
+			{module: "idtest-one", name: "TEST_ID"},
+		},
 	},
 }
 
@@ -143,7 +208,7 @@ func TestIdentityExtract(t *testing.T) {
 		}
 
 		for _, ti := range tt.identities {
-			parsedMod, err := ms.GetModule(ti.module)
+			_, err := ms.GetModule(ti.module)
 
 			if err != nil {
 				t.Errorf("Could not parse module : %s", ti.module)
@@ -152,16 +217,22 @@ func TestIdentityExtract(t *testing.T) {
 
 			foundIdentity := false
 			var thisID *Identity
-			for _, identity := range parsedMod.Identities {
-				if identity.Name == ti.name {
+			for _, ri := range identities.dict {
+				// TODO(wenbli): Use definingModule helper from ygot after it's moved to goyang.
+				moduleName := ri.Module.Name
+				if ri.Module.Kind() == "submodule" {
+					moduleName = ri.Module.BelongsTo.Name
+				}
+				if ri.Identity.Name == ti.name && moduleName == ti.module {
 					foundIdentity = true
-					thisID = identity
+					thisID = ri.Identity
 					break
 				}
 			}
 
-			if foundIdentity == false {
-				t.Errorf("Could not found identity %s in %s", ti.name, ti.module)
+			if !foundIdentity {
+				t.Errorf("Could not find identity %s in module %s, identity dict:\n%+v", ti.name, ti.module, identities.dict)
+				continue
 			}
 
 			actualBaseNames := getBaseNamesFrom(thisID)
@@ -436,6 +507,94 @@ var treeTestCases = []identityTestCase{
 			},
 		},
 	},
+	{
+		name: "identity's base can't be found",
+		in: []inputModule{
+			{
+				name: "idtest",
+				content: `
+					module idtest{
+					  namespace "urn:idtwo";
+					  prefix "idone";
+
+					  identity TEST_ID_TWO;
+					  identity TEST_CHILD {
+					    base TEST_ID;
+					  }
+					}
+				`},
+		},
+		identities: []identityOut{
+			{module: "idtest", name: "TEST_ID2"},
+		},
+		wantErrSubstr: "can't resolve the local base",
+	},
+	{
+		name: "identity's base can't be found in remote",
+		in: []inputModule{
+			{
+				name: "remote.yang",
+				content: `
+				  module remote {
+				    namespace "urn:remote";
+				    prefix "remote";
+
+				    identity REMOTE_BASE_ESCAPE;
+				  }
+				`},
+			{
+				name: "base.yang",
+				content: `
+				  module base {
+				    namespace "urn:base";
+				    prefix "base";
+
+				    import remote { prefix "r"; }
+
+				    identity LOCAL_REMOTE_BASE {
+				      base r:REMOTE_BASE;
+				    }
+				  }
+				`},
+		},
+		identities: []identityOut{
+			{module: "base", name: "LOCAL_REMOTE_BASE"},
+		},
+		wantErrSubstr: "can't resolve remote base",
+	},
+	{
+		name: "identity's base's module can't be found",
+		in: []inputModule{
+			{
+				name: "remote.yang",
+				content: `
+				  module remote {
+				    namespace "urn:remote";
+				    prefix "remote";
+
+				    identity REMOTE_BASE;
+				  }
+				`},
+			{
+				name: "base.yang",
+				content: `
+				  module base {
+				    namespace "urn:base";
+				    prefix "base";
+
+				    import remote { prefix "r"; }
+
+				    identity LOCAL_REMOTE_BASE {
+				      base roe:REMOTE_BASE;
+				    }
+				  }
+				`},
+		},
+		identities: []identityOut{
+			{module: "base", name: "LOCAL_REMOTE_BASE"},
+		},
+		wantErrSubstr: "can't find external module",
+	},
 }
 
 // TestIdentityTree - check inheritance of identities from local and remote
@@ -443,119 +602,139 @@ var treeTestCases = []identityTestCase{
 // referenced by that identity, which need to be inherited.
 func TestIdentityTree(t *testing.T) {
 	for _, tt := range treeTestCases {
-		ms := NewModules()
+		t.Run(tt.name, func(t *testing.T) {
+			ms := NewModules()
 
-		for _, mod := range tt.in {
-			_ = ms.Parse(mod.content, mod.name)
-		}
-
-		if errs := ms.Process(); len(errs) != 0 {
-			t.Errorf("Couldn't process modules: %v", errs)
-			continue
-		}
-
-		// Walk through the identities that are defined in the test case output
-		// and validate that they exist, and their base and values are as expected.
-		for _, chkID := range tt.identities {
-			m, errs := ms.GetModule(chkID.module)
-			if errs != nil {
-				t.Errorf("Couldn't find expected module: %v", errs)
+			for _, mod := range tt.in {
+				_ = ms.Parse(mod.content, mod.name)
 			}
 
-			var foundID *Identity
-			for _, i := range m.Identities {
-				if i.Name == chkID.name {
-					foundID = i
-					break
+			errs := ms.Process()
+
+			var err error
+			switch len(errs) {
+			case 1:
+				err = errs[0]
+				if diff := errdiff.Substring(err, tt.wantErrSubstr); diff != "" {
+					t.Fatalf("%s", diff)
 				}
-			}
-
-			if foundID == nil {
-				t.Errorf("Couldn't find identity %s in module %s", chkID.name,
-					chkID.module)
-			}
-
-			if len(chkID.baseNames) > 0 {
-				actualBaseNames := getBaseNamesFrom(foundID)
-				if diff := cmp.Diff(actualBaseNames, chkID.baseNames); diff != "" {
-					t.Errorf("(-got, +want):\n%s", diff)
+				return
+			case 0:
+				if diff := errdiff.Substring(err, tt.wantErrSubstr); diff != "" {
+					t.Fatalf("%s", diff)
 				}
+			default:
+				t.Fatalf("got multiple errors: %v", errs)
 			}
 
-			valueMap := make(map[string]bool)
-
-			for _, val := range chkID.values {
-				valueMap[val] = false
-				// Check that IsDefined returns the right result
-				if !foundID.IsDefined(val) {
-					t.Errorf("Couldn't find defined value %s  for %s", val, chkID.name)
-				}
-
-				// Check that GetValue returns the right Identity
-				idval := foundID.GetValue(val)
-				if idval == nil {
-					t.Errorf("Couldn't GetValue(%s) for %s", val, chkID.name)
-				}
-			}
-
-			// Ensure that IsDefined does not return false positives
-			if foundID.IsDefined("DoesNotExist") {
-				t.Errorf("Non-existent value IsDefined for %s", foundID.Name)
-			}
-
-			if foundID.GetValue("DoesNotExist") != nil {
-				t.Errorf("Non-existent value GetValue not nil for %s", foundID.Name)
-			}
-
-			for _, chkv := range foundID.Values {
-				_, ok := valueMap[chkv.Name]
-				if !ok {
-					t.Errorf("Found unexpected value %s for %s", chkv.Name, chkID.name)
+			// Walk through the identities that are defined in the test case output
+			// and validate that they exist, and their base and values are as expected.
+			for _, chkID := range tt.identities {
+				m, errs := ms.GetModule(chkID.module)
+				if errs != nil {
+					t.Errorf("Couldn't find expected module: %v", errs)
 					continue
 				}
-				valueMap[chkv.Name] = true
-			}
 
-			for k, v := range valueMap {
-				if v == false {
-					t.Errorf("Could not find identity %s for %s", k, chkID.name)
+				var foundID *Identity
+				for _, i := range m.Identities {
+					if i.Name == chkID.name {
+						foundID = i
+						break
+					}
 				}
-			}
-		}
 
-		for _, idr := range tt.idrefs {
-			m, errs := ms.GetModule(idr.module)
-			if errs != nil {
-				t.Errorf("Couldn't find expected module %s: %v", idr.module, errs)
-				continue
-			}
+				if foundID == nil {
+					t.Errorf("Couldn't find identity %s in module %s", chkID.name,
+						chkID.module)
+				}
 
-			if _, ok := m.Dir[idr.name]; !ok {
-				t.Errorf("Could not find expected identity, got: nil, want: %v", idr.name)
-				continue
-			}
+				if len(chkID.baseNames) > 0 {
+					actualBaseNames := getBaseNamesFrom(foundID)
+					if diff := cmp.Diff(actualBaseNames, chkID.baseNames); diff != "" {
+						t.Errorf("(-got, +want):\n%s", diff)
+					}
+				}
 
-			identity := m.Dir[idr.name]
-			var vals []*Identity
-			switch len(identity.Type.Type) {
-			case 0:
-				vals = identity.Type.IdentityBase.Values
-			default:
-				for _, b := range identity.Type.Type {
-					if b.IdentityBase != nil {
-						vals = append(vals, b.IdentityBase.Values...)
+				valueMap := make(map[string]bool)
+
+				for _, val := range chkID.values {
+					valueMap[val] = false
+					// Check that IsDefined returns the right result
+					if !foundID.IsDefined(val) {
+						t.Errorf("Couldn't find defined value %s  for %s", val, chkID.name)
+					}
+
+					// Check that GetValue returns the right Identity
+					idval := foundID.GetValue(val)
+					if idval == nil {
+						t.Errorf("Couldn't GetValue(%s) for %s", val, chkID.name)
+					}
+				}
+
+				// Ensure that IsDefined does not return false positives
+				if foundID.IsDefined("DoesNotExist") {
+					t.Errorf("Non-existent value IsDefined for %s", foundID.Name)
+				}
+
+				if foundID.GetValue("DoesNotExist") != nil {
+					t.Errorf("Non-existent value GetValue not nil for %s", foundID.Name)
+				}
+
+				for _, chkv := range foundID.Values {
+					_, ok := valueMap[chkv.Name]
+					if !ok {
+						t.Errorf("Found unexpected value %s for %s", chkv.Name, chkID.name)
+						continue
+					}
+					valueMap[chkv.Name] = true
+				}
+
+				for k, v := range valueMap {
+					if v == false {
+						t.Errorf("Could not find identity %s for %s", k, chkID.name)
 					}
 				}
 			}
 
-			var valNames []string
-			for _, v := range vals {
-				valNames = append(valNames, v.Name)
-			}
+			for _, idr := range tt.idrefs {
+				m, errs := ms.GetModule(idr.module)
+				if errs != nil {
+					t.Errorf("Couldn't find expected module %s: %v", idr.module, errs)
+					continue
+				}
 
-			if !reflect.DeepEqual(idr.values, valNames) {
-				t.Errorf("Identity %s did not have expected values, got: %v, want: %v", idr.name, valNames, idr.values)
+				if _, ok := m.Dir[idr.name]; !ok {
+					t.Errorf("Could not find expected identity, got: nil, want: %v", idr.name)
+					continue
+				}
+
+				identity := m.Dir[idr.name]
+				var vals []*Identity
+				switch len(identity.Type.Type) {
+				case 0:
+					vals = identity.Type.IdentityBase.Values
+				default:
+					for _, b := range identity.Type.Type {
+						if b.IdentityBase != nil {
+							vals = append(vals, b.IdentityBase.Values...)
+						}
+					}
+				}
+
+				var valNames []string
+				for _, v := range vals {
+					valNames = append(valNames, v.Name)
+				}
+
+				if diff := cmp.Diff(idr.values, valNames); diff != "" {
+					t.Errorf("Identity %s did not have expected values, (-got, +want):\n%s", idr.name, diff)
+				}
 			}
-		}
+		})
+		// Reset this global after the test.
+		// TODO(wenovus): We should implement hermetic file analysis to
+		// prevent needing such hacks.
+		identities = identityDictionary{dict: map[string]resolvedIdentity{}}
 	}
 }

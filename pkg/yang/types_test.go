@@ -16,7 +16,6 @@ package yang
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -25,84 +24,430 @@ import (
 )
 
 func TestTypeResolve(t *testing.T) {
-	for x, tt := range []struct {
-		in  *Type
-		err string
-		out *YangType
-	}{
-		{
-			in: &Type{
-				Name: "int64",
-			},
-			out: &YangType{
-				Name:  "int64",
-				Kind:  Yint64,
-				Range: Int64Range,
+	tests := []struct {
+		desc string
+		in   *Type
+		err  string
+		out  *YangType
+	}{{
+		desc: "basic int64",
+		in: &Type{
+			Name: "int64",
+		},
+		out: &YangType{
+			Name:  "int64",
+			Kind:  Yint64,
+			Range: Int64Range,
+		},
+	}, {
+		desc: "basic int64 with a range",
+		in: &Type{
+			Name:  "int64",
+			Range: &Range{Name: "-42..42"},
+		},
+		out: &YangType{
+			Name:  "int64",
+			Kind:  Yint64,
+			Range: YangRange{{Min: FromInt(-42), Max: FromInt(42)}},
+		},
+	}, {
+		desc: "basic uint64 with an invalid range",
+		in: &Type{
+			Name:  "uint64",
+			Range: &Range{Name: "-42..42"},
+		},
+		err: "unknown: bad range: -42..42 not within 0..18446744073709551615",
+	}, {
+		desc: "basic uint64 with an unparseable range",
+		in: &Type{
+			Name:  "uint64",
+			Range: &Range{Name: "-42..forty-two"},
+		},
+		err: `unknown: bad range: strconv.ParseUint: parsing "forty-two": invalid syntax`,
+	}, {
+		desc: "basic string with a length",
+		in: &Type{
+			Name:   "string",
+			Length: &Length{Name: "24..42"},
+		},
+		out: &YangType{
+			Name:   "string",
+			Kind:   Ystring,
+			Length: YangRange{{Min: FromInt(24), Max: FromInt(42)}},
+		},
+	}, {
+		desc: "basic string with an invalid range",
+		in: &Type{
+			Name:   "string",
+			Length: &Length{Name: "-42..42"},
+		},
+		err: "unknown: negative length: -42..42",
+	}, {
+		desc: "basic binary with a length",
+		in: &Type{
+			Name:   "binary",
+			Length: &Length{Name: "24..42"},
+		},
+		out: &YangType{
+			Name:   "binary",
+			Kind:   Ybinary,
+			Length: YangRange{{Min: FromInt(24), Max: FromInt(42)}},
+		},
+	}, {
+		desc: "basic binary with an unparseable range",
+		in: &Type{
+			Name:   "binary",
+			Length: &Length{Name: "42..forty-two"},
+		},
+		err: `unknown: bad length: strconv.ParseUint: parsing "forty-two": invalid syntax`,
+	}, {
+		desc: "invalid fraction-digits argument for boolean value",
+		in: &Type{
+			Name:           "boolean",
+			FractionDigits: &Value{Name: "42"},
+		},
+		err: "unknown: fraction-digits only allowed for decimal64 values",
+	}, {
+		desc: "required field fraction-digits not supplied for decimal64",
+		in: &Type{
+			Name: "decimal64",
+		},
+		err: "unknown: value is required in the range of [1..18]",
+	}, {
+		desc: "invalid identityref that doesn't have a base identity name",
+		in: &Type{
+			Name: "identityref",
+		},
+		err: "unknown: an identityref must specify a base",
+	}, {
+		desc: "invalid decimal64 having an invalid fraction-digits value",
+		in: &Type{
+			Name:           "decimal64",
+			FractionDigits: &Value{Name: "42"},
+		},
+		err: "unknown: value 42 out of range [1..18]",
+	}, {
+		desc: "decimal64",
+		in: &Type{
+			Name:           "decimal64",
+			FractionDigits: &Value{Name: "7"},
+		},
+		out: &YangType{
+			Name:           "decimal64",
+			Kind:           Ydecimal64,
+			FractionDigits: 7,
+			Range:          Decimal64Range,
+		},
+	}, {
+		desc: "instance-identifier with unspecified require-instance value (default true)",
+		in: &Type{
+			Name:            "instance-identifier",
+			RequireInstance: nil,
+		},
+		out: &YangType{
+			Name: "instance-identifier",
+			Kind: YinstanceIdentifier,
+			// https://tools.ietf.org/html/rfc7950#section-9.9.3
+			// require-instance defaults to true.
+			OptionalInstance: false,
+		},
+	}, {
+		desc: "instance-identifier with true require-instance value",
+		in: &Type{
+			Name:            "instance-identifier",
+			RequireInstance: &Value{Name: "true"},
+		},
+		out: &YangType{
+			Name:             "instance-identifier",
+			Kind:             YinstanceIdentifier,
+			OptionalInstance: false,
+		},
+	}, {
+		desc: "instance-identifier with false require-instance value",
+		in: &Type{
+			Name:            "instance-identifier",
+			RequireInstance: &Value{Name: "false"},
+		},
+		out: &YangType{
+			Name:             "instance-identifier",
+			Kind:             YinstanceIdentifier,
+			OptionalInstance: true,
+		},
+	}, {
+		desc: "instance-identifier with invalid require-instance value",
+		in: &Type{
+			Name:            "instance-identifier",
+			RequireInstance: &Value{Name: "foo"},
+		},
+		err: "invalid boolean: foo",
+	}, {
+		desc: "enum with unspecified values",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY"},
+				{Name: "VENUS"},
+				{Name: "EARTH"},
 			},
 		},
-		{
-			in: &Type{
-				Name:           "boolean",
-				FractionDigits: &Value{Name: "42"},
-			},
-			err: "unknown: fraction-digits only allowed for decimal64 values",
-		},
-		{
-			in: &Type{
-				Name: "decimal64",
-			},
-			err: "unknown: value is required in the range of [1..18]",
-		},
-		{
-			in: &Type{
-				Name: "identityref",
-			},
-			err: "unknown: an identityref must specify a base",
-		},
-		{
-			in: &Type{
-				Name:           "decimal64",
-				FractionDigits: &Value{Name: "42"},
-			},
-			err: "unknown: value 42 out of range [1..18]",
-		},
-		{
-			in: &Type{
-				Name:           "decimal64",
-				FractionDigits: &Value{Name: "7"},
-			},
-			out: &YangType{
-				Name:           "decimal64",
-				Kind:           Ydecimal64,
-				FractionDigits: 7,
-				Range:          Decimal64Range,
+		out: &YangType{
+			Name: "enumeration",
+			Kind: Yenum,
+			Enum: &EnumType{
+				last:   30,
+				min:    MinEnum,
+				max:    MaxEnum,
+				unique: true,
+				toString: map[int64]string{
+					1: "MERCURY",
+					2: "VENUS",
+					3: "EARTH",
+				},
+				toInt: map[string]int64{
+					"MERCURY": 1,
+					"VENUS":   2,
+					"EARTH":   3,
+				},
 			},
 		},
+	}, {
+		desc: "enum with specified values",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-1"}},
+				{Name: "VENUS", Value: &Value{Name: "10"}},
+				{Name: "EARTH", Value: &Value{Name: "30"}},
+			},
+		},
+		out: &YangType{
+			Name: "enumeration",
+			Kind: Yenum,
+			Enum: &EnumType{
+				last:   30,
+				min:    MinEnum,
+				max:    MaxEnum,
+				unique: true,
+				toString: map[int64]string{
+					-1: "MERCURY",
+					10: "VENUS",
+					30: "EARTH",
+				},
+				toInt: map[string]int64{
+					"MERCURY": -1,
+					"VENUS":   10,
+					"EARTH":   30,
+				},
+			},
+		},
+	}, {
+		desc: "enum with some values specified",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-1"}},
+				{Name: "VENUS", Value: &Value{Name: "10"}},
+				{Name: "EARTH"},
+			},
+		},
+		out: &YangType{
+			Name: "enumeration",
+			Kind: Yenum,
+			Enum: &EnumType{
+				last:   11,
+				min:    MinEnum,
+				max:    MaxEnum,
+				unique: true,
+				toString: map[int64]string{
+					-1: "MERCURY",
+					10: "VENUS",
+					11: "EARTH",
+				},
+				toInt: map[string]int64{
+					"MERCURY": -1,
+					"VENUS":   10,
+					"EARTH":   11,
+				},
+			},
+		},
+	}, {
+		desc: "enum with repeated specified values",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "1"}},
+				{Name: "VENUS", Value: &Value{Name: "10"}},
+				{Name: "EARTH", Value: &Value{Name: "1"}},
+			},
+		},
+		err: "unknown: fields EARTH and MERCURY conflict on value 1",
+	}, {
+		desc: "enum with repeated specified names",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-1"}},
+				{Name: "VENUS", Value: &Value{Name: "10"}},
+				{Name: "MERCURY", Value: &Value{Name: "30"}},
+			},
+		},
+		err: "unknown: field MERCURY already assigned",
+	}, {
+		desc: "enum with last specified value equal to the max enum value",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-2147483648"}},
+				{Name: "VENUS", Value: &Value{Name: "2147483647"}},
+				{Name: "EARTH"},
+			},
+		},
+		err: `unknown: enum "EARTH" must specify a value since previous enum is the maximum value allowed`,
+	}, {
+		desc: "enum value too small",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-2147483649"}},
+				{Name: "VENUS", Value: &Value{Name: "0"}},
+				{Name: "EARTH"},
+			},
+		},
+		err: `unknown: value -2147483649 for MERCURY too small (minimum is -2147483648)`,
+	}, {
+		desc: "enum value too large",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-2147483648"}},
+				{Name: "VENUS", Value: &Value{Name: "2147483648"}},
+				{Name: "EARTH"},
+			},
+		},
+		err: `unknown: value 2147483648 for VENUS too large (maximum is 2147483647)`,
+	}, {
+		desc: "enum with an unparseable value",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-1"}},
+				{Name: "VENUS", Value: &Value{Name: "10"}},
+				{Name: "EARTH", Value: &Value{Name: "five"}},
+			},
+		},
+		err: `unknown: strconv.ParseUint: parsing "five": invalid syntax`,
 		// TODO(borman): Add in more tests as we honor more fields
 		// in Type.
-	} {
-		// We can initialize a value to ourself, so to it here.
-		errs := tt.in.resolve(newTypeDictionary())
+	}}
 
-		// TODO(borman):  Do not hack out Root and Base.  These
-		// are hacked out for now because they can be self-referential,
-		// making construction of them difficult.
-		tt.in.YangType.Root = nil
-		tt.in.YangType.Base = nil
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			// We can initialize a value to ourself, so to it here.
+			errs := tt.in.resolve(newTypeDictionary())
 
-		switch {
-		case tt.err == "" && len(errs) > 0:
-			t.Errorf("#%d: unexpected errors: %v", x, errs)
-		case tt.err != "" && len(errs) == 0:
-			t.Errorf("#%d: did not get expected errors: %v", x, tt.err)
-		case len(errs) > 1:
-			t.Errorf("#%d: too many errors: %v", x, errs)
-		case len(errs) == 1 && errs[0].Error() != tt.err:
-			t.Errorf("#%d: got error %v, want %s", x, errs[0], tt.err)
-		case len(errs) != 0:
-		case !reflect.DeepEqual(tt.in.YangType, tt.out):
-			t.Errorf("#%d: got %#v, want %#v", x, tt.in.YangType, tt.out)
-		}
+			// TODO(borman):  Do not hack out Root and Base.  These
+			// are hacked out for now because they can be self-referential,
+			// making construction of them difficult.
+			tt.in.YangType.Root = nil
+			tt.in.YangType.Base = nil
+
+			switch {
+			case tt.err == "" && len(errs) > 0:
+				t.Fatalf("unexpected errors: %v", errs)
+			case tt.err != "" && len(errs) == 0:
+				t.Fatalf("did not get expected errors: %v", tt.err)
+			case len(errs) > 1:
+				t.Fatalf("too many errors: %v", errs)
+			case len(errs) == 1 && errs[0].Error() != tt.err:
+				t.Fatalf("got error %v, want %s", errs[0], tt.err)
+			case len(errs) != 0:
+				return
+			}
+
+			if diff := cmp.Diff(tt.in.YangType, tt.out); diff != "" {
+				t.Errorf("YangType (-got, +want):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestTypedefResolve(t *testing.T) {
+	tests := []struct {
+		desc string
+		in   *Typedef
+		err  string
+		out  *YangType
+	}{{
+		desc: "basic int64",
+		in: &Typedef{
+			Name:    "time",
+			Parent:  baseTypes["int64"].typedef(),
+			Default: &Value{Name: "42"},
+			Type: &Type{
+				Name: "int64",
+			},
+			Units: &Value{Name: "nanoseconds"},
+		},
+		out: &YangType{
+			Name: "time",
+			Kind: Yint64,
+			Base: &Type{
+				Name: "int64",
+			},
+			Units:   "nanoseconds",
+			Default: "42",
+			Range:   Int64Range,
+		},
+	}, {
+		desc: "uint32 with more specific range",
+		in: &Typedef{
+			Name: "another-counter",
+			Parent: &Typedef{
+				Name:   "counter",
+				Parent: baseTypes["uint32"].typedef(),
+				Type: &Type{
+					Name:  "uint32",
+					Range: &Range{Name: "0..42"},
+				},
+			},
+			Type: &Type{
+				Name:  "uint32",
+				Range: &Range{Name: "10..20"},
+			},
+		},
+		out: &YangType{
+			Name: "another-counter",
+			Kind: Yuint32,
+			Base: &Type{
+				Name: "uint32",
+			},
+			Range: YangRange{{Min: FromInt(10), Max: FromInt(20)}},
+		},
+		// TODO(wenovus): Add tests on range and length inheritance once those are fixed.
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			// We can initialize a value to ourself, so to it here.
+			errs := tt.in.resolve(&typeDict)
+
+			switch {
+			case tt.err == "" && len(errs) > 0:
+				t.Fatalf("unexpected errors: %v", errs)
+			case tt.err != "" && len(errs) == 0:
+				t.Fatalf("did not get expected errors: %v", tt.err)
+			case len(errs) > 1:
+				t.Fatalf("too many errors: %v", errs)
+			case len(errs) == 1 && errs[0].Error() != tt.err:
+				t.Fatalf("got error %v, want %s", errs[0], tt.err)
+			case len(errs) != 0:
+				return
+			}
+
+			if diff := cmp.Diff(tt.in.YangType, tt.out); diff != "" {
+				t.Errorf("YangType (-got, +want):\n%s", diff)
+			}
+		})
 	}
 }
 

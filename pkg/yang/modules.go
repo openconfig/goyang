@@ -208,9 +208,6 @@ func (ms *Modules) FindModule(n Node) *Module {
 // or returns an error.
 func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
 	if m, ok := ms.byNS[ns]; ok {
-		if m == nil {
-			return nil, fmt.Errorf("%s: no such namespace", ns)
-		}
 		return m, nil
 	}
 	var found *Module
@@ -226,20 +223,20 @@ func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
 			}
 		}
 	}
-	ms.byNS[ns] = found
 	if found == nil {
 		return nil, fmt.Errorf("%s: no such namespace", ns)
 	}
+	// Don't cache negative results because new modules could be added.
+	ms.byNS[ns] = found
 	return found, nil
 }
 
 // FindModuleByPrefix either returns the Module specified by prefix or returns
 // an error.
+// TODO(wenovus): This should be deprecated since prefixes are not unique among
+// modules.
 func (ms *Modules) FindModuleByPrefix(prefix string) (*Module, error) {
 	if m, ok := ms.byPrefix[prefix]; ok {
-		if m == nil {
-			return nil, fmt.Errorf("%s: no such prefix", prefix)
-		}
 		return m, nil
 	}
 	var found *Module
@@ -254,10 +251,11 @@ func (ms *Modules) FindModuleByPrefix(prefix string) (*Module, error) {
 			}
 		}
 	}
-	ms.byPrefix[prefix] = found
 	if found == nil {
 		return nil, fmt.Errorf("%s: no such prefix", prefix)
 	}
+	// Don't cache negative results because new modules could be added.
+	ms.byPrefix[prefix] = found
 	return found, nil
 }
 
