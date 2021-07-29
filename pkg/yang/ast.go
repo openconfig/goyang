@@ -14,13 +14,14 @@
 
 package yang
 
-// This file contains source related to constructing an AST of Nodes from a
-// Statement tree.  It also include code that builds up the basic YANG parser
-// based on the various Node types (see yang.go).
+// This file implements BuildAST() and its associated helper structs and
+// functions for constructing an AST of Nodes from a Statement tree. This
+// function also populates all typedefs into a type cache.
 //
-// The initTypes function generates the functions that actually fill in the
-// various Node structures defined in yang.go.  BuildAST uses those functions to
-// convert generic Statements into an AST.
+// The initTypes function generates the helper struct and functions that
+// recursively fill in the various Node structures defined in yang.go.
+// BuildAST() then uses those functions to convert raw parsed Statements into
+// an AST.
 
 import (
 	"errors"
@@ -29,14 +30,14 @@ import (
 	"strings"
 )
 
-// A yangStatement contains all information needed to parse a particular
-// type of statement.
+// A yangStatement contains all information needed to build a particular
+// type of statement into an AST node.
 type yangStatement struct {
 	// funcs is the map of YANG field names to the function that handle them.
+	funcs map[string]func(*Statement, reflect.Value, reflect.Value) error
 	// required is a list of fields that must be present in the statement.
-	funcs    map[string]func(*Statement, reflect.Value, reflect.Value) error
 	required []string
-	// sRequired maps statement type to required fields
+	// sRequired maps statement type to a list of required fields.
 	//    If a field is required by statement type foo, then only foo should
 	//    have the field.
 	sRequired map[string][]string
@@ -54,11 +55,14 @@ func newYangStatement() *yangStatement {
 
 var (
 	// The following maps are built up at init time.
-	// nameMap provides a lookup from a keyword string to the related
-	// yangStatement in the typeMap to prevent redundant processing.
+	// typeMap provides a lookup from a Node type to the corresponding
+	// yangStatement.
 	typeMap = map[reflect.Type]*yangStatement{}
+	// nameMap provides a lookup from a keyword string to the corresponding
+	// concrete type implementing the Node interface (see yang.go).
 	nameMap = map[string]reflect.Type{}
 
+	// The following are helper types used by the implementation.
 	statementType = reflect.TypeOf(&Statement{})
 	nilValue      = reflect.ValueOf(nil)
 	// nodeType is the reflect.Type of the Node interface.
@@ -72,10 +76,6 @@ type meta struct {
 	Module []*Module `yang:"module"`
 }
 
-func init() {
-	initTypes(reflect.TypeOf(&meta{}))
-}
-
 // aliases is a map of "aliased" names, that is, two types of statements
 // that parse (nearly) the same.
 var aliases = map[string]string{
@@ -85,25 +85,36 @@ var aliases = map[string]string{
 // BuildAST builds an abstract syntax tree based on the yang statement s.
 // Normally it should return a *Module.
 func BuildAST(s *Statement) (Node, error) {
-	v, err := build(s, nilValue)
+	return buildASTWithTypeDict(s, &typeDict)
+}
+
+// buildASTWithTypeDict creates an AST for the input statement, and returns its
+// root node. It also takes as input a type dictionary into which any
+// encountered typedefs within the statement are cached.
+func buildASTWithTypeDict(s *Statement, d *typeDictionary) (Node, error) {
+	initTypes(reflect.TypeOf(&meta{}), d)
+	v, err := build(s, nilValue, d)
 	if err != nil {
 		return nil, err
 	}
 	return v.Interface().(Node), nil
 }
 
-// build builds and returns an AST from the statement s, with parent p, or
-// returns an error.  The keyword in s determines the concrete type of the
-// value returned.
-func build(s *Statement, p reflect.Value) (v reflect.Value, err error) {
+// build builds and returns an AST from the statement s and with parent p. It
+// also takes as input a type dictionary d into which any encountered typedefs
+// within the statement are cached. The type of value returned depends on the
+// keyword in s (see yang.go). It returns an error if it cannot build the
+// statement into its corresponding Node type.
+func build(s *Statement, p reflect.Value, d *typeDictionary) (v reflect.Value, err error) {
 	defer func() {
 		// If we are returning a real Node then call addTypedefs
 		// if the node possibly contains typedefs.
+		// Cache these in the typedef cache for look-ups.
 		if err != nil || v == nilValue {
 			return
 		}
 		if t, ok := v.Interface().(Typedefer); ok {
-			addTypedefs(t)
+			d.addTypedefs(t)
 		}
 	}()
 	keyword := s.Keyword
@@ -112,10 +123,13 @@ func build(s *Statement, p reflect.Value) (v reflect.Value, err error) {
 	}
 	t := nameMap[keyword]
 	y := typeMap[t]
+	// Keep track of which substatements are present in the statement.
 	found := map[string]bool{}
 
-	t = t.Elem()       // Get the struct type we are pointing to
-	v = reflect.New(t) // v is a pointer to the structure we are building
+	// Get the struct type we are pointing to.
+	t = t.Elem()
+	// v is a pointer to the instantiated structure we are building.
+	v = reflect.New(t)
 
 	// Handle special cases that are not actually substatements:
 
@@ -149,14 +163,13 @@ func build(s *Statement, p reflect.Value) (v reflect.Value, err error) {
 	for _, ss := range s.statements {
 		found[ss.Keyword] = true
 		fn := y.funcs[ss.Keyword]
-		parts := strings.Split(ss.Keyword, ":")
 		switch {
 		case fn != nil:
 			// Normal case, the keyword is known.
 			if err := fn(ss, v, p); err != nil {
 				return nilValue, err
 			}
-		case len(parts) == 2:
+		case len(strings.Split(ss.Keyword, ":")) == 2:
 			// Keyword is not known but it has a prefix so it might
 			// be an extension.
 			if y.addext == nil {
@@ -197,22 +210,27 @@ func build(s *Statement, p reflect.Value) (v reflect.Value, err error) {
 }
 
 // initTypes creates the functions necessary to build a Statement into the
-// given the type "at". at must implement Node, with its concrete type
-// being a pointer to a struct.
+// given the type "at" based on its possible substatements. at must implement
+// Node, with its concrete type being a pointer to a struct defined in yang.go.
+//
+// This function also builds up the functions to populate the input type
+// dictionary d with any encountered typedefs within the statement.
+//
 // For each field of the struct with a yang tag (e.g., `yang:"command"`), a
 // function is created with "command" as its unique ID.  The complete map of
 // builder functions for at is then added to the typeMap map with at as the
-// key.
+// key. The idea is to call these builder functions for each substatement
+// encountered.
 //
 // The functions have the form:
 //
 //	 func fn(ss *Statement, v, p reflect.Value) error
 //
-// Given s as a statement of type at, ss is a substatement of s (in a few
-// exceptional cases, ss is the Statement itself).  v must have the type at and
-// is the structure being filled in.  p is the parent Node, or nil.  p is only
-// used to set the Parent field of a Node.  For example, given the following
-// structure and variables:
+// Given s as a Statement of type at, ss is a substatement of s (in a few
+// exceptional cases, ss is the Statement itself).  v must have the same type
+// as at and is the structure being filled in.  p is the parent Node, or nil.
+// p is only used to set the Parent field of a Node.  For example, given the
+// following structure and variables:
 //
 //	type Include struct {
 //		Name         string       `yang:"Name"`
@@ -260,7 +278,7 @@ func build(s *Statement, p reflect.Value) (v reflect.Value, err error) {
 //                   (This is to support merging Module and SubModule).
 //
 // If at contains substructures, initTypes recurses on the substructures.
-func initTypes(at reflect.Type) {
+func initTypes(at reflect.Type, d *typeDictionary) {
 	if at.Kind() != reflect.Ptr || at.Elem().Kind() != reflect.Struct {
 		panic(fmt.Sprintf("interface not a struct pointer, is %v", at))
 	}
@@ -317,7 +335,7 @@ func initTypes(at reflect.Type) {
 			switch nameMap[name] {
 			case nil:
 				nameMap[name] = dt
-				initTypes(dt) // Make sure that structure type is included
+				initTypes(dt, d) // Make sure that structure type is included
 			case dt:
 			default:
 				panic("redeclared type " + name)
@@ -394,7 +412,7 @@ func initTypes(at reflect.Type) {
 				}
 
 				// Use build to build the value for this field.
-				sv, err := build(s, v)
+				sv, err := build(s, v, d)
 				if err != nil {
 					return err
 				}
@@ -417,7 +435,7 @@ func initTypes(at reflect.Type) {
 					if v.Type() != at {
 						panic(fmt.Sprintf("given type %s, need type %s", v.Type(), at))
 					}
-					sv, err := build(s, v)
+					sv, err := build(s, v, d)
 					if err != nil {
 						return err
 					}

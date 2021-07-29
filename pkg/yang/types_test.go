@@ -343,7 +343,7 @@ func TestTypeResolve(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			// We can initialize a value to ourself, so to it here.
-			errs := tt.in.resolve()
+			errs := tt.in.resolve(&typeDict)
 
 			// TODO(borman):  Do not hack out Root and Base.  These
 			// are hacked out for now because they can be self-referential,
@@ -429,7 +429,7 @@ func TestTypedefResolve(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			// We can initialize a value to ourself, so to it here.
-			errs := tt.in.resolve()
+			errs := tt.in.resolve(&typeDict)
 
 			switch {
 			case tt.err == "" && len(errs) > 0:

@@ -125,6 +125,17 @@ Tests:
 			T(tUnquoted, "fred"),
 		}},
 		{line(), `
+pattern '[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+';
+`, []*token{
+			T(tUnquoted, "pattern"),
+			T(tString, "[a-zA-Z0-9!#$%&"),
+			T(tUnquoted, "+"),
+			T(tString, "'"),
+			T(tUnquoted, "+"),
+			T(tString, "*+/=?^_`{|}~-]+"),
+			T(';', ";"),
+		}},
+		{line(), `
 // tab indent both lines
 	"Broken
 	line"
@@ -192,7 +203,7 @@ Tests:
 				continue Tests
 			}
 			if len(tt.tokens) > i && !token.Equal(tt.tokens[i]) {
-				t.Errorf("%d: got %v want %v", tt.line, token, tt.tokens[i])
+				t.Errorf("%d, %d: got (%v, %q) want (%v, %q)", tt.line, i, token.code, token.Text, tt.tokens[i].code, tt.tokens[i].Text)
 			}
 		}
 	}
