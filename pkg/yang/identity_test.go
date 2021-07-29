@@ -195,7 +195,6 @@ var basicTestCases = []identityTestCase{
 			{module: "idtest-one", name: "TEST_ID_DERIVED", baseNames: []string{"TEST_ID"}},
 			{module: "idtest-one", name: "TEST_ID"},
 		},
-		err: "basic-test-case-5: could not resolve identities",
 	},
 }
 
