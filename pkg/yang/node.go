@@ -127,12 +127,24 @@ func FindModuleByPrefix(n Node, prefix string) *Module {
 // MatchingExtensions returns the subset of the given node's extensions
 // that match the given module and identifier.
 func MatchingExtensions(n Node, module, identifier string) ([]*Statement, error) {
+	return matchingExtensions(n, n.Exts(), module, identifier)
+}
+
+// MatchingEntryExtensions returns the subset of the given entry's extensions
+// that match the given module and identifier.
+func MatchingEntryExtensions(e *Entry, module, identifier string) ([]*Statement, error) {
+	return matchingExtensions(e.Node, e.Exts, module, identifier)
+}
+
+// matchingEntryExtensions returns the subset of the given node's extensions
+// that match the given module and identifier.
+func matchingExtensions(n Node, exts []*Statement, module, identifier string) ([]*Statement, error) {
 	var matchingExtensions []*Statement
-	for _, ext := range n.Exts() {
+	for _, ext := range exts {
 		names := strings.SplitN(ext.Keyword, ":", 2)
 		mod := FindModuleByPrefix(n, names[0])
 		if mod == nil {
-			return nil, fmt.Errorf("MatchingExtensions: module prefix %q not found", names[0])
+			return nil, fmt.Errorf("matchingExtensions: module prefix %q not found", names[0])
 		}
 		if len(names) == 2 && names[1] == identifier && mod.Name == module {
 			matchingExtensions = append(matchingExtensions, ext)

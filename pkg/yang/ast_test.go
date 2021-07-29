@@ -235,7 +235,12 @@ func TestAST(t *testing.T) {
 	type meta struct {
 		MainNode []*MainNode `yang:"main_node"`
 	}
-	initTypes(reflect.TypeOf(&meta{}))
+	initTypes(reflect.TypeOf(&meta{}), &typeDict)
+
+	old_aliases := aliases
+	aliases = map[string]string{
+		"alt_req_node": "req_node",
+	}
 
 	old_aliases := aliases
 	aliases = map[string]string{
