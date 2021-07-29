@@ -152,15 +152,6 @@ func TestModuleLinkage(t *testing.T) {
 						deviate not-supported;
 					}
 				}`,
-			"sysdb": `
-				module sysdb {
-					prefix s;
-					namespace "urn:s";
-
-					revision 01-01-01 { description "the start of time"; }
-
-					container sys { leaf hostname { type string; } }
-				}`,
 		},
 		wantErrSubstr: "no such module",
 	}, {
