@@ -98,6 +98,13 @@ func (mod *Module) findIdentityBase(baseStr string) (*resolvedIdentity, []error)
 			errs = append(errs, fmt.Errorf("%s: can't resolve the local base %s as %s", source, baseStr, keyName))
 		}
 	default:
+		// The identity we are looking for is prefix:basename.  If
+		// we already know prefix:basename then just use it.  If not,
+		// try again within the module identified by prefix.
+		if id, ok := identities.dict[baseStr]; ok {
+			base = id
+			break
+		}
 		// This is an identity which is defined within another module
 		extmod := FindModuleByPrefix(mod, basePrefix)
 		if extmod == nil {
