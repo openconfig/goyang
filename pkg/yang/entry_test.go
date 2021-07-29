@@ -44,7 +44,7 @@ func TestNilEntry(t *testing.T) {
 		fallthrough
 	case 1:
 		got := errs[0].Error()
-		want := "ToEntry called with nil"
+		want := "ToEntry called on nil AST node"
 		if got != want {
 			t.Fatalf("got error %q, want %q", got, want)
 		}
@@ -1093,6 +1093,20 @@ module defaults {
       type string;
     }
     uses common;
+
+    choice choice-default {
+      case alpha {
+        leaf alpha {
+          type string;
+        }
+      }
+      case zeta {
+        leaf zeta {
+          type string;
+        }
+      }
+      default zeta;
+    }
   }
 
 }
@@ -1134,6 +1148,10 @@ module defaults {
 		{
 			path: []string{"defaults", "mandatory-default"},
 			want: "",
+		},
+		{
+			path: []string{"defaults", "choice-default"},
+			want: "zeta",
 		},
 	} {
 		tname := strings.Join(tc.path, "/")
@@ -2787,6 +2805,24 @@ func TestDeviation(t *testing.T) {
 			}},
 		},
 	}, {
+		desc: "error case - deviate type not recognized",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a { type string; }
+
+					deviation /a {
+						deviate shrink {
+							max-elements 42;
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "unknown deviation type",
+	}, {
 		desc: "error case - deviation add max-element to non-list",
 		inFiles: map[string]string{
 			"deviate": `
@@ -3393,6 +3429,28 @@ func TestLeafEntry(t *testing.T) {
 				t.Errorf("got %d, want %d", got, want)
 			}
 		},
+	}, {
+		name: "leaf description",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				leaf "mandatory" {
+					type "string" {
+					}
+					description "I am a leaf";
+				}
+			}
+			`,
+		},
+		wantEntryPath: "/test/mandatory",
+		wantEntryCustomTest: func(t *testing.T, e *Entry) {
+			if got, want := e.Description, "I am a leaf"; got != want {
+				t.Errorf("got %q, want %q", got, want)
+			}
+		},
 	}}
 
 	for _, tt := range tests {
@@ -3442,6 +3500,7 @@ func TestLess(t *testing.T) {
 		{"testfile2:1:1", errors.New("test error4")},
 		{"testfile3:1:1:error5", errors.New("test error5")},
 		{"testfile3:1:2:error6", errors.New("test error6")},
+		{"testfile3:1:1:error7", errors.New("test error7")},
 	}
 
 	tests := []struct {
@@ -3514,6 +3573,16 @@ func TestLess(t *testing.T) {
 		i:    5,
 		j:    5,
 		want: false,
+	}, {
+		desc: "compare different strings with four slices",
+		i:    7,
+		j:    5,
+		want: false,
+	}, {
+		desc: "compare different strings with four slices",
+		i:    5,
+		j:    7,
+		want: true,
 	}}
 	var cmpSymbol byte
 	for _, tt := range tests {

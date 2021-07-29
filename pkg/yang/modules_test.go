@@ -31,6 +31,36 @@ var testdataFindModulesText = map[string]string{
 	"dup-ns-two":  `module dup-ns-two { prefix ns-two; namespace urn:duplicate; }`,
 }
 
+func TestDupModule(t *testing.T) {
+	tests := []struct {
+		desc      string
+		inModules map[string]string
+		wantErr   bool
+	}{{
+		desc: "two modules with the same name",
+		inModules: map[string]string{
+			"foo": `module foo { prefix "foo"; namespace "urn:foo"; }`,
+			"bar": `module foo { prefix "foo"; namespace "urn:foo"; }`,
+		},
+		wantErr: true,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			ms := NewModules()
+			var err error
+			for name, modtext := range tt.inModules {
+				if err = ms.Parse(modtext, name+".yang"); err != nil {
+					break
+				}
+			}
+			if gotErr := err != nil; gotErr != tt.wantErr {
+				t.Fatalf("wantErr: %v, got error: %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
 func testModulesForTestdataModulesText(t *testing.T) *Modules {
 	ms := NewModules()
 	for name, modtext := range testdataFindModulesText {
