@@ -447,6 +447,19 @@ main_node the_node {
 			line: line(),
 			in: `
 main_node the_node {
+	// This test tests that the absence of a required field fails.
+	// req_node requires the field named "req_field".
+	req_node value1 {
+	}
+	main_field foo;
+}
+`,
+			err: `ast.yang:5:2: missing required req_node field: req_field`,
+		},
+		{
+			line: line(),
+			in: `
+main_node the_node {
 	// This test tests that the absence of a required field.
 	// main_node requires the field named "main_field".
 	req_node value1 {
