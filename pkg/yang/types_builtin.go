@@ -630,7 +630,7 @@ func (e *EnumType) Set(name string, value int64) error {
 // all previous values.
 func (e *EnumType) SetNext(name string) error {
 	if e.last == MaxEnum {
-		return fmt.Errorf("enum must specify value")
+		return fmt.Errorf("enum %q must specify a value since previous enum is the maximum value allowed", name)
 	}
 	return e.Set(name, e.last+1)
 }

@@ -32,6 +32,7 @@ type MainNode struct {
 	ChildNode  *SubNode   `yang:"child_node"`
 	ChildSlice []*SubNode `yang:"child_slice"`
 	ReqNode    *ReqNode   `yang:"req_node"`
+	AltReqNode *ReqNode   `yang:"alt_req_node"`
 }
 
 func (MainNode) Kind() string             { return "main_node" }
@@ -102,6 +103,17 @@ func (m *MainNode) checkEqual(n Node) string {
 			return fmt.Sprintf("req_node: %s", s)
 		}
 	}
+	if (m.AltReqNode == nil) != (o.AltReqNode == nil) {
+		if m.AltReqNode == nil {
+			return "unexpected alt_req_node entry"
+		}
+		return "missing expected alt_req_node entry"
+	}
+	if m.AltReqNode != nil {
+		if s := m.AltReqNode.checkEqual(o.AltReqNode); s != "" {
+			return fmt.Sprintf("alt_req_node: %s", s)
+		}
+	}
 	return ""
 }
 
@@ -142,20 +154,25 @@ func (s *SubNode) checkEqual(o *SubNode) string {
 }
 
 type ReqNode struct {
-	Name       string       `yang:"Name,nomerge"`
-	Source     *Statement   `yang:"Statement,nomerge"`
-	Parent     Node         `yang:"Parent,nomerge"`
-	Extensions []*Statement `yang:"Ext"`
+	Name   string     `yang:"Name,nomerge"`
+	Source *Statement `yang:"Statement,nomerge"`
+	Parent Node       `yang:"Parent,nomerge"`
 
-	ReqField *Value `yang:"req_field,required"`
-	Field    *Value `yang:"field"`
+	ReqField    *Value `yang:"req_field,required"`
+	AltReqField *Value `yang:"alt_req_field,required=alt_req_node"`
+	Field       *Value `yang:"field"`
 }
 
-func (ReqNode) Kind() string             { return "req_node" }
+func (s *ReqNode) Kind() string {
+	if s.AltReqField != nil {
+		return "alt_req_node"
+	}
+	return "req_node"
+}
 func (s *ReqNode) ParentNode() Node      { return s.Parent }
 func (s *ReqNode) NName() string         { return s.Name }
 func (s *ReqNode) Statement() *Statement { return s.Source }
-func (s *ReqNode) Exts() []*Statement    { return s.Extensions }
+func (m *ReqNode) Exts() []*Statement    { return nil }
 
 func (s *ReqNode) checkEqual(o *ReqNode) string {
 	if s.Name != o.Name {
@@ -173,6 +190,17 @@ func (s *ReqNode) checkEqual(o *ReqNode) string {
 	if s.ReqField != nil {
 		if s.ReqField.Name != o.ReqField.Name {
 			return fmt.Sprintf("got req_field of %s, want %s", o.ReqField.Name, s.ReqField.Name)
+		}
+	}
+	if (s.AltReqField == nil) != (o.AltReqField == nil) {
+		if s.AltReqField == nil {
+			return "unexpected alt_req_field entry"
+		}
+		return "missing expected alt_req_field entry"
+	}
+	if s.AltReqField != nil {
+		if s.AltReqField.Name != o.AltReqField.Name {
+			return fmt.Sprintf("got alt_req_field of %s, want %s", o.AltReqField.Name, s.AltReqField.Name)
 		}
 	}
 	return ""
@@ -208,6 +236,11 @@ func TestAST(t *testing.T) {
 		MainNode []*MainNode `yang:"main_node"`
 	}
 	initTypes(reflect.TypeOf(&meta{}), &typeDict)
+
+	old_aliases := aliases
+	aliases = map[string]string{
+		"alt_req_node": "req_node",
+	}
 
 	for _, tt := range []struct {
 		line int
@@ -312,12 +345,110 @@ main_node the_node {
 			line: line(),
 			in: `
 main_node the_node {
+	// This test tests for the presence of a required field.
+	// req_node requires the field named "req_field".
+	// alt_req_node requires the field named "alt_req_field".
+	req_node value1 {
+		req_field foo {
+		}
+	}
+
+	alt_req_node value2 {
+		req_field foo {
+		}
+		alt_req_field bar {
+		}
+	}
+}
+`,
+			out: &MainNode{
+				Source: SA("main_node", "the_node",
+					SA("req_node", "value1",
+						SA("req_field", "foo")),
+					SA("alt_req_node", "value2",
+						SA("req_field", "foo"),
+						SA("alt_req_field", "bar")),
+				),
+				Name: "the_node",
+				ReqNode: &ReqNode{
+					Source: SA("req_node", "value1",
+						SA("req_field", "foo")),
+					Name: "value1",
+					ReqField: &Value{
+						Name: "foo",
+					},
+				},
+				AltReqNode: &ReqNode{
+					Source: SA("alt_req_node", "value2",
+						SA("req_field", "foo"),
+						SA("alt_req_field", "bar")),
+					Name: "value2",
+					ReqField: &Value{
+						Name: "foo",
+					},
+					AltReqField: &Value{
+						Name: "bar",
+					},
+				},
+			},
+		},
+		{
+			line: line(),
+			in: `
+main_node the_node {
+	// This test tests that extensions are rejected when the node is not
+	// supposed to contain them.
+	req_node value1 {
+		req_field foo {
+		}
+		ex:ext1 value1;
+		ex:ext2 value2;
+	}
+}
+`,
+			err: `ast.yang:8:3: no extension function`,
+		},
+		{
+			line: line(),
+			in: `
+main_node the_node {
 	// This test tests that the absence of a required field.
 	// req_node requires the field named "req_field".
 	req_node value1 ;
 }
 `,
 			err: `ast.yang:5:2: missing required req_node field: req_field`,
+		},
+		{
+			line: line(),
+			in: `
+main_node the_node {
+	// This test tests that the alt_req_field, specified with
+	// required=alt_req_node, causes the AST construction to error when a
+	// req_node contains it.
+	req_node value1 {
+		req_field foo {
+		}
+		alt_req_field foo {
+		}
+	}
+}
+`,
+			err: `ast.yang:6:2: unknown req_node field: alt_req_field`,
+		},
+		{
+			line: line(),
+			in: `
+main_node the_node {
+	// This test tests that required=alt_req_node enforces that
+	// alt_req_node must contain it.
+	alt_req_node value2 {
+		req_field foo {
+		}
+	}
+}
+`,
+			err: `ast.yang:5:2: missing required alt_req_node field: alt_req_field`,
 		},
 	} {
 		ss, err := Parse(tt.in, "ast.yang")
@@ -343,4 +474,6 @@ main_node the_node {
 			t.Errorf("%d: got error %v, want %s", tt.line, err, tt.err)
 		}
 	}
+
+	aliases = old_aliases
 }

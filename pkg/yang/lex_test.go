@@ -46,61 +46,64 @@ Tests:
 	}{
 		{line(), "", nil},
 		{line(), "bob", []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
+		}},
+		{line(), "bob //bob", []*token{
+			T(tUnquoted, "bob"),
 		}},
 		{line(), "/the/path", []*token{
-			T(tIdentifier, "/the/path"),
+			T(tUnquoted, "/the/path"),
 		}},
 		{line(), "+the/path", []*token{
-			T(tIdentifier, "+the/path"),
+			T(tUnquoted, "+the/path"),
 		}},
 		{line(), "+the+path", []*token{
-			T(tIdentifier, "+the+path"),
+			T(tUnquoted, "+the+path"),
 		}},
 		{line(), "+ the/path", []*token{
-			T(tIdentifier, "+"),
-			T(tIdentifier, "the/path"),
+			T(tUnquoted, "+"),
+			T(tUnquoted, "the/path"),
 		}},
 		{line(), "{bob}", []*token{
 			T('{', "{"),
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T('}', "}"),
 		}},
 		{line(), "bob;fred", []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T(';', ";"),
-			T(tIdentifier, "fred"),
+			T(tUnquoted, "fred"),
 		}},
 		{line(), "\t bob\t; fred ", []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T(';', ";"),
-			T(tIdentifier, "fred"),
+			T(tUnquoted, "fred"),
 		}},
 		{line(), `
 	bob;
 	fred
 `, []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T(';', ";"),
-			T(tIdentifier, "fred"),
+			T(tUnquoted, "fred"),
 		}},
 		{line(), `
 	// This is a comment
 	bob;
 	fred
 `, []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T(';', ";"),
-			T(tIdentifier, "fred"),
+			T(tUnquoted, "fred"),
 		}},
 		{line(), `
 	/* This is a comment */
 	bob;
 	fred
 `, []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T(';', ";"),
-			T(tIdentifier, "fred"),
+			T(tUnquoted, "fred"),
 		}},
 		{line(), `
 	/*
@@ -109,26 +112,26 @@ Tests:
 	bob;
 	fred
 `, []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T(';', ";"),
-			T(tIdentifier, "fred"),
+			T(tUnquoted, "fred"),
 		}},
 		{line(), `
 	bob; // This is bob
 	fred // This is fred
 `, []*token{
-			T(tIdentifier, "bob"),
+			T(tUnquoted, "bob"),
 			T(';', ";"),
-			T(tIdentifier, "fred"),
+			T(tUnquoted, "fred"),
 		}},
 		{line(), `
 pattern '[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+';
 `, []*token{
-			T(tIdentifier, "pattern"),
+			T(tUnquoted, "pattern"),
 			T(tString, "[a-zA-Z0-9!#$%&"),
-			T(tIdentifier, "+"),
+			T(tUnquoted, "+"),
 			T(tString, "'"),
-			T(tIdentifier, "+"),
+			T(tUnquoted, "+"),
 			T(tString, "*+/=?^_`{|}~-]+"),
 			T(';', ";"),
 		}},
@@ -141,7 +144,7 @@ pattern '[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+';
 		}},
 		{line(), `
 // tab indent both lines, trailing spaces and tabs
-	"Broken 	 
+	"Broken
 	 line"
 `, []*token{
 			T(tString, "Broken\nline"),
@@ -180,6 +183,13 @@ pattern '[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+';
   space"
 `, []*token{
 			T(tString, "Broken\nspace"),
+		}},
+		{line(), `
+// Odd indenting
+   "Broken  \t
+  space with trailing space"
+`, []*token{
+			T(tString, "Broken\nspace with trailing space"),
 		}},
 	} {
 		l := newLexer(tt.in, "")
@@ -239,6 +249,32 @@ func TestLexErrors(t *testing.T) {
 `,
 			1,
 			`test.yang:4:26: missing closing "
+`,
+		},
+		{line(),
+			`1:
+2: 'Quoted string'
+3: 'Missing quote
+4: 'Another quoted string'
+`,
+			1,
+			`test.yang:4:26: missing closing '
+`,
+		},
+		{line(),
+			`1: "Quoted string\"
+2: Missing end-quote\q`,
+			2,
+			`test.yang:2:21: invalid escape sequence: \q
+test.yang:1:4: missing closing "
+`,
+		},
+		{line(),
+			`/* This is a comment
+without an ending.
+`,
+			1,
+			`test.yang:1:1: missing closing */
 `,
 		},
 	} {
