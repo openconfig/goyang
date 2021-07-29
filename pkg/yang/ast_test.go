@@ -165,8 +165,9 @@ type ReqNode struct {
 	Source *Statement `yang:"Statement,nomerge"`
 	Parent Node       `yang:"Parent,nomerge"`
 
-	ReqField *Value `yang:"req_field,required"`
-	Field    *Value `yang:"field"`
+	ReqField    *Value `yang:"req_field,required"`
+	AltReqField *Value `yang:"alt_req_field,required=alt_req_node"`
+	Field       *Value `yang:"field"`
 }
 
 func (s *ReqNode) Kind() string {
@@ -193,6 +194,17 @@ func (s *ReqNode) checkEqual(o *ReqNode) string {
 	if s.ReqField != nil {
 		if s.ReqField.Name != o.ReqField.Name {
 			return fmt.Sprintf("got req_field of %s, want %s", o.ReqField.Name, s.ReqField.Name)
+		}
+	}
+	if (s.AltReqField == nil) != (o.AltReqField == nil) {
+		if s.AltReqField == nil {
+			return "unexpected alt_req_field entry"
+		}
+		return "missing expected alt_req_field entry"
+	}
+	if s.AltReqField != nil {
+		if s.AltReqField.Name != o.AltReqField.Name {
+			return fmt.Sprintf("got alt_req_field of %s, want %s", o.AltReqField.Name, s.AltReqField.Name)
 		}
 	}
 	return ""
@@ -227,8 +239,6 @@ func TestAST(t *testing.T) {
 	type meta struct {
 		MainNode []*MainNode `yang:"main_node"`
 	}
-	//typeDict := newTypeDictionary()
-	//initTypes(reflect.TypeOf(&meta{}), typeDict)
 
 	old_aliases := aliases
 	aliases = map[string]string{
