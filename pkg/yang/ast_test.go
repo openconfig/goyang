@@ -242,11 +242,6 @@ func TestAST(t *testing.T) {
 		"alt_req_node": "req_node",
 	}
 
-	old_aliases := aliases
-	aliases = map[string]string{
-		"alt_req_node": "req_node",
-	}
-
 	for _, tt := range []struct {
 		line int
 		in   string
