@@ -41,7 +41,7 @@ type yangStatement struct {
 	//    If a field is required by statement type foo, then only foo should
 	//    have the field.
 	sRequired map[string][]string
-	// addext handles adding possible extensions.
+	// addext is the function to handle possible extensions.
 	addext func(*Statement, reflect.Value, reflect.Value) error
 }
 
