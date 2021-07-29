@@ -303,7 +303,7 @@ func TestNode(t *testing.T) {
 			return nil
 		},
 	}, {
-		desc: "Test MatchingExtensions",
+		desc: "Test matchingExtensions",
 		inFn: func(ms *Modules) (Node, error) {
 
 			m, err := ms.FindModuleByPrefix("t")
@@ -396,7 +396,7 @@ func TestNode(t *testing.T) {
 			}
 
 			var bars []string
-			matches, err := MatchingExtensions(n, "foo", "bar")
+			matches, err := matchingExtensions(n, n.Exts(), "foo", "bar")
 			if err != nil {
 				return err
 			}
@@ -405,13 +405,13 @@ func TestNode(t *testing.T) {
 			}
 
 			if diff := cmp.Diff(bars, []string{"boo", "coo", "foo"}); diff != "" {
-				return fmt.Errorf("MatchingExtensions (-got, +want):\n%s", diff)
+				return fmt.Errorf("matchingExtensions (-got, +want):\n%s", diff)
 			}
 
 			return nil
 		},
 	}, {
-		desc: "Test MatchingExtensions when module is not found",
+		desc: "Test matchingExtensions when module is not found",
 		inFn: func(ms *Modules) (Node, error) {
 
 			m, err := ms.FindModuleByPrefix("t")
@@ -471,7 +471,7 @@ func TestNode(t *testing.T) {
 			}
 
 			var bars []string
-			matches, err := MatchingExtensions(n, "foo", "bar")
+			matches, err := matchingExtensions(n, n.Exts(), "foo", "bar")
 			if err != nil {
 				return err
 			}
@@ -480,7 +480,7 @@ func TestNode(t *testing.T) {
 			}
 
 			if diff := cmp.Diff(bars, []string{"boo", "coo", "foo"}); diff != "" {
-				return fmt.Errorf("MatchingExtensions (-got, +want):\n%s", diff)
+				return fmt.Errorf("matchingExtensions (-got, +want):\n%s", diff)
 			}
 
 			return nil

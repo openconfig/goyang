@@ -158,12 +158,44 @@ var basicTestCases = []identityTestCase{
 				`},
 		},
 		identities: []identityOut{
-			// TODO(wenbli): Should this show up?
-			//   The reason this doesn't show up is because
-			//   Entry.merge doesn't merge the Identities field.
-			// {module: "idtest-one", name: "TEST_ID"},
+			{module: "idtest-one", name: "TEST_ID"},
 			{module: "idtest-one", name: "TEST_ID_DERIVED", baseNames: []string{"TEST_ID"}},
 		},
+	},
+	{
+		name: "basic-test-case-5: Check identity base is found from module.",
+		in: []inputModule{
+			{
+				name: "idtest-one",
+				content: `
+					module idtest-one {
+					  namespace "urn:idone";
+					  prefix "idone";
+
+					  include "idtest-one-sub";
+
+					  identity TEST_ID;
+					}
+				`},
+			{
+				name: "idtest-one-sub",
+				content: `
+					submodule idtest-one-sub {
+					  belongs-to idtest-one {
+					    prefix "idone";
+					  }
+
+					  identity TEST_ID_DERIVED {
+					    base TEST_ID;
+					  }
+					}
+				`},
+		},
+		identities: []identityOut{
+			{module: "idtest-one", name: "TEST_ID_DERIVED", baseNames: []string{"TEST_ID"}},
+			{module: "idtest-one", name: "TEST_ID"},
+		},
+		err: "basic-test-case-5: could not resolve identities",
 	},
 }
 
@@ -177,7 +209,7 @@ func TestIdentityExtract(t *testing.T) {
 		}
 
 		for _, ti := range tt.identities {
-			parsedMod, err := ms.GetModule(ti.module)
+			_, err := ms.GetModule(ti.module)
 
 			if err != nil {
 				t.Errorf("Could not parse module : %s", ti.module)
@@ -186,16 +218,21 @@ func TestIdentityExtract(t *testing.T) {
 
 			foundIdentity := false
 			var thisID *Identity
-			for _, identity := range parsedMod.Identities {
-				if identity.Name == ti.name {
+			for _, ri := range identities.dict {
+				// TODO(wenbli): Use definingModule helper from ygot after it's moved to goyang.
+				moduleName := ri.Module.Name
+				if ri.Module.Kind() == "submodule" {
+					moduleName = ri.Module.BelongsTo.Name
+				}
+				if ri.Identity.Name == ti.name && moduleName == ti.module {
 					foundIdentity = true
-					thisID = identity
+					thisID = ri.Identity
 					break
 				}
 			}
 
-			if foundIdentity == false {
-				t.Errorf("Could not find identity %s in module %s", ti.name, ti.module)
+			if !foundIdentity {
+				t.Errorf("Could not find identity %s in module %s, identity dict:\n%+v", ti.name, ti.module, identities.dict)
 				continue
 			}
 
