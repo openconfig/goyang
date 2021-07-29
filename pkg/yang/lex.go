@@ -394,8 +394,18 @@ func lexGround(l *lexer) stateFn {
 			l.next()
 			l.next()
 			return lexGround
+		default:
+			return lexUnquoted
 		}
-		fallthrough
+	case '+':
+		l.next()
+		switch l.peek() {
+		case '"', '\'':
+			l.emit(tUnquoted)
+			return lexGround
+		default:
+			return lexUnquoted
+		}
 	default:
 		return lexUnquoted
 	}
