@@ -1,0 +1,6 @@
+module test-module {
+  prefix "t";
+  namespace "urn:t";
+
+  leaf invalid-leaf { }
+}

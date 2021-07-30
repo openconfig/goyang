@@ -1,0 +1,6 @@
+module module-one {
+  prefix "t";
+  namespace "urn:t";
+
+  leaf one { type int8; }
+}

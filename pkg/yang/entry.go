@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"reflect"
 	"sort"
 	"strconv"
@@ -62,9 +63,21 @@ func (t TriState) String() string {
 	}
 }
 
-// An Entry represents a single node (directory or leaf) created from the
-// AST.  Directory entries have a non-nil Dir entry.  Leaf nodes have a nil
-// Dir entry.  If Errors is not nil then the only other valid field is Node.
+// deviationPresence stores whether certain attributes for a DeviateEntry-type
+// Entry have been given deviation values. This is useful when the attribute
+// doesn't have a presence indicator (e.g. non-pointers).
+type deviationPresence struct {
+	hasMinElements bool
+	hasMaxElements bool
+}
+
+// Entry represents a single schema tree node, which can be a directory
+// (containing a subtree) or a leaf node (which contains YANG types that have
+// no children, e.g., leaf, leaf-list). They can be distinguished by whether
+// their "Dir" field is nil. This object is created from a corresponding AST
+// node after applying modifications (i.e. uses, augments, deviations). If
+// Errors is not nil then it means semantic errors existed while converting the
+// AST, in which case the only other valid field other than Errors is Node.
 type Entry struct {
 	Parent      *Entry    `json:"-"`
 	Node        Node      `json:"-"` // the base node this Entry was derived from.
@@ -83,8 +96,10 @@ type Entry struct {
 	Key string            `json:",omitempty"` // Optional key name for lists (i.e., maps)
 
 	// Fields associated with leaf nodes
-	Type *YangType    `json:",omitempty"`
-	Exts []*Statement `json:",omitempty"` // extensions found
+	Type *YangType `json:",omitempty"`
+
+	// Extensions found
+	Exts []*Statement `json:",omitempty"`
 
 	// Fields associated with list nodes (both lists and leaf-lists)
 	ListAttr *ListAttr `json:",omitempty"`
@@ -99,7 +114,10 @@ type Entry struct {
 	Augmented  []*Entry                   `json:",omitempty"` // Augments merged into this entry.
 	Deviations []*DeviatedEntry           `json:"-"`          // Deviations associated with this entry.
 	Deviate    map[deviationType][]*Entry `json:"-"`
-	Uses       []*UsesStmt                `json:",omitempty"` // Uses merged into this entry.
+	// deviationPresence tracks whether certain attributes for a DeviateEntry-type
+	// Entry have been given deviation values.
+	deviatePresence deviationPresence
+	Uses            []*UsesStmt `json:",omitempty"` // Uses merged into this entry.
 
 	// Extra maps all the unsupported fields to their values
 	Extra map[string][]interface{} `json:"-"`
@@ -125,9 +143,18 @@ type RPCEntry struct {
 
 // A ListAttr is associated with an Entry that represents a List node
 type ListAttr struct {
-	MinElements *Value // leaf-list or list MUST have at least min-elements
-	MaxElements *Value // leaf-list or list has at most max-elements
+	MinElements uint64 // leaf-list or list MUST have at least min-elements
+	MaxElements uint64 // leaf-list or list has at most max-elements
 	OrderedBy   *Value // order of entries determined by "system" or "user"
+}
+
+// NewDefaultListAttr returns a new ListAttr object with min/max elements being
+// set to 0/math.MaxUint64 respectively.
+func NewDefaultListAttr() *ListAttr {
+	return &ListAttr{
+		MinElements: 0,
+		MaxElements: math.MaxUint64,
+	}
 }
 
 // A UsesStmt associates a *Uses with its referenced grouping *Entry
@@ -280,7 +307,7 @@ func newLeaf(n Node) *Entry {
 	}
 }
 
-// newError returns an error node using format and v to create the error
+// newError returns an error Entry using format and v to create the error
 // contained in the node.  The location of the error is prepended.
 func newError(n Node, format string, v ...interface{}) *Entry {
 	e := &Entry{Node: n}
@@ -288,7 +315,7 @@ func newError(n Node, format string, v ...interface{}) *Entry {
 	return e
 }
 
-// errorf appends the entry constructed from string and v to the list of errors
+// errorf appends the error constructed from string and v to the list of errors
 // on e.
 func (e *Entry) errorf(format string, v ...interface{}) {
 	e.Errors = append(e.Errors, fmt.Errorf(format, v...))
@@ -473,6 +500,33 @@ type DeviatedEntry struct {
 	*Entry
 }
 
+// semCheckMaxElements checks whether the max-element argument is valid, and returns the specified value.
+func semCheckMaxElements(v *Value) (uint64, error) {
+	if v == nil || v.Name == "unbounded" {
+		return math.MaxUint64, nil
+	}
+	val, err := strconv.ParseUint(v.Name, 10, 64)
+	if err != nil {
+		return val, fmt.Errorf(`%s: invalid max-elements value %q (expect "unbounded" or a positive integer): %v`, Source(v), v.Name, err)
+	}
+	if val == 0 {
+		return val, fmt.Errorf(`%s: invalid max-elements value 0 (expect "unbounded" or a positive integer)`, Source(v))
+	}
+	return val, nil
+}
+
+// semCheckMinElements checks whether the min-element argument is valid, and returns the specified value.
+func semCheckMinElements(v *Value) (uint64, error) {
+	if v == nil {
+		return 0, nil
+	}
+	val, err := strconv.ParseUint(v.Name, 10, 64)
+	if err != nil {
+		return val, fmt.Errorf(`%s: invalid min-elements value %q (expect a non-negative integer): %v`, Source(v), v.Name, err)
+	}
+	return val, nil
+}
+
 // ToEntry expands node n into a directory Entry.  Expansion is based on the
 // YANG tags in the structure behind n.  ToEntry must only be used
 // with nodes that are directories, such as top level modules and sub-modules.
@@ -481,12 +535,13 @@ type DeviatedEntry struct {
 // if there were any errors.
 func ToEntry(n Node) (e *Entry) {
 	if n == nil {
-		err := errors.New("ToEntry called with nil")
+		err := errors.New("ToEntry called on nil AST node")
 		return &Entry{
 			Node:   &ErrorNode{Error: err},
 			Errors: []error{err},
 		}
 	}
+	ms := RootNode(n).modules
 	if e := entryCache[n]; e != nil {
 		return e
 	}
@@ -524,7 +579,7 @@ func ToEntry(n Node) (e *Entry) {
 	switch s := n.(type) {
 	case *Leaf:
 		e := newLeaf(n)
-		if errs := s.Type.resolve(); errs != nil {
+		if errs := s.Type.resolve(ms.typeDict); errs != nil {
 			e.Errors = errs
 		}
 		if s.Description != nil {
@@ -534,11 +589,12 @@ func ToEntry(n Node) (e *Entry) {
 			e.Default = s.Default.Name
 		}
 		e.Type = s.Type.YangType
-		entryCache[n] = e
 		e.Config, err = tristateValue(s.Config)
 		e.addError(err)
 		e.Prefix = getRootPrefix(e)
 		addExtraKeywordsToLeafEntry(n, e)
+		e.Mandatory, err = tristateValue(s.Mandatory)
+		e.addError(err)
 		return e
 	case *LeafList:
 		// Create the equivalent leaf element that we are a list of.
@@ -559,11 +615,15 @@ func ToEntry(n Node) (e *Entry) {
 			When:        s.When,
 		}
 
-		e := ToEntry(leaf)
-		e.ListAttr = &ListAttr{
-			MinElements: s.MinElements,
-			MaxElements: s.MaxElements,
-			OrderedBy:   s.OrderedBy,
+		e = ToEntry(leaf)
+		e.ListAttr = NewDefaultListAttr()
+		e.ListAttr.OrderedBy = s.OrderedBy
+		var err error
+		if e.ListAttr.MaxElements, err = semCheckMaxElements(s.MaxElements); err != nil {
+			e.addError(err)
+		}
+		if e.ListAttr.MinElements, err = semCheckMinElements(s.MinElements); err != nil {
+			e.addError(err)
 		}
 		if s.Default != nil {
 			e.Default = s.Default.Name
@@ -579,7 +639,7 @@ func ToEntry(n Node) (e *Entry) {
 		// We need to return a duplicate so we resolve properly
 		// when the group is used in multiple locations and the
 		// grouping has a leafref that references outside the group.
-		e := ToEntry(g).dup()
+		e = ToEntry(g).dup()
 		addExtraKeywordsToLeafEntry(n, e)
 		return e
 	}
@@ -592,10 +652,14 @@ func ToEntry(n Node) (e *Entry) {
 	// Nodes of identified special kinds have their Kind set here.
 	switch s := n.(type) {
 	case *List:
-		e.ListAttr = &ListAttr{
-			MinElements: s.MinElements,
-			MaxElements: s.MaxElements,
-			OrderedBy:   s.OrderedBy,
+		e.ListAttr = NewDefaultListAttr()
+		e.ListAttr.OrderedBy = s.OrderedBy
+		var err error
+		if e.ListAttr.MaxElements, err = semCheckMaxElements(s.MaxElements); err != nil {
+			e.addError(err)
+		}
+		if e.ListAttr.MinElements, err = semCheckMinElements(s.MinElements); err != nil {
+			e.addError(err)
 		}
 	case *Choice:
 		e.Kind = ChoiceEntry
@@ -618,8 +682,7 @@ func ToEntry(n Node) (e *Entry) {
 		e.Kind = DeviateEntry
 	}
 
-	// Use Elem to get the Value of structure that n is pointing to, not
-	// the Value of the pointer.
+	// Use Elem to get the Value of structure that n is pointing to.
 	v := reflect.ValueOf(n).Elem()
 	t := v.Type()
 	found := false
@@ -683,8 +746,8 @@ func ToEntry(n Node) (e *Entry) {
 				e.importErrors(ToEntry(a))
 			}
 		case "import":
-			// Apparently import only makes types and such
-			// available.  There is nothing else for us to do.
+			// Import only makes types and such available.
+			// There is nothing else for us to do.
 		case "include":
 			for _, a := range fv.Interface().([]*Include) {
 				// Handle circular dependencies between submodules. This can occur in
@@ -807,7 +870,7 @@ func ToEntry(n Node) (e *Entry) {
 			}
 
 			if n.Type != nil {
-				if errs := n.Type.resolve(); errs != nil {
+				if errs := n.Type.resolve(ms.typeDict); errs != nil {
 					e.addError(fmt.Errorf("deviation has unresolvable type, %v", errs))
 					continue
 				}
@@ -817,11 +880,6 @@ func ToEntry(n Node) (e *Entry) {
 		// Keywords that do not need to be handled as an Entry as they are added
 		// to other dictionaries.
 		case "default":
-			if e.Kind == LeafEntry {
-				// default is handled separately for a leaf, but in a deviate statement
-				// we must deal with it here.
-				continue
-			}
 			d, ok := fv.Interface().(*Value)
 			if !ok {
 				e.addError(fmt.Errorf("%s: unexpected default type in %s:%s", Source(n), n.Kind(), n.NName()))
@@ -839,7 +897,7 @@ func ToEntry(n Node) (e *Entry) {
 
 					for _, sd := range d.Deviate {
 						if sd.Type != nil {
-							sd.Type.resolve()
+							sd.Type.resolve(ms.typeDict)
 						}
 					}
 				}
@@ -882,13 +940,23 @@ func ToEntry(n Node) (e *Entry) {
 			}
 
 			if e.ListAttr == nil {
-				e.ListAttr = &ListAttr{}
+				e.ListAttr = NewDefaultListAttr()
 			}
 
-			if name == "max-elements" {
-				e.ListAttr.MaxElements = v
-			} else {
-				e.ListAttr.MinElements = v
+			// Only record the deviation if the statement exists.
+			if v != nil {
+				var err error
+				if name == "max-elements" {
+					e.deviatePresence.hasMaxElements = true
+					if e.ListAttr.MaxElements, err = semCheckMaxElements(v); err != nil {
+						e.addError(err)
+					}
+				} else {
+					e.deviatePresence.hasMinElements = true
+					if e.ListAttr.MinElements, err = semCheckMinElements(v); err != nil {
+						e.addError(err)
+					}
+				}
 			}
 		case "units":
 			v, ok := fv.Interface().(*Value)
@@ -984,15 +1052,15 @@ func (e *Entry) Augment(addErrors bool) (processed, skipped int) {
 	// Augments can depend upon augments.  We need to figure out how to
 	// order the augments (or just keep trying until we can make no further
 	// progress)
-	var sa []*Entry
+	var unapplied []*Entry
 	for _, a := range e.Augments {
-		ae := a.Find(a.Name)
-		if ae == nil {
+		target := a.Find(a.Name)
+		if target == nil {
 			if addErrors {
 				e.errorf("%s: augment %s not found", Source(a.Node), a.Name)
 			}
 			skipped++
-			sa = append(sa, a)
+			unapplied = append(unapplied, a)
 			continue
 		}
 		// Augments do not have a prefix we merge in, just a node.
@@ -1000,10 +1068,10 @@ func (e *Entry) Augment(addErrors bool) (processed, skipped int) {
 		// augment since the nodes have this namespace even though they
 		// are merged into another entry.
 		processed++
-		ae.merge(nil, a.Namespace(), a)
-		ae.Augmented = append(ae.Augmented, a.shallowDup())
+		target.merge(nil, a.Namespace(), a)
+		target.Augmented = append(target.Augmented, a.shallowDup())
 	}
-	e.Augments = sa
+	e.Augments = unapplied
 	return processed, skipped
 }
 
@@ -1035,7 +1103,7 @@ func (e *Entry) ApplyDeviate() []error {
 						deviatedNode.Mandatory = devSpec.Mandatory
 					}
 
-					if devSpec.ListAttr != nil && devSpec.ListAttr.MinElements != nil {
+					if devSpec.deviatePresence.hasMinElements {
 						if !deviatedNode.IsList() && !deviatedNode.IsLeafList() {
 							appendErr(fmt.Errorf("tried to deviate min-elements on a non-list type %s", deviatedNode.Kind))
 							continue
@@ -1043,7 +1111,7 @@ func (e *Entry) ApplyDeviate() []error {
 						deviatedNode.ListAttr.MinElements = devSpec.ListAttr.MinElements
 					}
 
-					if devSpec.ListAttr != nil && devSpec.ListAttr.MaxElements != nil {
+					if devSpec.deviatePresence.hasMaxElements {
 						if !deviatedNode.IsList() && !deviatedNode.IsLeafList() {
 							appendErr(fmt.Errorf("tried to deviate max-elements on a non-list type %s", deviatedNode.Kind))
 							continue
@@ -1076,8 +1144,33 @@ func (e *Entry) ApplyDeviate() []error {
 					}
 
 					if devSpec.Mandatory != TSUnset {
-						devSpec.Mandatory = TSUnset
+						deviatedNode.Mandatory = TSUnset
 					}
+
+					if devSpec.deviatePresence.hasMinElements {
+						if !deviatedNode.IsList() && !deviatedNode.IsLeafList() {
+							appendErr(fmt.Errorf("tried to deviate min-elements on a non-list type %s", deviatedNode.Kind))
+							continue
+						}
+						if deviatedNode.ListAttr.MinElements != devSpec.ListAttr.MinElements {
+							// Argument value must match:
+							// https://tools.ietf.org/html/rfc7950#section-7.20.3.2
+							appendErr(fmt.Errorf("min-element value %d differs from deviation's min-element value %d for entry %v", devSpec.ListAttr.MinElements, deviatedNode.ListAttr.MinElements, d.DeviatedPath))
+						}
+						deviatedNode.ListAttr.MinElements = 0
+					}
+
+					if devSpec.deviatePresence.hasMaxElements {
+						if !deviatedNode.IsList() && !deviatedNode.IsLeafList() {
+							appendErr(fmt.Errorf("tried to deviate max-elements on a non-list type %s", deviatedNode.Kind))
+							continue
+						}
+						if deviatedNode.ListAttr.MaxElements != devSpec.ListAttr.MaxElements {
+							appendErr(fmt.Errorf("max-element value %d differs from deviation's max-element value %d for entry %v", devSpec.ListAttr.MaxElements, deviatedNode.ListAttr.MaxElements, d.DeviatedPath))
+						}
+						deviatedNode.ListAttr.MaxElements = math.MaxUint64
+					}
+
 				default:
 					appendErr(fmt.Errorf("invalid deviation type %s", dt))
 				}
@@ -1086,10 +1179,10 @@ func (e *Entry) ApplyDeviate() []error {
 	}
 
 	return errs
-
 }
 
-// FixChoice inserts missing Case entries in a choice
+// FixChoice inserts missing Case entries for non-case entries within a choice
+// entry.
 func (e *Entry) FixChoice() {
 	if e.Kind == ChoiceEntry && len(e.Errors) == 0 {
 		for k, ce := range e.Dir {
@@ -1201,6 +1294,7 @@ func (e *Entry) Find(name string) *Entry {
 		case part == "..":
 			e = e.Parent
 		case e.RPC != nil:
+			_, part = getPrefix(part)
 			switch part {
 			case "input":
 				e = e.RPC.Input
@@ -1248,6 +1342,12 @@ func (e *Entry) Namespace() *Value {
 	// Return the namespace of a valid root parent entry
 	if e != nil && e.Node != nil {
 		if root := RootNode(e.Node); root != nil {
+			if root.Kind() == "submodule" {
+				root = root.modules.Modules[root.BelongsTo.Name]
+				if root == nil {
+					return new(Value)
+				}
+			}
 			return root.Namespace
 		}
 	}
@@ -1256,7 +1356,7 @@ func (e *Entry) Namespace() *Value {
 	return new(Value)
 }
 
-// InstantiatingModule returns the YANG module which instanitated the Entry
+// InstantiatingModule returns the YANG module which instantiated the Entry
 // within the schema tree - using the same rules described in the documentation
 // of the Namespace function. The namespace is resolved in the module name. This
 // approach to namespacing is used when serialising YANG-modelled data to JSON as
@@ -1267,11 +1367,11 @@ func (e *Entry) InstantiatingModule() (string, error) {
 		return "", fmt.Errorf("entry %s had nil namespace", e.Name)
 	}
 
-	ns, err := e.Modules().FindModuleByNamespace(n.Name)
+	module, err := e.Modules().FindModuleByNamespace(n.Name)
 	if err != nil {
-		return "", fmt.Errorf("could not find module %s when retrieving namespace for %s", n.Name, e.Name)
+		return "", fmt.Errorf("could not find module %q when retrieving namespace for %s", n.Name, e.Name)
 	}
-	return ns.Name, nil
+	return module.Name, nil
 }
 
 // shallowDup makes a shallow duplicate of e (only direct children are
@@ -1378,8 +1478,12 @@ type sortedErrors []sError
 func (s sortedErrors) Len() int      { return len(s) }
 func (s sortedErrors) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 func (s sortedErrors) Less(i, j int) bool {
-	fi := strings.SplitN(s[i].s, ":", 4)
-	fj := strings.SplitN(s[j].s, ":", 4)
+	// We expect the error strings to be composed of error messages,
+	// line numbers, etc. delimited by ":".
+	const errorSplitCount = 4
+	fi := strings.SplitN(s[i].s, ":", errorSplitCount)
+	fj := strings.SplitN(s[j].s, ":", errorSplitCount)
+	// First, order the errors by the file name.
 	if fi[0] < fj[0] {
 		return true
 	}
@@ -1387,21 +1491,18 @@ func (s sortedErrors) Less(i, j int) bool {
 		return false
 	}
 
-	// compare compares field x to see which is less.
-	// numbers are compared as numbers.
-	compare := func(x int) int {
+	// compare remaining indices of the error string slices
+	// in order to create a total ordering.
+	for i := 1; i < errorSplitCount; i++ {
 		switch {
-		case len(fi) == x && len(fj) > x:
-			return -1
-		case len(fj) == x && len(fi) > x:
-			return 1
-		case len(fj) < x && len(fi) < x:
-			return 0
+		// Handle when an expected index doesn't exist.
+		case len(fj) == i:
+			return false
+		case len(fi) == i:
+			return true
 		}
-		return nless(fi[x], fj[x])
-	}
-	for x := 1; x < 4; x++ {
-		switch compare(1) {
+
+		switch nless(fi[i], fj[i]) {
 		case -1:
 			return true
 		case 1:
@@ -1441,7 +1542,7 @@ func errorSort(errors []error) []error {
 // DefaultValue returns the schema default value for e, if any. If the leaf
 // has no explicit default, its type default (if any) will be used.
 func (e *Entry) DefaultValue() string {
-	if len(e.Default) > 0 {
+	if e.Default != "" {
 		return e.Default
 	} else if typ := e.Type; typ != nil {
 		if leaf, ok := e.Node.(*Leaf); ok {

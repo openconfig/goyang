@@ -1,0 +1,5 @@
+module imported {
+  prefix "imported";
+  namespace "urn:i";
+  
+}

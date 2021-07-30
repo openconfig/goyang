@@ -1,6 +1,8 @@
 ![Go](https://github.com/openconfig/goyang/workflows/Go/badge.svg?branch=master)
 [![Coverage Status](https://coveralls.io/repos/github/openconfig/goyang/badge.svg?branch=master)](https://coveralls.io/github/openconfig/goyang?branch=master)
 
+Current support for `goyang` is for the [latest 3 Go releases](https://golang.org/project/#release).
+
 # goyang
 YANG parser and compiler for Go programs.
 

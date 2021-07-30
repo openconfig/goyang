@@ -821,7 +821,7 @@ type Identity struct {
 	Parent     Node         `yang:"Parent,nomerge" json:"-"`
 	Extensions []*Statement `yang:"Ext" json:"-"`
 
-	Base        *Value      `yang:"base" json:"-"`
+	Base        []*Value    `yang:"base" json:"-"`
 	Description *Value      `yang:"description" json:"-"`
 	IfFeature   []*Value    `yang:"if-feature" json:"-"`
 	Reference   *Value      `yang:"reference" json:"-"`

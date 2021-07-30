@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/kylelemons/godebug/pretty"
 )
 
@@ -302,17 +303,16 @@ func TestMarshalJSON(t *testing.T) {
 					Kind: LeafEntry,
 				},
 				"leaf-list": {
-					Name:     "leaf-list",
-					ListAttr: &ListAttr{},
+					Name: "leaf-list",
+					ListAttr: &ListAttr{
+						MaxElements: 18446744073709551615,
+						MinElements: 0,
+					},
 				},
 			},
 			ListAttr: &ListAttr{
-				MaxElements: &Value{
-					Name: "42",
-				},
-				MinElements: &Value{
-					Name: "48",
-				},
+				MaxElements: 42,
+				MinElements: 48,
 			},
 			Identities: []*Identity{{
 				Name: "ID_ONE",
@@ -338,8 +338,8 @@ func TestMarshalJSON(t *testing.T) {
       "Kind": 0,
       "Config": 0,
       "ListAttr": {
-        "MinElements": null,
-        "MaxElements": null,
+        "MinElements": 0,
+        "MaxElements": 18446744073709551615,
         "OrderedBy": null
       }
     }
@@ -352,12 +352,8 @@ func TestMarshalJSON(t *testing.T) {
     }
   ],
   "ListAttr": {
-    "MinElements": {
-      "Name": "48"
-    },
-    "MaxElements": {
-      "Name": "42"
-    },
+    "MinElements": 48,
+    "MaxElements": 42,
     "OrderedBy": null
   },
   "Identities": [
@@ -408,6 +404,8 @@ func TestParseAndMarshal(t *testing.T) {
 											container test {
 												list a {
 													key "k";
+													min-elements 10;
+													max-elements "unbounded";
 													leaf k { type string; }
 
 													leaf bar {
@@ -422,6 +420,11 @@ func TestParseAndMarshal(t *testing.T) {
 												}
 
 												leaf-list zip {
+													type string;
+												}
+
+												leaf-list zip2 {
+													max-elements 1000;
 													type string;
 												}
 
@@ -527,8 +530,8 @@ func TestParseAndMarshal(t *testing.T) {
           },
           "Key": "k",
           "ListAttr": {
-            "MinElements": null,
-            "MaxElements": null,
+            "MinElements": 10,
+            "MaxElements": 18446744073709551615,
             "OrderedBy": null
           }
         },
@@ -616,8 +619,30 @@ func TestParseAndMarshal(t *testing.T) {
             "Kind": 18
           },
           "ListAttr": {
-            "MinElements": null,
-            "MaxElements": null,
+            "MinElements": 0,
+            "MaxElements": 18446744073709551615,
+            "OrderedBy": null
+          }
+        },
+        "zip2": {
+          "Name": "zip2",
+          "Kind": 0,
+          "Config": 0,
+          "Prefix": {
+            "Name": "t",
+            "Source": {
+              "Keyword": "prefix",
+              "HasArgument": true,
+              "Argument": "t"
+            }
+          },
+          "Type": {
+            "Name": "string",
+            "Kind": 18
+          },
+          "ListAttr": {
+            "MinElements": 0,
+            "MaxElements": 1000,
             "OrderedBy": null
           }
         }
@@ -746,7 +771,7 @@ func TestParseAndMarshal(t *testing.T) {
 						continue
 					}
 
-					if diff := pretty.Compare(string(got), tt.want[m.Name]); diff != "" {
+					if diff := cmp.Diff(string(got), tt.want[m.Name]); diff != "" {
 						t.Errorf("%s: json.MarshalIndent(...): did not get expected JSON, diff(-got,+want):\n%s", tt.name, diff)
 					}
 				}

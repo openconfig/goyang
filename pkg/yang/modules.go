@@ -18,7 +18,9 @@ package yang
 // include and import statements, which must be done prior to turning the
 // module into an Entry tree.
 
-import "fmt"
+import (
+	"fmt"
+)
 
 // Modules contains information about all the top level modules and
 // submodules that are read into it via its Read method.
@@ -28,6 +30,7 @@ type Modules struct {
 	includes   map[*Module]bool   // Modules we have already done include on
 	byPrefix   map[string]*Module // Cache of prefix lookup
 	byNS       map[string]*Module // Cache of namespace lookup
+	typeDict   *typeDictionary    // Cache for type definitions.
 }
 
 // NewModules returns a newly created and initialized Modules.
@@ -38,6 +41,7 @@ func NewModules() *Modules {
 		includes:   map[*Module]bool{},
 		byPrefix:   map[string]*Module{},
 		byNS:       map[string]*Module{},
+		typeDict:   &typeDictionary{dict: map[Node]map[string]*Typedef{}},
 	}
 }
 
@@ -55,17 +59,21 @@ func (ms *Modules) Read(name string) error {
 
 // Parse parses data as YANG source and adds it to ms.  The name should reflect
 // the source of data.
+// Note: If an error is returned, valid modules might still have been added to
+// the Modules cache.
 func (ms *Modules) Parse(data, name string) error {
 	ss, err := Parse(data, name)
 	if err != nil {
 		return err
 	}
 	for _, s := range ss {
-		n, err := BuildAST(s)
+		n, err := buildASTWithTypeDict(s, ms.typeDict)
 		if err != nil {
 			return err
 		}
-		ms.add(n)
+		if err := ms.add(n); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -184,9 +192,12 @@ func (ms *Modules) FindModule(n Node) *Module {
 		return n
 	}
 
-	// Try to read it in.
-	if err := ms.Read(name); err != nil {
-		return nil
+	// Try to read first a module by revision
+	if err := ms.Read(rev); err != nil {
+		// if failed, try to read a module by its bare name
+		if err := ms.Read(name); err != nil {
+			return nil
+		}
 	}
 	if n := m[rev]; n != nil {
 		return n
@@ -198,9 +209,6 @@ func (ms *Modules) FindModule(n Node) *Module {
 // or returns an error.
 func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
 	if m, ok := ms.byNS[ns]; ok {
-		if m == nil {
-			return nil, fmt.Errorf("%s: no such namespace", ns)
-		}
 		return m, nil
 	}
 	var found *Module
@@ -216,20 +224,20 @@ func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
 			}
 		}
 	}
-	ms.byNS[ns] = found
 	if found == nil {
 		return nil, fmt.Errorf("%s: no such namespace", ns)
 	}
+	// Don't cache negative results because new modules could be added.
+	ms.byNS[ns] = found
 	return found, nil
 }
 
 // FindModuleByPrefix either returns the Module specified by prefix or returns
 // an error.
+// TODO(wenovus): This should be deprecated since prefixes are not unique among
+// modules.
 func (ms *Modules) FindModuleByPrefix(prefix string) (*Module, error) {
 	if m, ok := ms.byPrefix[prefix]; ok {
-		if m == nil {
-			return nil, fmt.Errorf("%s: no such prefix", prefix)
-		}
 		return m, nil
 	}
 	var found *Module
@@ -244,10 +252,11 @@ func (ms *Modules) FindModuleByPrefix(prefix string) (*Module, error) {
 			}
 		}
 	}
-	ms.byPrefix[prefix] = found
 	if found == nil {
 		return nil, fmt.Errorf("%s: no such prefix", prefix)
 	}
+	// Don't cache negative results because new modules could be added.
+	ms.byPrefix[prefix] = found
 	return found, nil
 }
 
@@ -280,7 +289,7 @@ func (ms *Modules) process() []error {
 	// has not yet been built.
 	errs = append(errs, ms.resolveIdentities()...)
 	// Append any errors found trying to resolve typedefs
-	errs = append(errs, resolveTypedefs()...)
+	errs = append(errs, ms.typeDict.resolveTypedefs()...)
 
 	return errs
 }
