@@ -1580,17 +1580,37 @@ func errorSort(errors []error) []error {
 	return errors[:i]
 }
 
+// HasDefault indicates whether the leaf entry has a default value or not.
+func (e *Entry) HasDefault() bool {
+	return len(e.DefaultValues()) > 0
+}
+
 // SingleDefaultValue returns the schema default value for e, if any. If the leaf
 // has no explicit default, its type default (if any) will be used.
+// Note: if there is not default value, then the empty string will be returned.
 func (e *Entry) SingleDefaultValue() string {
+	if dvals := e.DefaultValues(); len(dvals) > 0 {
+		return dvals[0]
+	}
+	return ""
+}
+
+// DefaultValues returns all default values for the leaf entry. For all but
+// leaf-list nodes, there will at most one default value given. If the entry
+// has no explicit default, its type default (if any) will be used.
+func (e *Entry) DefaultValues() []string {
 	if len(e.Default) > 0 {
-		return e.Default[0]
-	} else if typ := e.Type; typ != nil {
-		if leaf, ok := e.Node.(*Leaf); ok {
-			if leaf.Mandatory == nil || leaf.Mandatory.Name == "false" {
-				return typ.Default
+		return append([]string{}, e.Default...)
+	}
+
+	if typ := e.Type; typ != nil && typ.HasDefault {
+		switch leaf := e.Node.(type) {
+		case *Leaf:
+			switch {
+			case e.IsLeaf() && (leaf.Mandatory == nil || leaf.Mandatory.Name == "false"), e.IsLeafList() && e.ListAttr.MinElements == 0:
+				return []string{typ.Default}
 			}
 		}
 	}
-	return ""
+	return nil
 }

@@ -2,10 +2,17 @@ module deviate {
     prefix "d";
     namespace "urn:d";
 
+    typedef derived-string {
+      type string;
+      default "barnacles";
+    }
+
     grouping substmts {
         leaf config { type string; }
         leaf default { type string; }
+        leaf default-typedef { type derived-string; }
         leaf-list default-list { type string; default "foo"; default "bar"; }
+        leaf-list default-list-typedef-default { type derived-string; }
         leaf mandatory { type string; }
         leaf-list max-elements { type string; }
         leaf-list min-elements { type string; }
