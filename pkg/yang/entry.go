@@ -79,17 +79,20 @@ type deviationPresence struct {
 // Errors is not nil then it means semantic errors existed while converting the
 // AST, in which case the only other valid field other than Errors is Node.
 type Entry struct {
-	Parent      *Entry    `json:"-"`
-	Node        Node      `json:"-"` // the base node this Entry was derived from.
-	Name        string    // our name, same as the key in our parent Dirs
-	Description string    `json:",omitempty"` // description from node, if any
-	Default     []string  `json:",omitempty"` // default from node, if any
-	Units       string    `json:",omitempty"` // units associated with the type, if any
-	Errors      []error   `json:"-"`          // list of errors encountered on this node
-	Kind        EntryKind // kind of Entry
-	Config      TriState  // config state of this entry, if known
-	Prefix      *Value    `json:",omitempty"` // prefix to use from this point down
-	Mandatory   TriState  `json:",omitempty"` // whether this entry is mandatory in the tree
+	Parent      *Entry `json:"-"`
+	Node        Node   `json:"-"` // the base node this Entry was derived from.
+	Name        string // our name, same as the key in our parent Dirs
+	Description string `json:",omitempty"` // description from node, if any
+	// Default value for the node, if any. Note that only leaf-lists may
+	// have more than one value. For all other types, use the
+	// SingleDefaultValue() method to access the default value.
+	Default   []string  `json:",omitempty"`
+	Units     string    `json:",omitempty"` // units associated with the type, if any
+	Errors    []error   `json:"-"`          // list of errors encountered on this node
+	Kind      EntryKind // kind of Entry
+	Config    TriState  // config state of this entry, if known
+	Prefix    *Value    `json:",omitempty"` // prefix to use from this point down
+	Mandatory TriState  `json:",omitempty"` // whether this entry is mandatory in the tree
 
 	// Fields associated with directory nodes
 	Dir map[string]*Entry `json:",omitempty"`
