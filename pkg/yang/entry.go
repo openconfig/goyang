@@ -1585,8 +1585,9 @@ func (e *Entry) HasDefault() bool {
 	return len(e.DefaultValues()) > 0
 }
 
-// SingleDefaultValue returns the schema default value for e, if any. If the leaf
-// has no explicit default, its type default (if any) will be used.
+// SingleDefaultValue returns the schema default value for e, if any. This is
+// useful for determining the default values of a non-leaf-list leaf entry. If
+// the leaf has no explicit default, its type default (if any) will be used.
 // Note: if there is not default value, then the empty string will be returned.
 func (e *Entry) SingleDefaultValue() string {
 	if dvals := e.DefaultValues(); len(dvals) > 0 {
@@ -1595,9 +1596,11 @@ func (e *Entry) SingleDefaultValue() string {
 	return ""
 }
 
-// DefaultValues returns all default values for the leaf entry. For all but
-// leaf-list nodes, there will at most one default value given. If the entry
-// has no explicit default, its type default (if any) will be used.
+// DefaultValues returns all default values for the leaf entry. This is useful
+// for determining the default values for a leaf-list, which may have more than
+// one default value. If the entry has no explicit default, its type default
+// (if any) will be used.
+// For all but leaf-list nodes, there will at most one default value given.
 func (e *Entry) DefaultValues() []string {
 	if len(e.Default) > 0 {
 		return append([]string{}, e.Default...)
