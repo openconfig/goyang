@@ -83,7 +83,7 @@ type Entry struct {
 	Node        Node      `json:"-"` // the base node this Entry was derived from.
 	Name        string    // our name, same as the key in our parent Dirs
 	Description string    `json:",omitempty"` // description from node, if any
-	Default     string    `json:",omitempty"` // default from node, if any
+	Default     []string  `json:",omitempty"` // default from node, if any
 	Units       string    `json:",omitempty"` // units associated with the type, if any
 	Errors      []error   `json:"-"`          // list of errors encountered on this node
 	Kind        EntryKind // kind of Entry
@@ -586,7 +586,7 @@ func ToEntry(n Node) (e *Entry) {
 			e.Description = s.Description.Name
 		}
 		if s.Default != nil {
-			e.Default = s.Default.Name
+			e.Default = []string{s.Default.Name}
 		}
 		e.Type = s.Type.YangType
 		e.Config, err = tristateValue(s.Config)
@@ -625,8 +625,10 @@ func ToEntry(n Node) (e *Entry) {
 		if e.ListAttr.MinElements, err = semCheckMinElements(s.MinElements); err != nil {
 			e.addError(err)
 		}
-		if s.Default != nil {
-			e.Default = s.Default.Name
+		if len(s.Default) != 0 {
+			for _, def := range s.Default {
+				e.Default = append(e.Default, def.Name)
+			}
 		}
 		e.Prefix = getRootPrefix(e)
 		addExtraKeywordsToLeafEntry(n, e)
@@ -664,7 +666,7 @@ func ToEntry(n Node) (e *Entry) {
 	case *Choice:
 		e.Kind = ChoiceEntry
 		if s.Default != nil {
-			e.Default = s.Default.Name
+			e.Default = []string{s.Default.Name}
 		}
 	case *Case:
 		e.Kind = CaseEntry
@@ -880,11 +882,22 @@ func ToEntry(n Node) (e *Entry) {
 		// Keywords that do not need to be handled as an Entry as they are added
 		// to other dictionaries.
 		case "default":
-			d, ok := fv.Interface().(*Value)
-			if !ok {
-				e.addError(fmt.Errorf("%s: unexpected default type in %s:%s", Source(n), n.Kind(), n.NName()))
+			switch e.Kind {
+			case LeafEntry, ChoiceEntry:
+				// default is handled separately for leaf, leaf-list and choice
+			case DeviateEntry:
+				// handle deviate statements.
+				// TODO(wenovus): support refine statement's default substatement.
+				d, ok := fv.Interface().(*Value)
+				if !ok {
+					e.addError(fmt.Errorf("%s: unexpected default type in %s:%s", Source(n), n.Kind(), n.NName()))
+				}
+				// TODO(wenovus): deviate statement and refine statement should
+				// allow multiple default substatements for leaf-list types (YANG1.1).
+				if d != nil {
+					e.Default = []string{d.asString()}
+				}
 			}
-			e.Default = d.asString()
 		case "typedef":
 			continue
 		case "deviation":
@@ -1095,8 +1108,23 @@ func (e *Entry) ApplyDeviate() []error {
 						deviatedNode.Config = devSpec.Config
 					}
 
-					if devSpec.Default != "" {
-						deviatedNode.Default = ""
+					// FIXME(wenbli): Add tests.
+					if len(devSpec.Default) > 0 {
+						switch dt {
+						case DeviationAdd:
+							switch {
+							case deviatedNode.IsLeafList():
+								deviatedNode.Default = append(deviatedNode.Default, devSpec.Default...)
+							case len(devSpec.Default) > 1:
+								appendErr(fmt.Errorf("%s: tried to add more than one default to a non-leaflist entry at deviation", Source(e.Node)))
+							case len(deviatedNode.Default) != 0:
+								appendErr(fmt.Errorf("%s: tried to add a default value to an entry that already has a default value", Source(e.Node)))
+							case len(devSpec.Default) == 1 && len(deviatedNode.Default) == 0:
+								deviatedNode.Default = append([]string{}, devSpec.Default[0])
+							}
+						case DeviationReplace:
+							deviatedNode.Default = append([]string{}, devSpec.Default...)
+						}
 					}
 
 					if devSpec.Mandatory != TSUnset {
@@ -1139,8 +1167,19 @@ func (e *Entry) ApplyDeviate() []error {
 						deviatedNode.Config = TSUnset
 					}
 
-					if devSpec.Default == "" {
-						deviatedNode.Default = ""
+					if len(devSpec.Default) > 0 {
+						switch {
+						case deviatedNode.IsLeafList():
+							// It is unclear from RFC7950 on how deviate delete works
+							// when there are duplicate leaf-list values.
+							appendErr(fmt.Errorf("%s: deviate delete on default statements unsupported for leaf-lists, please use replace instead", Source(e.Node)))
+						case len(deviatedNode.Default) == 0:
+							appendErr(fmt.Errorf("%s: tried to deviate delete a default statement that doesn't exist", Source(e.Node)))
+						case devSpec.Default[0] != deviatedNode.Default[0]:
+							appendErr(fmt.Errorf("%s: tried to deviate delete a default statement with a non-matching keyword", Source(e.Node)))
+						default:
+							deviatedNode.Default = nil
+						}
 					}
 
 					if devSpec.Mandatory != TSUnset {
@@ -1539,11 +1578,11 @@ func errorSort(errors []error) []error {
 	return errors[:i]
 }
 
-// DefaultValue returns the schema default value for e, if any. If the leaf
+// SingleDefaultValue returns the schema default value for e, if any. If the leaf
 // has no explicit default, its type default (if any) will be used.
-func (e *Entry) DefaultValue() string {
-	if e.Default != "" {
-		return e.Default
+func (e *Entry) SingleDefaultValue() string {
+	if len(e.Default) > 0 {
+		return e.Default[0]
 	} else if typ := e.Type; typ != nil {
 		if leaf, ok := e.Node.(*Leaf); ok {
 			if leaf.Mandatory == nil || leaf.Mandatory.Name == "false" {

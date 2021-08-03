@@ -423,7 +423,7 @@ type LeafList struct {
 	Extensions []*Statement `yang:"Ext"`
 
 	Config      *Value   `yang:"config"`
-	Default     *Value   `yang:"default"`
+	Default     []*Value `yang:"default"`
 	Description *Value   `yang:"description"`
 	IfFeature   []*Value `yang:"if-feature"`
 	MaxElements *Value   `yang:"max-elements"`

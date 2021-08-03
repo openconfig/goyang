@@ -37,7 +37,7 @@ func TestMarshalJSON(t *testing.T) {
 				Name: "leaf",
 			},
 			Description: "This is a fake leaf.",
-			Default:     "default-leaf-value",
+			Default:     []string{"default-leaf-value"},
 			Errors:      []error{fmt.Errorf("error one")},
 			Kind:        LeafEntry,
 			Config:      TSTrue,
@@ -61,7 +61,9 @@ func TestMarshalJSON(t *testing.T) {
 		want: `{
   "Name": "leaf",
   "Description": "This is a fake leaf.",
-  "Default": "default-leaf-value",
+  "Default": [
+    "default-leaf-value"
+  ],
   "Kind": 0,
   "Config": 1,
   "Prefix": {

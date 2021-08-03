@@ -1133,6 +1133,7 @@ module defaults {
     leaf-list uint32-withdefault {
       type uint32;
       default "13";
+      default 14;
     }
     leaf-list string-withdefault {
       type string-default;
@@ -1186,8 +1187,8 @@ module defaults {
 		{
 			path: []string{"defaults", "choice-default"},
 			want: "zeta",
-    },
-    {
+		},
+		{
 			path: []string{"leaflist-defaults", "uint32-withdefault"},
 			want: "13",
 		},
@@ -1223,8 +1224,8 @@ module defaults {
 		if err != nil {
 			t.Fatalf("[%d_%s] could not retrieve path: %v", i, tname, err)
 		}
-		if got := dir.DefaultValue(); tc.want != got {
-			t.Errorf("[%d_%s] want DefaultValue %q, got %q", i, tname, tc.want, got)
+		if got := dir.SingleDefaultValue(); tc.want != got {
+			t.Errorf("[%d_%s] want SingleDefaultValue %q, got %q", i, tname, tc.want, got)
 		}
 	}
 }
@@ -2819,6 +2820,16 @@ func TestDeviation(t *testing.T) {
 					Config: TSFalse,
 				},
 			}, {
+				path: "/target/add/default",
+				entry: &Entry{
+					Default: []string{"a default value"},
+				},
+			}, {
+				path: "/target/add/default-list",
+				entry: &Entry{
+					Default: []string{"foo", "bar", "foo"},
+				},
+			}, {
 				path: "/target/add/mandatory",
 				entry: &Entry{
 					Mandatory: TSTrue,
@@ -2862,6 +2873,27 @@ func TestDeviation(t *testing.T) {
 				},
 			}},
 		},
+	}, {
+		desc: "error case - deviation add that already has a default",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a {
+						type string;
+						default "fish";
+					}
+
+					deviation /a {
+						deviate add {
+							default "fishsticks";
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "already has a default value",
 	}, {
 		desc: "error case - deviate type not recognized",
 		inFiles: map[string]string{
@@ -3025,6 +3057,16 @@ func TestDeviation(t *testing.T) {
 					Config: TSFalse,
 				},
 			}, {
+				path: "/target/replace/default",
+				entry: &Entry{
+					Default: []string{"a default value"},
+				},
+			}, {
+				path: "/target/replace/default-list",
+				entry: &Entry{
+					Default: []string{"nematodes"},
+				},
+			}, {
 				path: "/target/replace/mandatory",
 				entry: &Entry{
 					Mandatory: TSTrue,
@@ -3086,6 +3128,9 @@ func TestDeviation(t *testing.T) {
 					Config: TSUnset,
 				},
 			}, {
+				path:  "/target/delete/default",
+				entry: &Entry{},
+			}, {
 				path: "/target/delete/mandatory",
 				entry: &Entry{
 					Mandatory: TSUnset,
@@ -3129,6 +3174,27 @@ func TestDeviation(t *testing.T) {
 				},
 			}},
 		},
+	}, {
+		desc: "error case - deviation delete of default has different keyword value",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a {
+						type string;
+						default "fish";
+					}
+
+					deviation /a {
+						deviate delete {
+							default "fishsticks";
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "non-matching keyword",
 	}, {
 		desc: "error case - deviation delete of min-elements has different keyword value",
 		inFiles: map[string]string{
@@ -3305,8 +3371,8 @@ func TestDeviation(t *testing.T) {
 						t.Errorf("%d (%s): did not get expected config statement, got: %v, want: %v", idx, want.path, got.Config, want.entry.Config)
 					}
 
-					if got.Default != want.entry.Default {
-						t.Errorf("%d (%s): did not get expected default statement, got: %v, want: %v", idx, want.path, got.Default, want.entry.Default)
+					if diff := cmp.Diff(got.Default, want.entry.Default, cmpopts.EquateEmpty()); diff != "" {
+						t.Errorf("%d (%s): did not get expected default statement, (-got, +want): %s", idx, want.path, diff)
 					}
 
 					if got.Mandatory != want.entry.Mandatory {
