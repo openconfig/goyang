@@ -1108,7 +1108,6 @@ func (e *Entry) ApplyDeviate() []error {
 						deviatedNode.Config = devSpec.Config
 					}
 
-					// FIXME(wenbli): Add tests.
 					if len(devSpec.Default) > 0 {
 						switch dt {
 						case DeviationAdd:
