@@ -3175,6 +3175,28 @@ func TestDeviation(t *testing.T) {
 			}},
 		},
 	}, {
+		// TODO(wenovus): Support deviate delete for leaf-lists once its semantics are clear.
+		desc: "error case - deviation delete on a leaf-list",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf-list a {
+						type string;
+						default "fish";
+					}
+
+					deviation /a {
+						deviate delete {
+							default "fishsticks";
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "deviate delete on default statements unsupported for leaf-lists",
+	}, {
 		desc: "error case - deviation delete of default has different keyword value",
 		inFiles: map[string]string{
 			"deviate": `
@@ -3195,6 +3217,26 @@ func TestDeviation(t *testing.T) {
 				}`,
 		},
 		wantProcessErrSubstring: "non-matching keyword",
+	}, {
+		desc: "error case - deviation delete where the default didn't exist",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a {
+						type string;
+					}
+
+					deviation /a {
+						deviate delete {
+							default "fishsticks";
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "default statement that doesn't exist",
 	}, {
 		desc: "error case - deviation delete of min-elements has different keyword value",
 		inFiles: map[string]string{
