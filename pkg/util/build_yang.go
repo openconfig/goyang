@@ -22,10 +22,12 @@ import (
 	"github.com/openconfig/goyang/pkg/yang"
 )
 
-// ProcessModules takes a list of either .yang file or module/submodule names
-// and a list of include paths, and runs the yang parser against them,
-// returning a slice of yang.Entry pointers which represent the parsed top
-// level modules.
+// ProcessModules takes a list of either module/submodule names or .yang file
+// paths, and a list of include paths. It runs the yang parser on the YANG
+// files by searching for them in the include paths or in the current
+// directory, returning a slice of yang.Entry pointers which represent the
+// parsed top level modules. It also returns a list of errors encountered while
+// parsing, if any.
 func ProcessModules(yangfiles, path []string) (map[string]*yang.Entry, []error) {
 	for _, p := range path {
 		yang.AddPath(fmt.Sprintf("%s/...", p))

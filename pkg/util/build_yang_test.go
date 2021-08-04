@@ -32,6 +32,11 @@ func TestProcessModules(t *testing.T) {
 		inPath:   []string{"testdata"},
 		wantMods: []string{"test-module"},
 	}, {
+		name:     "simple valid module without .yang extension",
+		inFiles:  []string{"00-valid-module"},
+		inPath:   []string{"testdata"},
+		wantMods: []string{"test-module"},
+	}, {
 		name:    "simple invalid module",
 		inFiles: []string{"testdata/01-invalid-module.yang"},
 		inPath:  []string{"testdata"},
