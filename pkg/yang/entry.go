@@ -169,7 +169,7 @@ func (e *Entry) Modules() *Modules {
 	for e.Parent != nil {
 		e = e.Parent
 	}
-	return e.Node.(*Module).modules
+	return e.Node.(*Module).Modules
 }
 
 // IsDir returns true if e is a directory.
@@ -541,7 +541,7 @@ func ToEntry(n Node) (e *Entry) {
 			Errors: []error{err},
 		}
 	}
-	ms := RootNode(n).modules
+	ms := RootNode(n).Modules
 	if e := entryCache[n]; e != nil {
 		return e
 	}
@@ -1255,7 +1255,7 @@ func (e *Entry) Find(name string) *Entry {
 		for _, i := range e.Node.(*Module).Import {
 			// Resolve the module using the current module set, since we may
 			// not have populated the Module for the entry yet.
-			m, ok := e.Node.(*Module).modules.Modules[i.Name]
+			m, ok := e.Node.(*Module).Modules.Modules[i.Name]
 			if !ok {
 				e.addError(fmt.Errorf("cannot find a module with name %s when looking at imports in %s", i.Name, e.Path()))
 				return nil
@@ -1340,7 +1340,7 @@ func (e *Entry) Namespace() *Value {
 	if e != nil && e.Node != nil {
 		if root := RootNode(e.Node); root != nil {
 			if root.Kind() == "submodule" {
-				root = root.modules.Modules[root.BelongsTo.Name]
+				root = root.Modules.Modules[root.BelongsTo.Name]
 				if root == nil {
 					return new(Value)
 				}

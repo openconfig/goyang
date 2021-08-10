@@ -204,7 +204,7 @@ func FindNode(n Node, path string) (Node, error) {
 		mod := n.(*Module)
 		prefix, _ := getPrefix(parts[0])
 		if mod.Kind() == "submodule" {
-			m := mod.modules.Modules[mod.BelongsTo.Name]
+			m := mod.Modules.Modules[mod.BelongsTo.Name]
 			if m == nil {
 				return nil, fmt.Errorf("%s: unknown module %s", m.Name, mod.BelongsTo.Name)
 			}
