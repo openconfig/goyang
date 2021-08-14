@@ -406,7 +406,7 @@ func TestEntryNamespace(t *testing.T) {
 			descr:        "leaf directly defined within an augment to foo from orphan submodule qux-augment has empty namespace",
 			entry:        foo.Dir["foo-c"].Dir["qux-submod-leaf"],
 			ns:           "",
-			wantModError: `could not find module "" when retrieving namespace for qux-submod-leaf`,
+			wantModError: `could not find module "" when retrieving namespace for qux-submod-leaf: "": no such namespace`,
 		},
 		{
 			descr:   "children of a container within an augment to from baz have baz's namespace",

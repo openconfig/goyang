@@ -1366,7 +1366,7 @@ func (e *Entry) InstantiatingModule() (string, error) {
 
 	module, err := e.Modules().FindModuleByNamespace(n.Name)
 	if err != nil {
-		return "", fmt.Errorf("could not find module %q when retrieving namespace for %s", n.Name, e.Name)
+		return "", fmt.Errorf("could not find module %q when retrieving namespace for %s: %v", n.Name, e.Name, err)
 	}
 	return module.Name, nil
 }

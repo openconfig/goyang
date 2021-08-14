@@ -225,7 +225,7 @@ func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
 		}
 	}
 	if found == nil {
-		return nil, fmt.Errorf("%s: no such namespace", ns)
+		return nil, fmt.Errorf("%q: no such namespace", ns)
 	}
 	// Don't cache negative results because new modules could be added.
 	ms.byNS[ns] = found
