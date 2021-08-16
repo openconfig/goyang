@@ -146,7 +146,7 @@ func (ms *Modules) add(n Node) error {
 
 	mod := n.(*Module)
 	fullName := mod.FullName()
-	mod.modules = ms
+	mod.Modules = ms
 
 	if o := m[fullName]; o != nil {
 		return fmt.Errorf("duplicate %s %s at %s and %s", kind, fullName, Source(o), Source(n))
