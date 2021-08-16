@@ -134,12 +134,9 @@ type Module struct {
 	Uses         []*Uses         `yang:"uses"`
 	YangVersion  *Value          `yang:"yang-version,nomerge"`
 
-	// modules is used to get back to the Modules structure
-	// when searching for a rooted element in the schema tree
-	// as the schema tree has multiple root elements.
-	// typedefs is a list of all top level typedefs in this
-	// module.
-	modules *Modules
+	// Modules references the Modules object from which this Module node
+	// was parsed.
+	Modules *Modules
 }
 
 func (s *Module) Kind() string {
