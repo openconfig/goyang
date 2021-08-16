@@ -31,6 +31,10 @@ type typeDictionary struct {
 	dict map[Node]map[string]*Typedef
 }
 
+func newTypeDictionary() *typeDictionary {
+	return &typeDictionary{dict: map[Node]map[string]*Typedef{}}
+}
+
 // typeDict is a protected global dictionary of all typedefs.
 // TODO(borman): should this be made as part of some other structure, rather
 // than a singleton.  That can be done later when we replumb everything to more

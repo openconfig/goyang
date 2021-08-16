@@ -33,13 +33,16 @@ import (
 // A yangStatement contains all information needed to build a particular
 // type of statement into an AST node.
 type yangStatement struct {
-	// funcs is the map of YANG field names to the function that handle them.
+	// funcs is the map of YANG field names to the function that populates
+	// the statement into the AST node.
 	funcs map[string]func(*Statement, reflect.Value, reflect.Value) error
 	// required is a list of fields that must be present in the statement.
 	required []string
-	// sRequired maps statement type to a list of required fields.
-	//    If a field is required by statement type foo, then only foo should
-	//    have the field.
+	// sRequired maps a statement name to a list of required sub-field
+	// names. The statement name can be an alias of the primary field type.
+	//    e.g. If a field is required by statement type foo, then only foo
+	//    should have the field. If bar is an alias of foo, it must not
+	//    have this field.
 	sRequired map[string][]string
 	// addext is the function to handle possible extensions.
 	addext func(*Statement, reflect.Value, reflect.Value) error
@@ -78,6 +81,12 @@ type meta struct {
 
 // aliases is a map of "aliased" names, that is, two types of statements
 // that parse (nearly) the same.
+// NOTE: This only works for root-level aliasing for now, which is good enough
+// for module/submodule. This is because yangStatement.funcs doesn't store the
+// handler function for aliased fields, and sRequired also may only store the
+// correct values when processing a root-level statement due to aliasing. These
+// issues would need to be fixed in order to support aliasing for non-top-level
+// statements.
 var aliases = map[string]string{
 	"submodule": "module",
 }
@@ -92,7 +101,6 @@ func BuildAST(s *Statement) (Node, error) {
 // root node. It also takes as input a type dictionary into which any
 // encountered typedefs within the statement are cached.
 func buildASTWithTypeDict(s *Statement, d *typeDictionary) (Node, error) {
-	initTypes(reflect.TypeOf(&meta{}), d)
 	v, err := build(s, nilValue, d)
 	if err != nil {
 		return nil, err

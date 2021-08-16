@@ -20,6 +20,7 @@ package yang
 
 import (
 	"fmt"
+	"reflect"
 )
 
 // Modules contains information about all the top level modules and
@@ -35,14 +36,16 @@ type Modules struct {
 
 // NewModules returns a newly created and initialized Modules.
 func NewModules() *Modules {
-	return &Modules{
+	ms := &Modules{
 		Modules:    map[string]*Module{},
 		SubModules: map[string]*Module{},
 		includes:   map[*Module]bool{},
 		byPrefix:   map[string]*Module{},
 		byNS:       map[string]*Module{},
-		typeDict:   &typeDictionary{dict: map[Node]map[string]*Typedef{}},
+		typeDict:   newTypeDictionary(),
 	}
+	initTypes(reflect.TypeOf(&meta{}), ms.typeDict)
+	return ms
 }
 
 // Read reads the named yang module into ms.  The name can be the name of an
