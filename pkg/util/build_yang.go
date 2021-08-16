@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package util contains goyang utility functions that could be useful for
+// external users.
 package util
 
 import (
@@ -20,11 +22,13 @@ import (
 	"github.com/openconfig/goyang/pkg/yang"
 )
 
-// ProcessModules takes a list of modules, and a path specification and
-// runs the yang parser against them, returning a slice of yang.Entry
-// pointers which represent the top level modules that are to be parsed
-// by the struct generation.
-func ProcessModules(yangf, path []string) (map[string]*yang.Entry, []error) {
+// ProcessModules takes a list of either module/submodule names or .yang file
+// paths, and a list of include paths. It runs the yang parser on the YANG
+// files by searching for them in the include paths or in the current
+// directory, returning a slice of yang.Entry pointers which represent the
+// parsed top level modules. It also returns a list of errors encountered while
+// parsing, if any.
+func ProcessModules(yangfiles, path []string) (map[string]*yang.Entry, []error) {
 	for _, p := range path {
 		yang.AddPath(fmt.Sprintf("%s/...", p))
 	}
@@ -32,7 +36,7 @@ func ProcessModules(yangf, path []string) (map[string]*yang.Entry, []error) {
 	ms := yang.NewModules()
 
 	var processErr []error
-	for _, name := range yangf {
+	for _, name := range yangfiles {
 		if err := ms.Read(name); err != nil {
 			processErr = append(processErr, err)
 		}
