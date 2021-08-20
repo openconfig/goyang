@@ -96,6 +96,9 @@ func getPrefix(s string) (string, string) {
 // relative to where n was defined.  If the prefix cannot be resolved then nil
 // is returned.
 func FindModuleByPrefix(n Node, prefix string) *Module {
+	if n == nil {
+		return nil
+	}
 	mod := RootNode(n)
 
 	if prefix == "" || prefix == mod.GetPrefix() {
@@ -104,6 +107,9 @@ func FindModuleByPrefix(n Node, prefix string) *Module {
 
 	for _, i := range mod.Import {
 		if prefix == i.Prefix.Name {
+			if i.Module == nil {
+				return mod.Modules.Modules[i.Name]
+			}
 			return i.Module
 		}
 	}

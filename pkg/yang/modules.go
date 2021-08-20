@@ -29,7 +29,6 @@ type Modules struct {
 	Modules    map[string]*Module // All "module" nodes
 	SubModules map[string]*Module // All "submodule" nodes
 	includes   map[*Module]bool   // Modules we have already done include on
-	byPrefix   map[string]*Module // Cache of prefix lookup
 	byNS       map[string]*Module // Cache of namespace lookup
 	typeDict   *typeDictionary    // Cache for type definitions.
 }
@@ -40,7 +39,6 @@ func NewModules() *Modules {
 		Modules:    map[string]*Module{},
 		SubModules: map[string]*Module{},
 		includes:   map[*Module]bool{},
-		byPrefix:   map[string]*Module{},
 		byNS:       map[string]*Module{},
 		typeDict:   newTypeDictionary(),
 	}
@@ -232,34 +230,6 @@ func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
 	}
 	// Don't cache negative results because new modules could be added.
 	ms.byNS[ns] = found
-	return found, nil
-}
-
-// FindModuleByPrefix either returns the Module specified by prefix or returns
-// an error.
-// TODO(wenovus): This should be deprecated since prefixes are not unique among
-// modules.
-func (ms *Modules) FindModuleByPrefix(prefix string) (*Module, error) {
-	if m, ok := ms.byPrefix[prefix]; ok {
-		return m, nil
-	}
-	var found *Module
-	for _, m := range ms.Modules {
-		if m.Prefix.Name == prefix {
-			switch {
-			case m == found:
-			case found != nil:
-				return nil, fmt.Errorf("prefix %s matches two or more modules (%s, %s)", prefix, found.Name, m.Name)
-			default:
-				found = m
-			}
-		}
-	}
-	if found == nil {
-		return nil, fmt.Errorf("%s: no such prefix", prefix)
-	}
-	// Don't cache negative results because new modules could be added.
-	ms.byPrefix[prefix] = found
 	return found, nil
 }
 

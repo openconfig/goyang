@@ -94,40 +94,6 @@ func testModulesFindByCommonHandler(t *testing.T, i int, got, want *Module, want
 	}
 }
 
-func TestModulesFindByPrefix(t *testing.T) {
-	ms := testModulesForTestdataModulesText(t)
-
-	for i, tc := range []struct {
-		prefix    string
-		want      *Module
-		wantError string
-	}{
-		{
-			prefix:    "does-not-exist",
-			wantError: "does-not-exist: no such prefix",
-		},
-		{
-			prefix: "foo",
-			want:   ms.Modules["foo"],
-		},
-		{
-			prefix: "bar",
-			want:   ms.Modules["bar"],
-		},
-		{
-			prefix: "baz",
-			want:   ms.Modules["baz"],
-		},
-		{
-			prefix:    "duplicate",
-			wantError: "prefix duplicate matches two or more modules (dup-pre-",
-		},
-	} {
-		got, err := ms.FindModuleByPrefix(tc.prefix)
-		testModulesFindByCommonHandler(t, i, got, tc.want, tc.wantError, err)
-	}
-}
-
 func TestModulesFindByNamespace(t *testing.T) {
 	ms := testModulesForTestdataModulesText(t)
 

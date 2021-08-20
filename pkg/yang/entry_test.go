@@ -1156,9 +1156,9 @@ module defaults {
 	} {
 		tname := strings.Join(tc.path, "/")
 
-		mod, err := ms.FindModuleByPrefix("defaults")
-		if err != nil {
-			t.Fatalf("[%d_%s] module not found: %v", i, tname, err)
+		mod, ok := ms.Modules["defaults"]
+		if !ok {
+			t.Fatalf("[%d] module not found: %q", i, tname)
 		}
 		defaults := ToEntry(mod)
 		dir, err := getdir(defaults, tc.path...)
