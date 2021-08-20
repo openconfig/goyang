@@ -1242,10 +1242,7 @@ func (e *Entry) Find(name string) *Entry {
 			e = e.Parent
 		}
 		if prefix, _ := getPrefix(parts[0]); prefix != "" {
-			m := FindModuleByPrefix(contextNode, prefix)
-			if m.Kind() == "submodule" {
-				m = m.Modules.Modules[m.BelongsTo.Name]
-			}
+			m := module(FindModuleByPrefix(contextNode, prefix))
 			if m == nil {
 				e.addError(fmt.Errorf("cannot find module giving prefix %q within context entry %q", prefix, e.Path()))
 				return nil
