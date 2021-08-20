@@ -185,13 +185,14 @@ func (s *Module) GetPrefix() string {
 	return pfx.Name
 }
 
+// getPrefix returns the local prefix of the module used to refer to itself.
 func (s *Module) getPrefix() *Value {
 	switch {
 	case s == nil:
 		return nil
-	case s.Prefix != nil:
+	case s.Kind() == "module" && s.Prefix != nil:
 		return s.Prefix
-	case s.BelongsTo != nil:
+	case s.Kind() == "submodule" && s.BelongsTo != nil:
 		return s.BelongsTo.Prefix
 	default:
 		return nil

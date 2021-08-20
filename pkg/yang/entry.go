@@ -1243,7 +1243,7 @@ func (e *Entry) Find(name string) *Entry {
 
 		// Since this module might use a different prefix that isn't
 		// the prefix that the module itself uses then we need to resolve
-		// the module into its local prefix to find it.
+		// the remotely-used prefix into its locally-used prefix to find it.
 		pfxMap := map[string]string{
 			// Seed the map with the local module - we use GetPrefix just
 			// in case the module is a submodule.
