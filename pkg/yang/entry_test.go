@@ -1532,7 +1532,6 @@ func TestFullModuleProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		ms := NewModules()
-		mergedSubmodule = map[string]bool{}
 
 		ParseOptions.IgnoreSubmoduleCircularDependencies = tt.inIgnoreCircDeps
 		for n, m := range tt.inModules {
@@ -3200,7 +3199,6 @@ func TestDeviation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			ms := NewModules()
-			mergedSubmodule = map[string]bool{}
 
 			for name, mod := range tt.inFiles {
 				if err := ms.Parse(mod, name); err != nil {

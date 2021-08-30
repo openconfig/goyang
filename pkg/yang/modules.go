@@ -31,17 +31,27 @@ type Modules struct {
 	byPrefix   map[string]*Module // Cache of prefix lookup
 	byNS       map[string]*Module // Cache of namespace lookup
 	typeDict   *typeDictionary    // Cache for type definitions.
+	// entryCache is used to prevent unnecessary recursion into previously
+	// converted nodes.
+	entryCache map[Node]*Entry
+	// mergedSubmodule is used to prevent re-parsing a submodule that has already
+	// been merged into a particular entity when circular dependencies are being
+	// ignored. The keys of the map are a string that is formed by concatenating
+	// the name of the including (sub)module and the included submodule.
+	mergedSubmodule map[string]bool
 }
 
 // NewModules returns a newly created and initialized Modules.
 func NewModules() *Modules {
 	ms := &Modules{
-		Modules:    map[string]*Module{},
-		SubModules: map[string]*Module{},
-		includes:   map[*Module]bool{},
-		byPrefix:   map[string]*Module{},
-		byNS:       map[string]*Module{},
-		typeDict:   newTypeDictionary(),
+		Modules:         map[string]*Module{},
+		SubModules:      map[string]*Module{},
+		includes:        map[*Module]bool{},
+		byPrefix:        map[string]*Module{},
+		byNS:            map[string]*Module{},
+		typeDict:        newTypeDictionary(),
+		mergedSubmodule: map[string]bool{},
+		entryCache:      map[Node]*Entry{},
 	}
 	return ms
 }
@@ -327,8 +337,8 @@ func (ms *Modules) process() []error {
 func (ms *Modules) Process() []error {
 	// Reset globals that may remain stale if multiple Process() calls are
 	// made by the same caller.
-	mergedSubmodule = map[string]bool{}
-	entryCache = map[Node]*Entry{}
+	ms.mergedSubmodule = map[string]bool{}
+	ms.entryCache = map[Node]*Entry{}
 
 	errs := ms.process()
 	if len(errs) > 0 {
