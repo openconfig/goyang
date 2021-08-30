@@ -40,15 +40,6 @@ func newTypeDictionary() *typeDictionary {
 	}
 }
 
-// typeDict is a protected global dictionary of all typedefs.
-// TODO(borman): should this be made as part of some other structure, rather
-// than a singleton.  That can be done later when we replumb everything to more
-// or less pass around an extra pointer.  That is not needed until such time
-// that we plan for a single application to process completely independent YANG
-// modules where there may be conflicts between the modules or we plan to
-// process them completely independently of eachother.
-var typeDict = typeDictionary{dict: map[Node]map[string]*Typedef{}}
-
 // add adds an entry to the typeDictionary d.
 func (d *typeDictionary) add(n Node, name string, td *Typedef) {
 	defer d.mu.Unlock()

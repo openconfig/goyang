@@ -95,12 +95,6 @@ var aliases = map[string]string{
 	"submodule": "module",
 }
 
-// BuildAST builds an abstract syntax tree based on the yang statement s.
-// Normally it should return a *Module.
-func BuildAST(s *Statement) (Node, error) {
-	return buildASTWithTypeDict(s, &typeDict)
-}
-
 // buildASTWithTypeDict creates an AST for the input statement, and returns its
 // root node. It also takes as input a type dictionary into which any
 // encountered typedefs within the statement are cached.
