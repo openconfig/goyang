@@ -32,7 +32,7 @@ func TestBGP(t *testing.T) {
 		t.Fatalf("got %d results, want 1", len(ss))
 	}
 	typeDict := newTypeDictionary()
-	initTypes(reflect.TypeOf(&meta{}), typeDict)
+	initTypes(reflect.TypeOf(&meta{}))
 	if _, err := buildASTWithTypeDict(ss[0], typeDict); err != nil {
 		t.Fatal(err)
 	}

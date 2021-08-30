@@ -30,12 +30,16 @@ import (
 	"strings"
 )
 
+func init() {
+	initTypes(reflect.TypeOf(&meta{}))
+}
+
 // A yangStatement contains all information needed to build a particular
 // type of statement into an AST node.
 type yangStatement struct {
 	// funcs is the map of YANG field names to the function that populates
 	// the statement into the AST node.
-	funcs map[string]func(*Statement, reflect.Value, reflect.Value) error
+	funcs map[string]func(*Statement, reflect.Value, reflect.Value, *typeDictionary) error
 	// required is a list of fields that must be present in the statement.
 	required []string
 	// sRequired maps a statement name to a list of required sub-field
@@ -51,7 +55,7 @@ type yangStatement struct {
 // newYangStatement creates a new yangStatement.
 func newYangStatement() *yangStatement {
 	return &yangStatement{
-		funcs:     make(map[string]func(*Statement, reflect.Value, reflect.Value) error),
+		funcs:     make(map[string]func(*Statement, reflect.Value, reflect.Value, *typeDictionary) error),
 		sRequired: make(map[string][]string),
 	}
 }
@@ -143,13 +147,13 @@ func build(s *Statement, p reflect.Value, d *typeDictionary) (v reflect.Value, e
 
 	if fn := y.funcs["Name"]; fn != nil {
 		// Name uses s directly.
-		if err := fn(s, v, p); err != nil {
+		if err := fn(s, v, p, d); err != nil {
 			return nilValue, err
 		}
 	}
 	if fn := y.funcs["Statement"]; fn != nil {
 		// Statement uses s directly.
-		if err := fn(s, v, p); err != nil {
+		if err := fn(s, v, p, d); err != nil {
 			return nilValue, err
 		}
 	}
@@ -160,7 +164,7 @@ func build(s *Statement, p reflect.Value, d *typeDictionary) (v reflect.Value, e
 		// p.IsValid will true if p is references a concrete type
 		// (even if it is nil).
 		if p.IsValid() {
-			if err := fn(s, v, p); err != nil {
+			if err := fn(s, v, p, d); err != nil {
 				return nilValue, err
 			}
 		}
@@ -174,7 +178,7 @@ func build(s *Statement, p reflect.Value, d *typeDictionary) (v reflect.Value, e
 		switch {
 		case fn != nil:
 			// Normal case, the keyword is known.
-			if err := fn(ss, v, p); err != nil {
+			if err := fn(ss, v, p, d); err != nil {
 				return nilValue, err
 			}
 		case len(strings.Split(ss.Keyword, ":")) == 2:
@@ -232,13 +236,14 @@ func build(s *Statement, p reflect.Value, d *typeDictionary) (v reflect.Value, e
 //
 // The functions have the form:
 //
-//	 func fn(ss *Statement, v, p reflect.Value) error
+//	 func fn(ss *Statement, v, p reflect.Value, d *typeDictionary) error
 //
 // Given s as a Statement of type at, ss is a substatement of s (in a few
 // exceptional cases, ss is the Statement itself).  v must have the same type
 // as at and is the structure being filled in.  p is the parent Node, or nil.
-// p is only used to set the Parent field of a Node.  For example, given the
-// following structure and variables:
+// d is the type dictionary cache of the current set of modules being parsed,
+// which is used for looking up typedefs.  p is only used to set the Parent
+// field of a Node.  For example, given the following structure and variables:
 //
 //	type Include struct {
 //		Name         string       `yang:"Name"`
@@ -259,7 +264,7 @@ func build(s *Statement, p reflect.Value, d *typeDictionary) (v reflect.Value, e
 // ds, of s that has the keyword "revision-date" along with the value of
 // vInc and its parent:
 //
-//	typeMap[tInc]["revision-date"](ss, vInc, parent)
+//	typeMap[tInc]["revision-date"](ss, vInc, parent, d)
 //
 // Normal fields are all processed this same way.
 //
@@ -286,7 +291,7 @@ func build(s *Statement, p reflect.Value, d *typeDictionary) (v reflect.Value, e
 //                   (This is to support merging Module and SubModule).
 //
 // If at contains substructures, initTypes recurses on the substructures.
-func initTypes(at reflect.Type, d *typeDictionary) {
+func initTypes(at reflect.Type) {
 	if at.Kind() != reflect.Ptr || at.Elem().Kind() != reflect.Struct {
 		panic(fmt.Sprintf("interface not a struct pointer, is %v", at))
 	}
@@ -343,7 +348,7 @@ func initTypes(at reflect.Type, d *typeDictionary) {
 			switch nameMap[name] {
 			case nil:
 				nameMap[name] = dt
-				initTypes(dt, d) // Make sure that structure type is included
+				initTypes(dt) // Make sure that structure type is included
 			case dt:
 			default:
 				panic("redeclared type " + name)
@@ -353,7 +358,7 @@ func initTypes(at reflect.Type, d *typeDictionary) {
 		// Create a function, fn, that will build the field from a
 		// Statement.  These functions are used when actually making
 		// an AST from a Statement Tree.
-		var fn func(*Statement, reflect.Value, reflect.Value) error
+		var fn func(*Statement, reflect.Value, reflect.Value, *typeDictionary) error
 
 		// The field can be a pointer, a slice or a string
 		switch f.Type.Kind() {
@@ -365,7 +370,7 @@ func initTypes(at reflect.Type, d *typeDictionary) {
 			if name != "Parent" {
 				panic(fmt.Sprintf("interface field is %s, not Parent", name))
 			}
-			fn = func(s *Statement, v, p reflect.Value) error {
+			fn = func(s *Statement, v, p reflect.Value, d *typeDictionary) error {
 				if !p.Type().Implements(nodeType) {
 					panic(fmt.Sprintf("invalid interface: %v", f.Type.Kind()))
 				}
@@ -377,7 +382,7 @@ func initTypes(at reflect.Type, d *typeDictionary) {
 			if name != "Name" {
 				panic(fmt.Sprintf("string field is %s, not Name", name))
 			}
-			fn = func(s *Statement, v, _ reflect.Value) error {
+			fn = func(s *Statement, v, _ reflect.Value, d *typeDictionary) error {
 				if v.Type() != at {
 					panic(fmt.Sprintf("got type %v, want %v", v.Type(), at))
 				}
@@ -397,7 +402,7 @@ func initTypes(at reflect.Type, d *typeDictionary) {
 				if name != "Statement" {
 					panic(fmt.Sprintf("string field is %s, not Statement", name))
 				}
-				fn = func(s *Statement, v, _ reflect.Value) error {
+				fn = func(s *Statement, v, _ reflect.Value, d *typeDictionary) error {
 					if v.Type() != at {
 						panic(fmt.Sprintf("got type %v, want %v", v.Type(), at))
 					}
@@ -410,7 +415,7 @@ func initTypes(at reflect.Type, d *typeDictionary) {
 			// Make sure our field type is also setup.
 			descend(name, f.Type)
 
-			fn = func(s *Statement, v, p reflect.Value) error {
+			fn = func(s *Statement, v, p reflect.Value, d *typeDictionary) error {
 				if v.Type() != at {
 					panic(fmt.Sprintf("given type %s, need type %s", v.Type(), at))
 				}
@@ -439,7 +444,7 @@ func initTypes(at reflect.Type, d *typeDictionary) {
 				panic(fmt.Sprintf("invalid type: %v", st.Kind()))
 			case reflect.Ptr:
 				descend(name, st)
-				fn = func(s *Statement, v, p reflect.Value) error {
+				fn = func(s *Statement, v, p reflect.Value, d *typeDictionary) error {
 					if v.Type() != at {
 						panic(fmt.Sprintf("given type %s, need type %s", v.Type(), at))
 					}
