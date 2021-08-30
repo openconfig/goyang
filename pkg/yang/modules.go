@@ -39,6 +39,10 @@ type Modules struct {
 	// ignored. The keys of the map are a string that is formed by concatenating
 	// the name of the including (sub)module and the included submodule.
 	mergedSubmodule map[string]bool
+	// ParseOptions sets the options for the current YANG module parsing. It can be
+	// directly set by the caller to influence how goyang will behave in the presence
+	// of certain exceptional cases.
+	ParseOptions Options
 }
 
 // NewModules returns a newly created and initialized Modules.
