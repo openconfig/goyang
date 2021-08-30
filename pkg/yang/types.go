@@ -29,10 +29,15 @@ import (
 type typeDictionary struct {
 	mu   sync.Mutex
 	dict map[Node]map[string]*Typedef
+	// identities contains a dictionary of resolved identities.
+	identities identityDictionary
 }
 
 func newTypeDictionary() *typeDictionary {
-	return &typeDictionary{dict: map[Node]map[string]*Typedef{}}
+	return &typeDictionary{
+		dict:       map[Node]map[string]*Typedef{},
+		identities: identityDictionary{dict: map[string]resolvedIdentity{}},
+	}
 }
 
 // typeDict is a protected global dictionary of all typedefs.
