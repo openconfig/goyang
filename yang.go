@@ -92,11 +92,12 @@ func main() {
 	var traceP string
 	var help bool
 	var paths []string
+	var ignoreSubmoduleCircularDependencies bool
 	getopt.ListVarLong(&paths, "path", 'p', "comma separated list of directories to add to search path", "DIR[,DIR...]")
 	getopt.StringVarLong(&format, "format", 'f', "format to display: "+strings.Join(formats, ", "), "FORMAT")
 	getopt.StringVarLong(&traceP, "trace", 't', "write trace into to TRACEFILE", "TRACEFILE")
 	getopt.BoolVarLong(&help, "help", 'h', "display help")
-	getopt.BoolVarLong(&yang.ParseOptions.IgnoreSubmoduleCircularDependencies, "ignore-circdep", 'g', "ignore circular dependencies between submodules")
+	getopt.BoolVarLong(&ignoreSubmoduleCircularDependencies, "ignore-circdep", 'g', "ignore circular dependencies between submodules")
 	getopt.SetParameters("[FORMAT OPTIONS] [SOURCE] [...]")
 
 	if err := getopt.Getopt(func(o getopt.Option) bool {
@@ -169,6 +170,7 @@ Formats:
 	files := getopt.Args()
 
 	ms := yang.NewModules()
+	ms.ParseOptions.IgnoreSubmoduleCircularDependencies = ignoreSubmoduleCircularDependencies
 
 	if len(files) == 0 {
 		data, err := ioutil.ReadAll(os.Stdin)
