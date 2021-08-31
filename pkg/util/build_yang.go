@@ -29,11 +29,11 @@ import (
 // parsed top level modules. It also returns a list of errors encountered while
 // parsing, if any.
 func ProcessModules(yangfiles, path []string) (map[string]*yang.Entry, []error) {
-	for _, p := range path {
-		yang.AddPath(fmt.Sprintf("%s/...", p))
-	}
-
 	ms := yang.NewModules()
+
+	for _, p := range path {
+		ms.AddPath(fmt.Sprintf("%s/...", p))
+	}
 
 	var processErr []error
 	for _, name := range yangfiles {

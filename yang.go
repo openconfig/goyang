@@ -149,13 +149,16 @@ Formats:
 		stop(0)
 	}
 
+	ms := yang.NewModules()
+	ms.ParseOptions.IgnoreSubmoduleCircularDependencies = ignoreSubmoduleCircularDependencies
+
 	for _, path := range paths {
 		expanded, err := yang.PathsWithModules(path)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			continue
 		}
-		yang.AddPath(expanded...)
+		ms.AddPath(expanded...)
 	}
 
 	if format == "" {
@@ -168,9 +171,6 @@ Formats:
 	}
 
 	files := getopt.Args()
-
-	ms := yang.NewModules()
-	ms.ParseOptions.IgnoreSubmoduleCircularDependencies = ignoreSubmoduleCircularDependencies
 
 	if len(files) == 0 {
 		data, err := ioutil.ReadAll(os.Stdin)
