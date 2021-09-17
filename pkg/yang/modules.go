@@ -18,7 +18,10 @@ package yang
 // include and import statements, which must be done prior to turning the
 // module into an Entry tree.
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 // Modules contains information about all the top level modules and
 // submodules that are read into it via its Read method.
@@ -28,6 +31,7 @@ type Modules struct {
 	includes   map[*Module]bool   // Modules we have already done include on
 	byPrefix   map[string]*Module // Cache of prefix lookup
 	byNS       map[string]*Module // Cache of namespace lookup
+	mu         sync.Mutex
 }
 
 // NewModules returns a newly created and initialized Modules.
@@ -200,6 +204,9 @@ func (ms *Modules) FindModule(n Node) *Module {
 // FindModuleByNamespace either returns the Module specified by the namespace
 // or returns an error.
 func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
 	if m, ok := ms.byNS[ns]; ok {
 		if m == nil {
 			return nil, fmt.Errorf("%s: no such namespace", ns)
@@ -229,6 +236,9 @@ func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
 // FindModuleByPrefix either returns the Module specified by prefix or returns
 // an error.
 func (ms *Modules) FindModuleByPrefix(prefix string) (*Module, error) {
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
 	if m, ok := ms.byPrefix[prefix]; ok {
 		if m == nil {
 			return nil, fmt.Errorf("%s: no such prefix", prefix)
