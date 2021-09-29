@@ -835,6 +835,11 @@ func (s *Identity) PrefixedName() string {
 	return fmt.Sprintf("%s:%s", RootNode(s).GetPrefix(), s.Name)
 }
 
+// modulePrefixedName returns the module-qualified name for the identity.
+func (s *Identity) modulePrefixedName() string {
+	return fmt.Sprintf("%s:%s", module(s).Name, s.Name)
+}
+
 // IsDefined behaves the same as the implementation for Enum - it returns
 // true if an identity with the name is defined within the Values of the
 // identity

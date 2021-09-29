@@ -152,6 +152,17 @@ func RootNode(n Node) *Module {
 	return nil
 }
 
+// module returns the Module to which n belongs. If n resides in a submodule,
+// the belonging module will be returned.
+// If n is nil or a module could not be find, nil is returned.
+func module(n Node) *Module {
+	m := RootNode(n)
+	if m.Kind() == "submodule" {
+		m = m.Modules.Modules[m.BelongsTo.Name]
+	}
+	return m
+}
+
 // NodePath returns the full path of the node from the module name.
 func NodePath(n Node) string {
 	var path string
