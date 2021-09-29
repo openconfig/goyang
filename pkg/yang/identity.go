@@ -29,7 +29,7 @@ type identityDictionary struct {
 	// dict is a global cache of identities keyed by
 	// modulename:identityname, where modulename is the full name of the
 	// module to which the identity belongs. If the identity were defined
-	// in a submodule, then the belonging module name is used instead.
+	// in a submodule, then the parent module name is used instead.
 	dict map[string]resolvedIdentity
 }
 
@@ -107,9 +107,7 @@ func (mod *Module) findIdentityBase(baseStr string) (*resolvedIdentity, []error)
 				fmt.Errorf("%s: can't find external module with prefix %s", source, basePrefix))
 			break
 		}
-		// The identity we are looking for is modulename:basename.  If
-		// we already know modulename:basename then just use it.  If not,
-		// try again within the module identified by prefix.
+		// The identity we are looking for is modulename:basename.
 		if id, ok := identities.dict[fmt.Sprintf("%s:%s", module(extmod).Name, baseName)]; ok {
 			base = id
 			break
