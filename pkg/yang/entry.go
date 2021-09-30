@@ -1093,7 +1093,16 @@ func (e *Entry) ApplyDeviate() []error {
 					}
 
 					if devSpec.Default != "" {
-						deviatedNode.Default = ""
+						switch dt {
+						case DeviationAdd:
+							if deviatedNode.Default != "" {
+								appendErr(fmt.Errorf("tried to deviate add a default statement when one already exists: %q", deviatedNode.Default))
+							} else {
+								deviatedNode.Default = devSpec.Default
+							}
+						case DeviationReplace:
+							deviatedNode.Default = devSpec.Default
+						}
 					}
 
 					if devSpec.Mandatory != TSUnset {
@@ -1136,8 +1145,12 @@ func (e *Entry) ApplyDeviate() []error {
 						deviatedNode.Config = TSUnset
 					}
 
-					if devSpec.Default == "" {
-						deviatedNode.Default = ""
+					if devSpec.Default != "" {
+						if devSpec.Default == deviatedNode.Default {
+							deviatedNode.Default = ""
+						} else {
+							appendErr(fmt.Errorf("%s: tried to deviate delete a default statement that doesn't exist or with a non-matching keyword", Source(e.Node)))
+						}
 					}
 
 					if devSpec.Mandatory != TSUnset {
@@ -1336,7 +1349,7 @@ func (e *Entry) InstantiatingModule() (string, error) {
 
 	module, err := e.Modules().FindModuleByNamespace(n.Name)
 	if err != nil {
-		return "", fmt.Errorf("could not find module %q when retrieving namespace for %s", n.Name, e.Name)
+		return "", fmt.Errorf("could not find module %q when retrieving namespace for %s: %v", n.Name, e.Name, err)
 	}
 	return module.Name, nil
 }

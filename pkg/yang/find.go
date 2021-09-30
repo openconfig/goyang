@@ -28,7 +28,8 @@ func localPrefix(n Node) string {
 }
 
 // trimLocalPrefix trims the current module's prefix from the given name. If the
-// name is not prefixed with it, the same string is returned unchanged.
+// name is not prefixed with the local module's prefix or is unprefixed
+// entirely, then the same string is returned unchanged.
 func trimLocalPrefix(n Node, name string) string {
 	pfx := localPrefix(n)
 	if pfx != "" {
@@ -58,6 +59,8 @@ func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 		v = e.FieldByName("Import")
 		if v.IsValid() {
 			for _, i := range v.Interface().([]*Import) {
+				// If the prefix matches the import statement,
+				// then search for the trimmed name in that module.
 				pname := strings.TrimPrefix(name, i.Prefix.Name+":")
 				if pname == name {
 					continue

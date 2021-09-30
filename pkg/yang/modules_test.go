@@ -104,7 +104,7 @@ func TestModulesFindByNamespace(t *testing.T) {
 	}{
 		{
 			namespace: "does-not-exist",
-			wantError: "does-not-exist: no such namespace",
+			wantError: `"does-not-exist": no such namespace`,
 		},
 		{
 			namespace: "urn:foo",
