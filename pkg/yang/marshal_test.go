@@ -662,7 +662,7 @@ func TestParseAndMarshal(t *testing.T) {
       "Name": "DERIVED"
     }
   ],
-  "Extra": {
+  "extra-unsupported-unstable": {
     "namespace": [
       {
         "Name": "urn:t",
@@ -741,7 +741,7 @@ func TestParseAndMarshal(t *testing.T) {
       ]
     }
   },
-  "Extra": {
+  "extra-unsupported-unstable": {
     "namespace": [
       {
         "Name": "urn:t",
@@ -766,7 +766,7 @@ func TestParseAndMarshal(t *testing.T) {
       "Argument": "e"
     }
   },
-  "Extra": {
+  "extra-unsupported-unstable": {
     "extension": [
       {
         "Name": "foobar",
