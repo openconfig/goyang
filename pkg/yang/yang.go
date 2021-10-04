@@ -134,12 +134,9 @@ type Module struct {
 	Uses         []*Uses         `yang:"uses"`
 	YangVersion  *Value          `yang:"yang-version,nomerge"`
 
-	// modules is used to get back to the Modules structure
-	// when searching for a rooted element in the schema tree
-	// as the schema tree has multiple root elements.
-	// typedefs is a list of all top level typedefs in this
-	// module.
-	modules *Modules
+	// Modules references the Modules object from which this Module node
+	// was parsed.
+	Modules *Modules
 }
 
 func (s *Module) Kind() string {
@@ -188,13 +185,14 @@ func (s *Module) GetPrefix() string {
 	return pfx.Name
 }
 
+// getPrefix returns the local prefix of the module used to refer to itself.
 func (s *Module) getPrefix() *Value {
 	switch {
 	case s == nil:
 		return nil
-	case s.Prefix != nil:
+	case s.Kind() == "module" && s.Prefix != nil:
 		return s.Prefix
-	case s.BelongsTo != nil:
+	case s.Kind() == "submodule" && s.BelongsTo != nil:
 		return s.BelongsTo.Prefix
 	default:
 		return nil
@@ -838,6 +836,11 @@ func (s *Identity) Exts() []*Statement    { return s.Extensions }
 // PrefixedName returns the prefix-qualified name for the identity
 func (s *Identity) PrefixedName() string {
 	return fmt.Sprintf("%s:%s", RootNode(s).GetPrefix(), s.Name)
+}
+
+// modulePrefixedName returns the module-qualified name for the identity.
+func (s *Identity) modulePrefixedName() string {
+	return fmt.Sprintf("%s:%s", module(s).Name, s.Name)
 }
 
 // IsDefined behaves the same as the implementation for Enum - it returns

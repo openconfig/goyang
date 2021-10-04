@@ -20,6 +20,7 @@ package yang
 
 import (
 	"fmt"
+	"reflect"
 )
 
 // Modules contains information about all the top level modules and
@@ -28,21 +29,21 @@ type Modules struct {
 	Modules    map[string]*Module // All "module" nodes
 	SubModules map[string]*Module // All "submodule" nodes
 	includes   map[*Module]bool   // Modules we have already done include on
-	byPrefix   map[string]*Module // Cache of prefix lookup
 	byNS       map[string]*Module // Cache of namespace lookup
 	typeDict   *typeDictionary    // Cache for type definitions.
 }
 
 // NewModules returns a newly created and initialized Modules.
 func NewModules() *Modules {
-	return &Modules{
+	ms := &Modules{
 		Modules:    map[string]*Module{},
 		SubModules: map[string]*Module{},
 		includes:   map[*Module]bool{},
-		byPrefix:   map[string]*Module{},
 		byNS:       map[string]*Module{},
-		typeDict:   &typeDictionary{dict: map[Node]map[string]*Typedef{}},
+		typeDict:   newTypeDictionary(),
 	}
+	initTypes(reflect.TypeOf(&meta{}), ms.typeDict)
+	return ms
 }
 
 // Read reads the named yang module into ms.  The name can be the name of an
@@ -143,7 +144,7 @@ func (ms *Modules) add(n Node) error {
 
 	mod := n.(*Module)
 	fullName := mod.FullName()
-	mod.modules = ms
+	mod.Modules = ms
 
 	if o := m[fullName]; o != nil {
 		return fmt.Errorf("duplicate %s %s at %s and %s", kind, fullName, Source(o), Source(n))
@@ -225,38 +226,10 @@ func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
 		}
 	}
 	if found == nil {
-		return nil, fmt.Errorf("%s: no such namespace", ns)
+		return nil, fmt.Errorf("%q: no such namespace", ns)
 	}
 	// Don't cache negative results because new modules could be added.
 	ms.byNS[ns] = found
-	return found, nil
-}
-
-// FindModuleByPrefix either returns the Module specified by prefix or returns
-// an error.
-// TODO(wenovus): This should be deprecated since prefixes are not unique among
-// modules.
-func (ms *Modules) FindModuleByPrefix(prefix string) (*Module, error) {
-	if m, ok := ms.byPrefix[prefix]; ok {
-		return m, nil
-	}
-	var found *Module
-	for _, m := range ms.Modules {
-		if m.Prefix.Name == prefix {
-			switch {
-			case m == found:
-			case found != nil:
-				return nil, fmt.Errorf("prefix %s matches two or more modules (%s, %s)", prefix, found.Name, m.Name)
-			default:
-				found = m
-			}
-		}
-	}
-	if found == nil {
-		return nil, fmt.Errorf("%s: no such prefix", prefix)
-	}
-	// Don't cache negative results because new modules could be added.
-	ms.byPrefix[prefix] = found
 	return found, nil
 }
 

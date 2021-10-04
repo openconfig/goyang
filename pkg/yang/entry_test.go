@@ -161,7 +161,6 @@ module base {
 
 func TestBadYang(t *testing.T) {
 	for _, tt := range badInputs {
-		typeDict = typeDictionary{dict: map[Node]map[string]*Typedef{}}
 		ms := NewModules()
 		if err := ms.Parse(tt.in, tt.name); err != nil {
 			t.Fatalf("unexpected error %s", err)
@@ -406,7 +405,7 @@ func TestEntryNamespace(t *testing.T) {
 			descr:        "leaf directly defined within an augment to foo from orphan submodule qux-augment has empty namespace",
 			entry:        foo.Dir["foo-c"].Dir["qux-submod-leaf"],
 			ns:           "",
-			wantModError: `could not find module "" when retrieving namespace for qux-submod-leaf`,
+			wantModError: `could not find module "" when retrieving namespace for qux-submod-leaf: "": no such namespace`,
 		},
 		{
 			descr:   "children of a container within an augment to from baz have baz's namespace",
@@ -1296,9 +1295,9 @@ module defaults {
 	} {
 		tname := strings.Join(tc.path, "/")
 
-		mod, err := ms.FindModuleByPrefix("defaults")
-		if err != nil {
-			t.Fatalf("[%d_%s] module not found: %v", i, tname, err)
+		mod, ok := ms.Modules["defaults"]
+		if !ok {
+			t.Fatalf("[%d] module not found: %q", i, tname)
 		}
 		defaults := ToEntry(mod)
 		dir, err := getdir(defaults, tc.path...)
@@ -2449,6 +2448,74 @@ func TestEntryFind(t *testing.T) {
 			"/t:e/t:operation/t:output": "/test/e/operation/output",
 		},
 	}, {
+		name: "submodule find",
+		inModules: map[string]string{
+			"test.yang": `
+				module test {
+					prefix "t";
+					namespace "urn:t";
+
+					include test1;
+
+					leaf a { type string; }
+					leaf b { type string; }
+
+					container c { leaf d { type string; } }
+
+                    rpc rpc1 {
+                        input { leaf input1 { type string; } }
+                    }
+
+                    container e {
+                        action operation {
+                          description "action";
+                          input { leaf input1 { type string; } }
+                          output { leaf output1 { type string; } }
+                        }
+                    }
+
+				}
+			`,
+			"test1.yang": `
+				submodule test1 {
+					belongs-to test {
+						prefix "t";
+					}
+
+					leaf d { type string; }
+				}
+			`,
+		},
+		inBaseEntryPath: "/test/d",
+		wantEntryPath: map[string]string{
+			// Absolute path with no prefixes.
+			"/b": "/test/b",
+			// Relative path with no prefixes.
+			"../b": "/test/b",
+			// Absolute path with prefixes.
+			"/t:b": "/test/b",
+			// Relative path with prefixes.
+			"../t:b": "/test/b",
+			// Find within a directory.
+			"/c/d": "/test/c/d",
+			// Find within a directory specified relatively.
+			"../c/d": "/test/c/d",
+			// Find within a relative directory with prefixes.
+			"../t:c/t:d": "/test/c/d",
+			"../t:c/d":   "/test/c/d",
+			"../c/t:d":   "/test/c/d",
+			// Find within an absolute directory with prefixes.
+			"/t:c/d":                    "/test/c/d",
+			"/c/t:d":                    "/test/c/d",
+			"../t:rpc1/input":           "/test/rpc1/input",
+			"/t:rpc1/input":             "/test/rpc1/input",
+			"/t:rpc1/t:input":           "/test/rpc1/input",
+			"/t:e/operation/input":      "/test/e/operation/input",
+			"/t:e/operation/output":     "/test/e/operation/output",
+			"/t:e/t:operation/t:input":  "/test/e/operation/input",
+			"/t:e/t:operation/t:output": "/test/e/operation/output",
+		},
+	}, {
 		name: "inter-module find",
 		inModules: map[string]string{
 			"test.yang": `
@@ -3273,6 +3340,7 @@ func TestDeviation(t *testing.T) {
 		},
 	}, {
 		// TODO(wenovus): Support deviate delete for leaf-lists once its semantics are clear.
+		// https://github.com/mbj4668/pyang/issues/756
 		desc: "error case - deviation delete on a leaf-list",
 		inFiles: map[string]string{
 			"deviate": `

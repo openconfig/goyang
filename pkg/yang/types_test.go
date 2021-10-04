@@ -343,7 +343,7 @@ func TestTypeResolve(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			// We can initialize a value to ourself, so to it here.
-			errs := tt.in.resolve(&typeDict)
+			errs := tt.in.resolve(newTypeDictionary())
 
 			// TODO(borman):  Do not hack out Root and Base.  These
 			// are hacked out for now because they can be self-referential,
@@ -910,10 +910,12 @@ func TestTypeResolveUnions(t *testing.T) {
 	}}
 
 	getTestLeaf := func(ms *Modules) (*YangType, error) {
-		m, err := ms.FindModuleByPrefix("t")
-		if err != nil {
-			return nil, fmt.Errorf("can't find module in %v", ms)
+		const module = "test"
+		m, ok := ms.Modules[module]
+		if !ok {
+			return nil, fmt.Errorf("can't find module %q", module)
 		}
+
 		if len(m.Leaf) == 0 {
 			return nil, fmt.Errorf("node %v is missing imports", m)
 		}
@@ -1219,10 +1221,12 @@ func TestPattern(t *testing.T) {
 	}}
 
 	getTestLeaf := func(ms *Modules) (*YangType, error) {
-		m, err := ms.FindModuleByPrefix("t")
-		if err != nil {
-			return nil, fmt.Errorf("can't find module in %v", ms)
+		const module = "test"
+		m, ok := ms.Modules[module]
+		if !ok {
+			return nil, fmt.Errorf("can't find module %q", module)
 		}
+
 		if len(m.Leaf) == 0 {
 			return nil, fmt.Errorf("node %v is missing imports", m)
 		}

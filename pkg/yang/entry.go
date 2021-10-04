@@ -172,7 +172,7 @@ func (e *Entry) Modules() *Modules {
 	for e.Parent != nil {
 		e = e.Parent
 	}
-	return e.Node.(*Module).modules
+	return e.Node.(*Module).Modules
 }
 
 // IsDir returns true if e is a directory.
@@ -544,7 +544,7 @@ func ToEntry(n Node) (e *Entry) {
 			Errors: []error{err},
 		}
 	}
-	ms := RootNode(n).modules
+	ms := RootNode(n).Modules
 	if e := entryCache[n]; e != nil {
 		return e
 	}
@@ -1280,48 +1280,18 @@ func (e *Entry) Find(name string) *Entry {
 	// If parts[0] is "" then this path started with a /
 	// and we need to find our parent.
 	if parts[0] == "" {
+		parts = parts[1:]
+		contextNode := e.Node
 		for e.Parent != nil {
 			e = e.Parent
 		}
-		parts = parts[1:]
-
-		// Since this module might use a different prefix that isn't
-		// the prefix that the module itself uses then we need to resolve
-		// the module into its local prefix to find it.
-		pfxMap := map[string]string{
-			// Seed the map with the local module - we use GetPrefix just
-			// in case the module is a submodule.
-			e.Node.(*Module).GetPrefix(): e.Prefix.Name,
-		}
-
-		// Add a map between the prefix used in the import statement, and
-		// the prefix that is used in the module itself.
-		for _, i := range e.Node.(*Module).Import {
-			// Resolve the module using the current module set, since we may
-			// not have populated the Module for the entry yet.
-			m, ok := e.Node.(*Module).modules.Modules[i.Name]
-			if !ok {
-				e.addError(fmt.Errorf("cannot find a module with name %s when looking at imports in %s", i.Name, e.Path()))
-				return nil
-			}
-
-			pfxMap[i.Prefix.Name] = m.Prefix.Name
-		}
-
 		if prefix, _ := getPrefix(parts[0]); prefix != "" {
-			pfx, ok := pfxMap[prefix]
-			if !ok {
-				// This is an undefined prefix within our context, so
-				// we can't do anything about resolving it.
-				e.addError(fmt.Errorf("invalid module prefix %s within module %s, defined prefix map: %v", prefix, e.Name, pfxMap))
+			m := module(FindModuleByPrefix(contextNode, prefix))
+			if m == nil {
+				e.addError(fmt.Errorf("cannot find module giving prefix %q within context entry %q", prefix, e.Path()))
 				return nil
 			}
-			m, err := e.Modules().FindModuleByPrefix(pfx)
-			if err != nil {
-				e.addError(err)
-				return nil
-			}
-			if e.Node.(*Module) != m {
+			if m != e.Node.(*Module) {
 				e = ToEntry(m)
 			}
 		}
@@ -1384,7 +1354,7 @@ func (e *Entry) Namespace() *Value {
 	if e != nil && e.Node != nil {
 		if root := RootNode(e.Node); root != nil {
 			if root.Kind() == "submodule" {
-				root = root.modules.Modules[root.BelongsTo.Name]
+				root = root.Modules.Modules[root.BelongsTo.Name]
 				if root == nil {
 					return new(Value)
 				}
@@ -1410,7 +1380,7 @@ func (e *Entry) InstantiatingModule() (string, error) {
 
 	module, err := e.Modules().FindModuleByNamespace(n.Name)
 	if err != nil {
-		return "", fmt.Errorf("could not find module %q when retrieving namespace for %s", n.Name, e.Name)
+		return "", fmt.Errorf("could not find module %q when retrieving namespace for %s: %v", n.Name, e.Name, err)
 	}
 	return module.Name, nil
 }

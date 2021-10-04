@@ -31,6 +31,10 @@ type typeDictionary struct {
 	dict map[Node]map[string]*Typedef
 }
 
+func newTypeDictionary() *typeDictionary {
+	return &typeDictionary{dict: map[Node]map[string]*Typedef{}}
+}
+
 // typeDict is a protected global dictionary of all typedefs.
 // TODO(borman): should this be made as part of some other structure, rather
 // than a singleton.  That can be done later when we replumb everything to more
@@ -60,7 +64,7 @@ func (d *typeDictionary) find(n Node, name string) *Typedef {
 	return d.dict[n][name]
 }
 
-// findExternal finds the externally defined typedef name in the module imported
+// findExternal finds the externally-defined typedef name in a module imported
 // by n's root with the specified prefix.
 func (d *typeDictionary) findExternal(n Node, prefix, name string) (*Typedef, error) {
 	root := FindModuleByPrefix(n, prefix)
