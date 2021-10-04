@@ -242,7 +242,7 @@ type YangType struct {
 	Enum             *EnumType   `json:",omitempty"` // enum name to value, "status" is lost
 	Units            string      `json:",omitempty"` // units to be used for this type
 	Default          string      `json:",omitempty"` // default value, if any
-	HasDefault       bool        `json:",omitempty"` // Whether the type has a default.
+	HasDefault       bool        `json:",omitempty"` // whether the type has a default.
 	FractionDigits   int         `json:",omitempty"` // decimal64 fixed point precision
 	Length           YangRange   `json:",omitempty"` // this should be processed by section 12
 	OptionalInstance bool        `json:",omitempty"` // !require-instances which defaults to true
