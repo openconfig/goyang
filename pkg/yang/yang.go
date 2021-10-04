@@ -179,13 +179,14 @@ func (s *Module) GetPrefix() string {
 	return pfx.Name
 }
 
+// getPrefix returns the local prefix of the module used to refer to itself.
 func (s *Module) getPrefix() *Value {
 	switch {
 	case s == nil:
 		return nil
-	case s.Prefix != nil:
+	case s.Kind() == "module" && s.Prefix != nil:
 		return s.Prefix
-	case s.BelongsTo != nil:
+	case s.Kind() == "submodule" && s.BelongsTo != nil:
 		return s.BelongsTo.Prefix
 	default:
 		return nil
@@ -826,6 +827,11 @@ func (s *Identity) Exts() []*Statement    { return s.Extensions }
 // PrefixedName returns the prefix-qualified name for the identity
 func (s *Identity) PrefixedName() string {
 	return fmt.Sprintf("%s:%s", RootNode(s).GetPrefix(), s.Name)
+}
+
+// modulePrefixedName returns the module-qualified name for the identity.
+func (s *Identity) modulePrefixedName() string {
+	return fmt.Sprintf("%s:%s", module(s).Name, s.Name)
 }
 
 // IsDefined behaves the same as the implementation for Enum - it returns

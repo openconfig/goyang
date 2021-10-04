@@ -199,6 +199,7 @@ func (r YRange) String() string {
 	return r.Min.String() + ".." + r.Max.String()
 }
 
+// Equal compares whether two YRanges are equal.
 func (r YRange) Equal(s YRange) bool {
 	return r.Min.Equal(s.Min) && r.Max.Equal(s.Max)
 }
@@ -284,7 +285,7 @@ func (r YangRange) Contains(s YangRange) bool {
 	ri := 0
 	for _, ss := range s {
 		for r[ri].Max.Less(ss.Min) {
-			ri += 1
+			ri++
 			if ri == len(r) {
 				return false
 			}

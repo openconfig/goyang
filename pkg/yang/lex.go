@@ -145,7 +145,7 @@ func newLexer(input, path string) *lexer {
 		file:   path,
 		input:  input,
 		line:   1, // humans start with 1
-		items:  make(chan *token, 3),
+		items:  make(chan *token, maxErrors),
 		state:  lexGround,
 		errout: os.Stderr,
 	}
@@ -187,12 +187,15 @@ func (l *lexer) emitText(c code, text string) {
 	if l.debug {
 		fmt.Fprintf(os.Stderr, "%v: %q\n", c, text)
 	}
-	l.items <- &token{
+	select {
+	case l.items <- &token{
 		code: c,
 		Text: text,
 		File: l.file,
 		Line: l.sline,
 		Col:  l.scol + 1,
+	}:
+	default:
 	}
 	l.consume()
 }
@@ -330,11 +333,14 @@ func (l *lexer) ErrorfAt(line, col int, f string, v ...interface{}) {
 // If more than maxErrors are encountered, a "too many errors" message is
 // displayed and processing stops (by clearing the input).
 func (l *lexer) adderror(err []byte) {
-	if l.errcnt >= maxErrors {
+	if l.errcnt == maxErrors {
 		l.pos = 0
 		l.start = 0
 		l.input = ""
 		l.errout.Write([]byte(tooMany))
+		l.errcnt++
+		return
+	} else if l.errcnt == maxErrors+1 {
 		return
 	}
 	l.errout.Write(err)
