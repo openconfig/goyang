@@ -626,7 +626,6 @@ func ToEntry(n Node) (e *Entry) {
 			e.addError(err)
 		}
 		e.Prefix = getRootPrefix(e)
-		addExtraKeywordsToLeafEntry(n, e)
 		return e
 	case *Uses:
 		g := FindGrouping(s, s.Name, map[string]bool{})
@@ -1035,14 +1034,7 @@ func addExtraKeywordsToLeafEntry(n Node, e *Entry) {
 
 func addToExtrasSlice(fv reflect.Value, name string, e *Entry) {
 	if fv.Kind() == reflect.Slice {
-	outerLoop:
 		for j := 0; j < fv.Len(); j++ {
-			for _, en := range e.Extra[name] {
-				if en == fv.Index(j).Interface() {
-					// Don't add again if identical
-					continue outerLoop
-				}
-			}
 			e.Extra[name] = append(e.Extra[name], fv.Index(j).Interface())
 		}
 	} else {
