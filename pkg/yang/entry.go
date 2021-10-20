@@ -120,7 +120,7 @@ type Entry struct {
 	Uses            []*UsesStmt `json:",omitempty"` // Uses merged into this entry.
 
 	// Extra maps all the unsupported fields to their values
-	Extra map[string][]interface{} `json:"-"`
+	Extra map[string][]interface{} `json:"extra-unstable,omitempty"`
 
 	// Annotation stores annotated values, and is not populated by this
 	// library but rather can be used by calling code where additional
@@ -626,7 +626,6 @@ func ToEntry(n Node) (e *Entry) {
 			e.addError(err)
 		}
 		e.Prefix = getRootPrefix(e)
-		addExtraKeywordsToLeafEntry(n, e)
 		return e
 	case *Uses:
 		g := FindGrouping(s, s.Name, map[string]bool{})
@@ -980,7 +979,9 @@ func ToEntry(n Node) (e *Entry) {
 			"unique",
 			"when",
 			"yang-version":
-			e.Extra[name] = append(e.Extra[name], fv.Interface())
+			if !fv.IsNil() {
+				addToExtrasSlice(fv, name, e)
+			}
 			continue
 
 		case "Ext", "Name", "Parent", "Statement":
@@ -1024,8 +1025,20 @@ func addExtraKeywordsToLeafEntry(n Node, e *Entry) {
 			"reference",
 			"status",
 			"when":
-			e.Extra[name] = append(e.Extra[name], fv.Interface())
+			if !fv.IsNil() {
+				addToExtrasSlice(fv, name, e)
+			}
 		}
+	}
+}
+
+func addToExtrasSlice(fv reflect.Value, name string, e *Entry) {
+	if fv.Kind() == reflect.Slice {
+		for j := 0; j < fv.Len(); j++ {
+			e.Extra[name] = append(e.Extra[name], fv.Index(j).Interface())
+		}
+	} else {
+		e.Extra[name] = append(e.Extra[name], fv.Interface())
 	}
 }
 

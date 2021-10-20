@@ -2006,13 +2006,18 @@ func TestIfFeature(t *testing.T) {
 		if len(extra) == 0 {
 			return nil
 		}
-		return extra[0].([]*Value)
+		values := make([]*Value, len(extra))
+		for i, ex := range extra {
+			values[i] = ex.(*Value)
+		}
+		return values
 	}
 
 	featureByName := func(e *Entry, name string) *Feature {
-		for _, f := range e.Extra["feature"][0].([]*Feature) {
-			if f.Name == name {
-				return f
+		for _, f := range e.Extra["feature"] {
+			ft := f.(*Feature)
+			if ft.Name == name {
+				return ft
 			}
 		}
 		return nil
