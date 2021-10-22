@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -26,9 +27,16 @@ import (
 // TODO(borman): encapsulate all of this someday so you can parse
 // two completely independent yang files with different Paths.
 
-// Path is the list of directories to look for .yang files in.
-var Path []string
-var pathMap = map[string]bool{} // prevent adding dups in Path
+var (
+	// Path is the list of directories to look for .yang files in.
+	Path []string
+	// pathMap is used to prevent adding dups in Path.
+	pathMap = map[string]bool{}
+
+	// revisionDateSuffixRegex matches on the revision-date portion of a YANG
+	// file's name.
+	revisionDateSuffixRegex = regexp.MustCompile(`^@\d{4}-\d{2}-\d{2}\.yang$`)
+)
 
 // AddPath adds the directories specified in p, a colon separated list
 // of directory names, to Path, if they are not already in Path. Using
@@ -126,27 +134,32 @@ func findFile(name string) (string, string, error) {
 
 // findInDir looks for a file named name in dir or any of its subdirectories if
 // recurse is true. if recurse is false, scan only the directory dir.
+// If no matching file is found, an empty string is returned.
+//
+// The file SHOULD have the following name, per
+// https://tools.ietf.org/html/rfc7950#section-5.2:
+// module-or-submodule-name ['@' revision-date] '.yang'
+// where revision-date = 4DIGIT "-" 2DIGIT "-" 2DIGIT
+//
+// If a perfect name match is found, then that file's path is returned.
+// Else if file(s) with otherwise matching names but which contain a
+// revision-date pattern exactly matching the above are found, then path of the
+// one with the latest date is returned.
 func findInDir(dir, name string, recurse bool) string {
 	fis, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return ""
 	}
-	var candidates []string
-	mname := name
-	if strings.HasSuffix(mname, ".yang") {
-		mname = name[:len(name)-len(".yang")]
-	}
 
+	var revisions []string
+	mname := strings.TrimSuffix(name, ".yang")
 	for _, fi := range fis {
 		switch {
 		case !fi.IsDir():
 			if fn := fi.Name(); fn == name {
 				return filepath.Join(dir, name)
-			} else if !strings.Contains(name, "@") {
-				// the query had no revision-date so look for candidate revisions
-				if strings.HasPrefix(fn, mname+"@") && strings.HasSuffix(fn, ".yang") {
-					candidates = append(candidates, fn)
-				}
+			} else if strings.HasPrefix(fn, mname) && revisionDateSuffixRegex.MatchString(strings.TrimPrefix(fn, mname)) {
+				revisions = append(revisions, fn)
 			}
 		case recurse:
 			if n := findInDir(filepath.Join(dir, fi.Name()), name, recurse); n != "" {
@@ -154,12 +167,9 @@ func findInDir(dir, name string, recurse bool) string {
 			}
 		}
 	}
-	if len(candidates) == 0 {
+	if len(revisions) == 0 {
 		return ""
 	}
-	// sort the candidates and return the ultimate ("highest") value, which in
-	// the case of revision-date fields per the module file name format (RFC6020
-	// section 5.2) should be the newest candidate.
-	sort.Strings(candidates)
-	return filepath.Join(dir, candidates[len(candidates)-1])
+	sort.Strings(revisions)
+	return filepath.Join(dir, revisions[len(revisions)-1])
 }

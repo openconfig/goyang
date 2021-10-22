@@ -31,6 +31,10 @@ type typeDictionary struct {
 	dict map[Node]map[string]*Typedef
 }
 
+func newTypeDictionary() *typeDictionary {
+	return &typeDictionary{dict: map[Node]map[string]*Typedef{}}
+}
+
 // typeDict is a protected global dictionary of all typedefs.
 // TODO(borman): should this be made as part of some other structure, rather
 // than a singleton.  That can be done later when we replumb everything to more
@@ -60,7 +64,7 @@ func (d *typeDictionary) find(n Node, name string) *Typedef {
 	return d.dict[n][name]
 }
 
-// findExternal finds the externally defined typedef name in the module imported
+// findExternal finds the externally-defined typedef name in a module imported
 // by n's root with the specified prefix.
 func (d *typeDictionary) findExternal(n Node, prefix, name string) (*Typedef, error) {
 	root := FindModuleByPrefix(n, prefix)
@@ -92,37 +96,37 @@ func (d *typeDictionary) typedefs() []*Typedef {
 // addTypedefs is called from BuildAST after each Typedefer is defined.  There
 // are no error conditions in this process as it is simply used to build up the
 // typedef dictionary.
-func addTypedefs(t Typedefer) {
+func (d *typeDictionary) addTypedefs(t Typedefer) {
 	for _, td := range t.Typedefs() {
-		typeDict.add(t, td.Name, td)
+		d.add(t, td.Name, td)
 	}
 }
 
 // resolveTypedefs is called after all of modules and submodules have been read,
 // as well as their imports and includes.  It resolves all typedefs found in all
 // modules and submodules read in.
-func resolveTypedefs() []error {
+func (d *typeDictionary) resolveTypedefs() []error {
 	var errs []error
 
 	// When resolve typedefs, we may need to look up other typedefs.
 	// We gather all typedefs into a slice so we don't deadlock on
 	// typeDict.
-	for _, td := range typeDict.typedefs() {
-		errs = append(errs, td.resolve()...)
+	for _, td := range d.typedefs() {
+		errs = append(errs, td.resolve(d)...)
 	}
 	return errs
 }
 
 // resolve creates a YangType for t, if not already done.  Resolving t
 // requires resolving the Type that t is based on.
-func (t *Typedef) resolve() []error {
+func (t *Typedef) resolve(d *typeDictionary) []error {
 	// If we have no parent we are a base type and
 	// are already resolved.
 	if t.Parent == nil || t.YangType != nil {
 		return nil
 	}
 
-	if errs := t.Type.resolve(); len(errs) != 0 {
+	if errs := t.Type.resolve(d); len(errs) != 0 {
 		return errs
 	}
 
@@ -158,7 +162,7 @@ func (t *Typedef) resolve() []error {
 
 // resolve resolves Type t, as well as the underlying typedef for t.  If t
 // cannot be resolved then one or more errors are returned.
-func (t *Type) resolve() (errs []error) {
+func (t *Type) resolve(d *typeDictionary) (errs []error) {
 	if t.YangType != nil {
 		return nil
 	}
@@ -182,13 +186,13 @@ check:
 		// If we have no prefix, or the prefix is what we call our own
 		// root, then we look in our ancestors for a typedef of name.
 		for n := Node(t); n != nil; n = n.ParentNode() {
-			if td = typeDict.find(n, name); td != nil {
+			if td = d.find(n, name); td != nil {
 				break check
 			}
 		}
 		// We need to check our sub-modules as well
 		for _, in := range root.Include {
-			if td = typeDict.find(in.Module, name); td != nil {
+			if td = d.find(in.Module, name); td != nil {
 				break check
 			}
 		}
@@ -208,12 +212,12 @@ check:
 		// what module it is part of and if it is defined at the top
 		// level of that module.
 		var err error
-		td, err = typeDict.findExternal(t, prefix, name)
+		td, err = d.findExternal(t, prefix, name)
 		if err != nil {
 			return []error{err}
 		}
 	}
-	if errs := td.resolve(); len(errs) > 0 {
+	if errs := td.resolve(d); len(errs) > 0 {
 		return errs
 	}
 
@@ -398,7 +402,7 @@ check:
 	// so we have to check equality the hard way.
 looking:
 	for _, ut := range t.Type {
-		errs = append(errs, ut.resolve()...)
+		errs = append(errs, ut.resolve(d)...)
 		if ut.YangType != nil {
 			for _, yt := range y.Type {
 				if ut.YangType.Equal(yt) {

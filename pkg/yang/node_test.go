@@ -79,9 +79,10 @@ func TestNode(t *testing.T) {
 		desc: "import reference statement",
 		inFn: func(ms *Modules) (Node, error) {
 
-			m, err := ms.FindModuleByPrefix("t")
-			if err != nil {
-				return nil, fmt.Errorf("can't find module in %v", ms)
+			const module = "test"
+			m, ok := ms.Modules[module]
+			if !ok {
+				return nil, fmt.Errorf("can't find module %q", module)
 			}
 
 			if len(m.Import) == 0 {
@@ -125,12 +126,142 @@ func TestNode(t *testing.T) {
 			return nil
 		},
 	}, {
+		desc: "get submodule from prefix in submodule",
+		inFn: func(ms *Modules) (Node, error) {
+
+			m, ok := ms.SubModules["foo"]
+			if !ok {
+				return nil, fmt.Errorf("can't find submodule in %v", ms)
+			}
+
+			if m.BelongsTo == nil {
+				return nil, fmt.Errorf("node %v is missing belongs-to", m)
+			}
+
+			return m.BelongsTo, nil
+		},
+		inModules: map[string]string{
+			"test": `
+				module test {
+					prefix "t";
+					namespace "urn:t";
+
+					include foo {
+						revision-date 2008-01-01;
+					}
+				}
+			`,
+			"foo": `
+				submodule foo {
+					belongs-to test {
+					  prefix "t";
+					}
+				}
+			`,
+		},
+		wantNode: func(n Node) error {
+			is, ok := n.(*BelongsTo)
+			if !ok {
+				return fmt.Errorf("got node: %v, want type: belongs-to", n)
+			}
+
+			switch {
+			case is.Prefix == nil:
+				return errors.New("did not get expected reference, got: nil, want: *yang.Statement")
+			case is.Prefix.Statement().Argument != "t":
+				return fmt.Errorf("did not get expected reference, got: %v, want: 't'", is.Prefix.Statement())
+			}
+
+			m := FindModuleByPrefix(is, is.Prefix.Statement().Argument)
+			if m == nil {
+				return fmt.Errorf("can't find module from submodule's belongs-to prefix value")
+			}
+			if want := "foo"; m.Name != want {
+				return fmt.Errorf("module from submodule's belongs-to prefix value doesn't match, got %q, want %q", m.Name, want)
+			}
+
+			return nil
+		},
+	}, {
+		desc: "import statement from submodule",
+		inFn: func(ms *Modules) (Node, error) {
+
+			m, ok := ms.SubModules["foo"]
+			if !ok {
+				return nil, fmt.Errorf("can't find submodule in %v", ms)
+			}
+
+			if len(m.Import) == 0 {
+				return nil, fmt.Errorf("node %v is missing import statement", m)
+			}
+
+			return m.Import[0], nil
+		},
+		inModules: map[string]string{
+			"test": `
+				module test {
+					prefix "t";
+					namespace "urn:t";
+
+					include foo {
+						revision-date 2008-01-01;
+					}
+
+					typedef t {
+						type string;
+					}
+				}
+			`,
+			"foo": `
+				submodule foo {
+					belongs-to test {
+					  prefix "t";
+					}
+
+					import test2 {
+						prefix "t2";
+						description "test2 module";
+					}
+				}
+			`,
+			"test2": `
+				module test2 {
+					prefix "t2";
+					namespace "urn:t2";
+				}
+			`,
+		},
+		wantNode: func(n Node) error {
+			is, ok := n.(*Import)
+			if !ok {
+				return fmt.Errorf("got node: %v, want type: belongs-to", n)
+			}
+
+			switch {
+			case is.Prefix == nil:
+				return errors.New("did not get expected reference, got: nil, want: *yang.Statement")
+			case is.Prefix.Statement().Argument != "t2":
+				return fmt.Errorf("did not get expected reference, got: %v, want: 't'", is.Prefix.Statement())
+			}
+
+			m := FindModuleByPrefix(is, is.Prefix.Statement().Argument)
+			if m == nil {
+				return fmt.Errorf("can't find module from submodule's import prefix value")
+			}
+			if want := "test2"; m.Name != want {
+				return fmt.Errorf("module from submodule's import prefix value doesn't match, got %q, want %q", m.Name, want)
+			}
+
+			return nil
+		},
+	}, {
 		desc: "import description statement",
 		inFn: func(ms *Modules) (Node, error) {
 
-			m, err := ms.FindModuleByPrefix("t")
-			if err != nil {
-				return nil, fmt.Errorf("can't find module in %v", ms)
+			const module = "test"
+			m, ok := ms.Modules[module]
+			if !ok {
+				return nil, fmt.Errorf("can't find module %q", module)
 			}
 
 			if len(m.Import) == 0 {
@@ -174,21 +305,22 @@ func TestNode(t *testing.T) {
 			return nil
 		},
 	}, {
-		desc: "Test MatchingExtensions",
+		desc: "Test matchingExtensions",
 		inFn: func(ms *Modules) (Node, error) {
 
-			m, err := ms.FindModuleByPrefix("t")
-			if err != nil {
-				return nil, fmt.Errorf("can't find module in %v", ms)
+			module := "test"
+			m, ok := ms.Modules[module]
+			if !ok {
+				return nil, fmt.Errorf("can't find module %q", module)
 			}
 
 			if len(m.Leaf) == 0 {
 				return nil, fmt.Errorf("node %v is missing imports", m)
 			}
 
-			_, err = ms.FindModuleByPrefix("f")
-			if err != nil {
-				return nil, err
+			module = "foo"
+			if _, ok := ms.Modules[module]; !ok {
+				return nil, fmt.Errorf("can't find module %q", module)
 			}
 
 			return m.Leaf[0].Type, nil
@@ -267,7 +399,7 @@ func TestNode(t *testing.T) {
 			}
 
 			var bars []string
-			matches, err := MatchingExtensions(n, "foo", "bar")
+			matches, err := matchingExtensions(n, n.Exts(), "foo", "bar")
 			if err != nil {
 				return err
 			}
@@ -276,27 +408,28 @@ func TestNode(t *testing.T) {
 			}
 
 			if diff := cmp.Diff(bars, []string{"boo", "coo", "foo"}); diff != "" {
-				return fmt.Errorf("MatchingExtensions (-got, +want):\n%s", diff)
+				return fmt.Errorf("matchingExtensions (-got, +want):\n%s", diff)
 			}
 
 			return nil
 		},
 	}, {
-		desc: "Test MatchingExtensions when module is not found",
+		desc: "Test matchingExtensions when module is not found",
 		inFn: func(ms *Modules) (Node, error) {
 
-			m, err := ms.FindModuleByPrefix("t")
-			if err != nil {
-				return nil, fmt.Errorf("can't find module in %v", ms)
+			module := "test"
+			m, ok := ms.Modules[module]
+			if !ok {
+				return nil, fmt.Errorf("can't find module %q", module)
 			}
 
 			if len(m.Leaf) == 0 {
 				return nil, fmt.Errorf("node %v is missing imports", m)
 			}
 
-			_, err = ms.FindModuleByPrefix("f")
-			if err != nil {
-				return nil, err
+			module = "foo"
+			if _, ok := ms.Modules[module]; !ok {
+				return nil, fmt.Errorf("can't find module %q", module)
 			}
 
 			return m.Leaf[0].Type, nil
@@ -342,7 +475,7 @@ func TestNode(t *testing.T) {
 			}
 
 			var bars []string
-			matches, err := MatchingExtensions(n, "foo", "bar")
+			matches, err := matchingExtensions(n, n.Exts(), "foo", "bar")
 			if err != nil {
 				return err
 			}
@@ -351,7 +484,7 @@ func TestNode(t *testing.T) {
 			}
 
 			if diff := cmp.Diff(bars, []string{"boo", "coo", "foo"}); diff != "" {
-				return fmt.Errorf("MatchingExtensions (-got, +want):\n%s", diff)
+				return fmt.Errorf("matchingExtensions (-got, +want):\n%s", diff)
 			}
 
 			return nil
@@ -390,6 +523,99 @@ func TestNode(t *testing.T) {
 
 			if err := tt.wantNode(node); err != nil {
 				t.Fatalf("failed check function, %v", err)
+			}
+		})
+	}
+}
+
+func TestModulesFindByPrefix(t *testing.T) {
+	// Some examples of where prefixes might be used are in the following
+	// YANG statements: extension, uses, augment, deviation, type, leafref.
+	// Not all are put into the test here, since the logic is the same for
+	// each.
+	modules := map[string]string{
+		"foo": `module foo { prefix "foo"; namespace "urn:foo"; include bar; leaf leafref { type leafref { path "../foo:leaf"; } } uses foo:lg; }`,
+		"bar": `submodule bar { belongs-to foo { prefix "bar"; } container c { uses bar:lg; } grouping lg { leaf leaf { type string; } } }`,
+		"baz": `module baz { prefix "foo"; namespace "urn:foo"; import foo { prefix f; } extension e; uses f:lg; foo:e; }`,
+	}
+
+	ms := NewModules()
+	for name, modtext := range modules {
+		if err := ms.Parse(modtext, name+".yang"); err != nil {
+			t.Fatalf("error parsing module %q: %v", name, err)
+		}
+	}
+	if errs := ms.Process(); errs != nil {
+		for _, err := range errs {
+			t.Errorf("error: %v", err)
+		}
+		t.Fatalf("fatal error(s) calling Process()")
+	}
+
+	for _, tt := range []struct {
+		desc   string
+		node   Node
+		prefix string
+		want   *Module
+	}{
+		{
+			desc:   "nil node",
+			node:   nil,
+			prefix: "does-not-exist",
+			want:   nil,
+		},
+		{
+			desc:   "module foo",
+			node:   ms.Modules["foo"],
+			prefix: "foo",
+			want:   ms.Modules["foo"],
+		},
+		{
+			desc:   "submodule bar",
+			node:   ms.SubModules["bar"],
+			prefix: "bar",
+			want:   ms.SubModules["bar"],
+		},
+		{
+			desc:   "module baz",
+			node:   ms.Modules["baz"],
+			prefix: "foo",
+			want:   ms.Modules["baz"],
+		},
+		{
+			desc:   "foo leafref",
+			node:   ms.Modules["foo"].Leaf[0].Type,
+			prefix: "foo",
+			want:   ms.Modules["foo"],
+		},
+		{
+			desc:   "foo uses",
+			node:   ms.Modules["foo"].Uses[0],
+			prefix: "foo",
+			want:   ms.Modules["foo"],
+		},
+		{
+			desc:   "bar uses",
+			node:   ms.SubModules["bar"].Container[0].Uses[0],
+			prefix: "bar",
+			want:   ms.SubModules["bar"],
+		},
+		{
+			desc:   "baz uses",
+			node:   ms.Modules["baz"].Uses[0],
+			prefix: "f",
+			want:   ms.Modules["foo"],
+		},
+		{
+			desc:   "baz extension",
+			node:   ms.Modules["baz"],
+			prefix: "foo",
+			want:   ms.Modules["baz"],
+		},
+	} {
+		t.Run(tt.desc, func(t *testing.T) {
+			if got := FindModuleByPrefix(tt.node, tt.prefix); got != tt.want {
+				t.Errorf("got: %v, want: %v", got, tt.want)
 			}
 		})
 	}

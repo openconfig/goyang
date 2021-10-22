@@ -71,9 +71,13 @@ type deviationPresence struct {
 	hasMaxElements bool
 }
 
-// An Entry represents a single node (directory or leaf) created from the
-// AST.  Directory entries have a non-nil Dir entry.  Leaf nodes have a nil
-// Dir entry.  If Errors is not nil then the only other valid field is Node.
+// Entry represents a single schema tree node, which can be a directory
+// (containing a subtree) or a leaf node (which contains YANG types that have
+// no children, e.g., leaf, leaf-list). They can be distinguished by whether
+// their "Dir" field is nil. This object is created from a corresponding AST
+// node after applying modifications (i.e. uses, augments, deviations). If
+// Errors is not nil then it means semantic errors existed while converting the
+// AST, in which case the only other valid field other than Errors is Node.
 type Entry struct {
 	Parent      *Entry    `json:"-"`
 	Node        Node      `json:"-"` // the base node this Entry was derived from.
@@ -92,8 +96,10 @@ type Entry struct {
 	Key string            `json:",omitempty"` // Optional key name for lists (i.e., maps)
 
 	// Fields associated with leaf nodes
-	Type *YangType    `json:",omitempty"`
-	Exts []*Statement `json:",omitempty"` // extensions found
+	Type *YangType `json:",omitempty"`
+
+	// Extensions found
+	Exts []*Statement `json:",omitempty"`
 
 	// Fields associated with list nodes (both lists and leaf-lists)
 	ListAttr *ListAttr `json:",omitempty"`
@@ -114,7 +120,7 @@ type Entry struct {
 	Uses            []*UsesStmt `json:",omitempty"` // Uses merged into this entry.
 
 	// Extra maps all the unsupported fields to their values
-	Extra map[string][]interface{} `json:"-"`
+	Extra map[string][]interface{} `json:"extra-unstable,omitempty"`
 
 	// Annotation stores annotated values, and is not populated by this
 	// library but rather can be used by calling code where additional
@@ -163,7 +169,7 @@ func (e *Entry) Modules() *Modules {
 	for e.Parent != nil {
 		e = e.Parent
 	}
-	return e.Node.(*Module).modules
+	return e.Node.(*Module).Modules
 }
 
 // IsDir returns true if e is a directory.
@@ -301,7 +307,7 @@ func newLeaf(n Node) *Entry {
 	}
 }
 
-// newError returns an error node using format and v to create the error
+// newError returns an error Entry using format and v to create the error
 // contained in the node.  The location of the error is prepended.
 func newError(n Node, format string, v ...interface{}) *Entry {
 	e := &Entry{Node: n}
@@ -309,7 +315,7 @@ func newError(n Node, format string, v ...interface{}) *Entry {
 	return e
 }
 
-// errorf appends the entry constructed from string and v to the list of errors
+// errorf appends the error constructed from string and v to the list of errors
 // on e.
 func (e *Entry) errorf(format string, v ...interface{}) {
 	e.Errors = append(e.Errors, fmt.Errorf(format, v...))
@@ -529,12 +535,13 @@ func semCheckMinElements(v *Value) (uint64, error) {
 // if there were any errors.
 func ToEntry(n Node) (e *Entry) {
 	if n == nil {
-		err := errors.New("ToEntry called with nil")
+		err := errors.New("ToEntry called on nil AST node")
 		return &Entry{
 			Node:   &ErrorNode{Error: err},
 			Errors: []error{err},
 		}
 	}
+	ms := RootNode(n).Modules
 	if e := entryCache[n]; e != nil {
 		return e
 	}
@@ -572,7 +579,7 @@ func ToEntry(n Node) (e *Entry) {
 	switch s := n.(type) {
 	case *Leaf:
 		e := newLeaf(n)
-		if errs := s.Type.resolve(); errs != nil {
+		if errs := s.Type.resolve(ms.typeDict); errs != nil {
 			e.Errors = errs
 		}
 		if s.Description != nil {
@@ -582,7 +589,6 @@ func ToEntry(n Node) (e *Entry) {
 			e.Default = s.Default.Name
 		}
 		e.Type = s.Type.YangType
-		entryCache[n] = e
 		e.Config, err = tristateValue(s.Config)
 		e.addError(err)
 		e.Prefix = getRootPrefix(e)
@@ -609,7 +615,7 @@ func ToEntry(n Node) (e *Entry) {
 			When:        s.When,
 		}
 
-		e := ToEntry(leaf)
+		e = ToEntry(leaf)
 		e.ListAttr = NewDefaultListAttr()
 		e.ListAttr.OrderedBy = s.OrderedBy
 		var err error
@@ -620,7 +626,6 @@ func ToEntry(n Node) (e *Entry) {
 			e.addError(err)
 		}
 		e.Prefix = getRootPrefix(e)
-		addExtraKeywordsToLeafEntry(n, e)
 		return e
 	case *Uses:
 		g := FindGrouping(s, s.Name, map[string]bool{})
@@ -630,7 +635,7 @@ func ToEntry(n Node) (e *Entry) {
 		// We need to return a duplicate so we resolve properly
 		// when the group is used in multiple locations and the
 		// grouping has a leafref that references outside the group.
-		e := ToEntry(g).dup()
+		e = ToEntry(g).dup()
 		addExtraKeywordsToLeafEntry(n, e)
 		return e
 	}
@@ -673,8 +678,7 @@ func ToEntry(n Node) (e *Entry) {
 		e.Kind = DeviateEntry
 	}
 
-	// Use Elem to get the Value of structure that n is pointing to, not
-	// the Value of the pointer.
+	// Use Elem to get the Value of structure that n is pointing to.
 	v := reflect.ValueOf(n).Elem()
 	t := v.Type()
 	found := false
@@ -738,8 +742,8 @@ func ToEntry(n Node) (e *Entry) {
 				e.importErrors(ToEntry(a))
 			}
 		case "import":
-			// Apparently import only makes types and such
-			// available.  There is nothing else for us to do.
+			// Import only makes types and such available.
+			// There is nothing else for us to do.
 		case "include":
 			for _, a := range fv.Interface().([]*Include) {
 				// Handle circular dependencies between submodules. This can occur in
@@ -862,7 +866,7 @@ func ToEntry(n Node) (e *Entry) {
 			}
 
 			if n.Type != nil {
-				if errs := n.Type.resolve(); errs != nil {
+				if errs := n.Type.resolve(ms.typeDict); errs != nil {
 					e.addError(fmt.Errorf("deviation has unresolvable type, %v", errs))
 					continue
 				}
@@ -872,11 +876,6 @@ func ToEntry(n Node) (e *Entry) {
 		// Keywords that do not need to be handled as an Entry as they are added
 		// to other dictionaries.
 		case "default":
-			if e.Kind == LeafEntry {
-				// default is handled separately for a leaf, but in a deviate statement
-				// we must deal with it here.
-				continue
-			}
 			d, ok := fv.Interface().(*Value)
 			if !ok {
 				e.addError(fmt.Errorf("%s: unexpected default type in %s:%s", Source(n), n.Kind(), n.NName()))
@@ -894,7 +893,7 @@ func ToEntry(n Node) (e *Entry) {
 
 					for _, sd := range d.Deviate {
 						if sd.Type != nil {
-							sd.Type.resolve()
+							sd.Type.resolve(ms.typeDict)
 						}
 					}
 				}
@@ -980,7 +979,9 @@ func ToEntry(n Node) (e *Entry) {
 			"unique",
 			"when",
 			"yang-version":
-			e.Extra[name] = append(e.Extra[name], fv.Interface())
+			if !fv.IsNil() {
+				addToExtrasSlice(fv, name, e)
+			}
 			continue
 
 		case "Ext", "Name", "Parent", "Statement":
@@ -1024,8 +1025,20 @@ func addExtraKeywordsToLeafEntry(n Node, e *Entry) {
 			"reference",
 			"status",
 			"when":
-			e.Extra[name] = append(e.Extra[name], fv.Interface())
+			if !fv.IsNil() {
+				addToExtrasSlice(fv, name, e)
+			}
 		}
+	}
+}
+
+func addToExtrasSlice(fv reflect.Value, name string, e *Entry) {
+	if fv.Kind() == reflect.Slice {
+		for j := 0; j < fv.Len(); j++ {
+			e.Extra[name] = append(e.Extra[name], fv.Index(j).Interface())
+		}
+	} else {
+		e.Extra[name] = append(e.Extra[name], fv.Interface())
 	}
 }
 
@@ -1049,15 +1062,15 @@ func (e *Entry) Augment(addErrors bool) (processed, skipped int) {
 	// Augments can depend upon augments.  We need to figure out how to
 	// order the augments (or just keep trying until we can make no further
 	// progress)
-	var sa []*Entry
+	var unapplied []*Entry
 	for _, a := range e.Augments {
-		ae := a.Find(a.Name)
-		if ae == nil {
+		target := a.Find(a.Name)
+		if target == nil {
 			if addErrors {
 				e.errorf("%s: augment %s not found", Source(a.Node), a.Name)
 			}
 			skipped++
-			sa = append(sa, a)
+			unapplied = append(unapplied, a)
 			continue
 		}
 		// Augments do not have a prefix we merge in, just a node.
@@ -1065,10 +1078,10 @@ func (e *Entry) Augment(addErrors bool) (processed, skipped int) {
 		// augment since the nodes have this namespace even though they
 		// are merged into another entry.
 		processed++
-		ae.merge(nil, a.Namespace(), a)
-		ae.Augmented = append(ae.Augmented, a.shallowDup())
+		target.merge(nil, a.Namespace(), a)
+		target.Augmented = append(target.Augmented, a.shallowDup())
 	}
-	e.Augments = sa
+	e.Augments = unapplied
 	return processed, skipped
 }
 
@@ -1093,7 +1106,16 @@ func (e *Entry) ApplyDeviate() []error {
 					}
 
 					if devSpec.Default != "" {
-						deviatedNode.Default = ""
+						switch dt {
+						case DeviationAdd:
+							if deviatedNode.Default != "" {
+								appendErr(fmt.Errorf("tried to deviate add a default statement when one already exists: %q", deviatedNode.Default))
+							} else {
+								deviatedNode.Default = devSpec.Default
+							}
+						case DeviationReplace:
+							deviatedNode.Default = devSpec.Default
+						}
 					}
 
 					if devSpec.Mandatory != TSUnset {
@@ -1136,8 +1158,12 @@ func (e *Entry) ApplyDeviate() []error {
 						deviatedNode.Config = TSUnset
 					}
 
-					if devSpec.Default == "" {
-						deviatedNode.Default = ""
+					if devSpec.Default != "" {
+						if devSpec.Default == deviatedNode.Default {
+							deviatedNode.Default = ""
+						} else {
+							appendErr(fmt.Errorf("%s: tried to deviate delete a default statement that doesn't exist or with a non-matching keyword", Source(e.Node)))
+						}
 					}
 
 					if devSpec.Mandatory != TSUnset {
@@ -1176,10 +1202,10 @@ func (e *Entry) ApplyDeviate() []error {
 	}
 
 	return errs
-
 }
 
-// FixChoice inserts missing Case entries in a choice
+// FixChoice inserts missing Case entries for non-case entries within a choice
+// entry.
 func (e *Entry) FixChoice() {
 	if e.Kind == ChoiceEntry && len(e.Errors) == 0 {
 		for k, ce := range e.Dir {
@@ -1236,48 +1262,18 @@ func (e *Entry) Find(name string) *Entry {
 	// If parts[0] is "" then this path started with a /
 	// and we need to find our parent.
 	if parts[0] == "" {
+		parts = parts[1:]
+		contextNode := e.Node
 		for e.Parent != nil {
 			e = e.Parent
 		}
-		parts = parts[1:]
-
-		// Since this module might use a different prefix that isn't
-		// the prefix that the module itself uses then we need to resolve
-		// the module into its local prefix to find it.
-		pfxMap := map[string]string{
-			// Seed the map with the local module - we use GetPrefix just
-			// in case the module is a submodule.
-			e.Node.(*Module).GetPrefix(): e.Prefix.Name,
-		}
-
-		// Add a map between the prefix used in the import statement, and
-		// the prefix that is used in the module itself.
-		for _, i := range e.Node.(*Module).Import {
-			// Resolve the module using the current module set, since we may
-			// not have populated the Module for the entry yet.
-			m, ok := e.Node.(*Module).modules.Modules[i.Name]
-			if !ok {
-				e.addError(fmt.Errorf("cannot find a module with name %s when looking at imports in %s", i.Name, e.Path()))
-				return nil
-			}
-
-			pfxMap[i.Prefix.Name] = m.Prefix.Name
-		}
-
 		if prefix, _ := getPrefix(parts[0]); prefix != "" {
-			pfx, ok := pfxMap[prefix]
-			if !ok {
-				// This is an undefined prefix within our context, so
-				// we can't do anything about resolving it.
-				e.addError(fmt.Errorf("invalid module prefix %s within module %s, defined prefix map: %v", prefix, e.Name, pfxMap))
+			m := module(FindModuleByPrefix(contextNode, prefix))
+			if m == nil {
+				e.addError(fmt.Errorf("cannot find module giving prefix %q within context entry %q", prefix, e.Path()))
 				return nil
 			}
-			m, err := e.Modules().FindModuleByPrefix(pfx)
-			if err != nil {
-				e.addError(err)
-				return nil
-			}
-			if e.Node.(*Module) != m {
+			if m != e.Node.(*Module) {
 				e = ToEntry(m)
 			}
 		}
@@ -1339,6 +1335,12 @@ func (e *Entry) Namespace() *Value {
 	// Return the namespace of a valid root parent entry
 	if e != nil && e.Node != nil {
 		if root := RootNode(e.Node); root != nil {
+			if root.Kind() == "submodule" {
+				root = root.Modules.Modules[root.BelongsTo.Name]
+				if root == nil {
+					return new(Value)
+				}
+			}
 			return root.Namespace
 		}
 	}
@@ -1347,7 +1349,7 @@ func (e *Entry) Namespace() *Value {
 	return new(Value)
 }
 
-// InstantiatingModule returns the YANG module which instanitated the Entry
+// InstantiatingModule returns the YANG module which instantiated the Entry
 // within the schema tree - using the same rules described in the documentation
 // of the Namespace function. The namespace is resolved in the module name. This
 // approach to namespacing is used when serialising YANG-modelled data to JSON as
@@ -1358,11 +1360,11 @@ func (e *Entry) InstantiatingModule() (string, error) {
 		return "", fmt.Errorf("entry %s had nil namespace", e.Name)
 	}
 
-	ns, err := e.Modules().FindModuleByNamespace(n.Name)
+	module, err := e.Modules().FindModuleByNamespace(n.Name)
 	if err != nil {
-		return "", fmt.Errorf("could not find module %s when retrieving namespace for %s", n.Name, e.Name)
+		return "", fmt.Errorf("could not find module %q when retrieving namespace for %s: %v", n.Name, e.Name, err)
 	}
-	return ns.Name, nil
+	return module.Name, nil
 }
 
 // shallowDup makes a shallow duplicate of e (only direct children are
@@ -1482,25 +1484,18 @@ func (s sortedErrors) Less(i, j int) bool {
 		return false
 	}
 
-	// compare compares field x to see which is less.
-	// numbers are compared as numbers.
-	// -1 means less than, 1 means greater or *equal* to and 0 means equal,
-	// thus far, but still undecided and need to see the rest of the elements.
-	compare := func(x int) int {
-		switch {
-		case len(fi) == x && len(fj) > x:
-			return -1
-		case len(fj) == x && len(fi) > x:
-			return 1
-		case len(fj) < x && len(fi) < x: // If neither element exist, then they're equal.
-			return 1
-		}
-		return nless(fi[x-1], fj[x-1]) // Both slices have this index: compare them.
-	}
 	// compare remaining indices of the error string slices
 	// in order to create a total ordering.
-	for x := 1; x < errorSplitCount; x++ {
-		switch compare(x) {
+	for i := 1; i < errorSplitCount; i++ {
+		switch {
+		// Handle when an expected index doesn't exist.
+		case len(fj) == i:
+			return false
+		case len(fi) == i:
+			return true
+		}
+
+		switch nless(fi[i], fj[i]) {
 		case -1:
 			return true
 		case 1:
@@ -1540,7 +1535,7 @@ func errorSort(errors []error) []error {
 // DefaultValue returns the schema default value for e, if any. If the leaf
 // has no explicit default, its type default (if any) will be used.
 func (e *Entry) DefaultValue() string {
-	if len(e.Default) > 0 {
+	if e.Default != "" {
 		return e.Default
 	} else if typ := e.Type; typ != nil {
 		if leaf, ok := e.Node.(*Leaf); ok {
