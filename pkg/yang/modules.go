@@ -21,6 +21,7 @@ package yang
 import (
 	"fmt"
 	"reflect"
+	"sync"
 )
 
 // Modules contains information about all the top level modules and
@@ -31,6 +32,7 @@ type Modules struct {
 	includes   map[*Module]bool   // Modules we have already done include on
 	byNS       map[string]*Module // Cache of namespace lookup
 	typeDict   *typeDictionary    // Cache for type definitions.
+	mu         sync.Mutex         // Mutex to protect byNS map
 }
 
 // NewModules returns a newly created and initialized Modules.
@@ -209,6 +211,10 @@ func (ms *Modules) FindModule(n Node) *Module {
 // FindModuleByNamespace either returns the Module specified by the namespace
 // or returns an error.
 func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
+	// Protect the byNS map from concurrent accesses
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
 	if m, ok := ms.byNS[ns]; ok {
 		return m, nil
 	}
