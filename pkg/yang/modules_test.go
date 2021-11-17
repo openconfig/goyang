@@ -362,9 +362,10 @@ func TestModuleLinkage(t *testing.T) {
 
 func TestModulesTotalProcess(t *testing.T) {
 	tests := []struct {
-		desc    string
-		inMods  map[string]string
-		wantErr bool
+		desc      string
+		inMods    map[string]string
+		inSubmods map[string]string
+		wantErr   bool
 	}{{
 		desc: "import with deviation",
 		inMods: map[string]string{
@@ -390,6 +391,12 @@ func TestModulesTotalProcess(t *testing.T) {
 					container sys { leaf hostname { type string; } }
 				}`,
 		},
+		inSubmods: map[string]string{
+			"sys-sub": `
+				submodule sys-sub {
+					belongs-to sys { prefix s; }
+				}`,
+		},
 	}}
 
 	for _, tt := range tests {
@@ -397,8 +404,28 @@ func TestModulesTotalProcess(t *testing.T) {
 			ms := NewModules()
 
 			for n, m := range tt.inMods {
+				n += ".yang"
 				if err := ms.Parse(m, n); err != nil {
 					t.Fatalf("cannot parse module %s, err: %v", n, err)
+				}
+			}
+
+			for n, m := range tt.inSubmods {
+				n += ".yang"
+				if err := ms.Parse(m, n); err != nil {
+					t.Fatalf("cannot parse submodule %s, err: %v", n, err)
+				}
+			}
+
+			for n := range tt.inMods {
+				if got, want := ms.Modules[n].FileName, n+".yang"; got != want {
+					t.Errorf("got module filename %q, want %q", got, want)
+				}
+			}
+
+			for n := range tt.inSubmods {
+				if got, want := ms.SubModules[n].FileName, n+".yang"; got != want {
+					t.Errorf("got submodule filename %q, want %q", got, want)
 				}
 			}
 

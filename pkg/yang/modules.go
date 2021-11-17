@@ -72,7 +72,7 @@ func (ms *Modules) Parse(data, name string) error {
 		if err != nil {
 			return err
 		}
-		if err := ms.add(n); err != nil {
+		if err := ms.add(n, name); err != nil {
 			return err
 		}
 	}
@@ -125,10 +125,11 @@ func GetModule(name string, sources ...string) (*Entry, []error) {
 	return ms.GetModule(name)
 }
 
-// add adds Node n to ms.  n must be assignable to *Module (i.e., it is a
+// add adds Node n to ms with the file name from which the module was parsed.
+// n must be assignable to *Module (i.e., it is a
 // "module" or "submodule").  An error is returned if n is a duplicate of
 // a name already added, or n is not assignable to *Module.
-func (ms *Modules) add(n Node) error {
+func (ms *Modules) add(n Node, fileName string) error {
 	var m map[string]*Module
 
 	name := n.NName()
@@ -145,6 +146,7 @@ func (ms *Modules) add(n Node) error {
 	mod := n.(*Module)
 	fullName := mod.FullName()
 	mod.Modules = ms
+	mod.FileName = fileName
 
 	if o := m[fullName]; o != nil {
 		return fmt.Errorf("duplicate %s %s at %s and %s", kind, fullName, Source(o), Source(n))

@@ -137,6 +137,9 @@ type Module struct {
 	// Modules references the Modules object from which this Module node
 	// was parsed.
 	Modules *Modules
+
+	// FileName is the name of the file from which the module was parsed.
+	FileName string
 }
 
 func (s *Module) Kind() string {
