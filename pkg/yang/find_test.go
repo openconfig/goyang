@@ -160,7 +160,7 @@ func TestFindGrouping(t *testing.T) {
 		inName:            "g",
 		wantGroupNodePath: "/sysdb/g",
 	}, {
-		desc: "valid import in submodule",
+		desc: "grouping in submodule",
 		inMods: map[string]string{
 			"dev": `
 				module dev {
