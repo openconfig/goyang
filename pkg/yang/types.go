@@ -60,7 +60,7 @@ func (d *typeDictionary) find(n Node, name string) *Typedef {
 	return d.dict[n][name]
 }
 
-// findExternal finds the externally defined typedef name in the module imported
+// findExternal finds the externally-defined typedef name in a module imported
 // by n's root with the specified prefix.
 func (d *typeDictionary) findExternal(n Node, prefix, name string) (*Typedef, error) {
 	root := FindModuleByPrefix(n, prefix)
