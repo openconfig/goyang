@@ -218,11 +218,7 @@ func TestIdentityExtract(t *testing.T) {
 			foundIdentity := false
 			var thisID *Identity
 			for _, ri := range ms.typeDict.identities.dict {
-				// TODO(wenbli): Use definingModule helper from ygot after it's moved to goyang.
-				moduleName := ri.Module.Name
-				if ri.Module.Kind() == "submodule" {
-					moduleName = ri.Module.BelongsTo.Name
-				}
+				moduleName := module(ri.Module).Name
 				if ri.Identity.Name == ti.name && moduleName == ti.module {
 					foundIdentity = true
 					thisID = ri.Identity
@@ -253,6 +249,43 @@ func TestIdentityExtract(t *testing.T) {
 // Test cases for validating that identities can be resolved correctly.
 var treeTestCases = []identityTestCase{
 	{
+		name: "tree-test-case-0: Validate identity resolution across submodules",
+		in: []inputModule{
+			{
+				name: "base.yang",
+				content: `
+				  module base {
+				    namespace "urn:base";
+				    prefix "base";
+
+				    include side;
+
+				    identity REMOTE_BASE;
+				  }
+				`},
+			{
+				name: "remote.yang",
+				content: `
+				  submodule side {
+				    belongs-to base {
+				      prefix "r";
+				    }
+
+				    identity LOCAL_REMOTE_BASE {
+				      base r:REMOTE_BASE;
+				    }
+				  }
+				`},
+		},
+		identities: []identityOut{
+			{
+				module: "base",
+				name:   "REMOTE_BASE",
+				values: []string{"LOCAL_REMOTE_BASE"},
+			},
+		},
+	},
+	{
 		name: "tree-test-case-1: Validate identity resolution across modules",
 		in: []inputModule{
 			{
@@ -263,9 +296,14 @@ var treeTestCases = []identityTestCase{
 				    prefix "base";
 
 				    import remote { prefix "r"; }
+				    import remote2 { prefix "r2"; }
 
 				    identity LOCAL_REMOTE_BASE {
 				      base r:REMOTE_BASE;
+				    }
+
+				    identity LOCAL_REMOTE_BASE2 {
+				      base r2:REMOTE_BASE2;
 				    }
 				  }
 				`},
@@ -274,9 +312,19 @@ var treeTestCases = []identityTestCase{
 				content: `
 				  module remote {
 				    namespace "urn:remote";
-				    prefix "remote";
+				    prefix "r";
 
 				    identity REMOTE_BASE;
+				  }
+				`},
+			{
+				name: "remote2.yang",
+				content: `
+				  module remote2 {
+				    namespace "urn:remote2";
+				    prefix "remote";
+
+				    identity REMOTE_BASE2;
 				  }
 				`},
 		},
@@ -287,9 +335,19 @@ var treeTestCases = []identityTestCase{
 				values: []string{"LOCAL_REMOTE_BASE"},
 			},
 			{
+				module: "remote2",
+				name:   "REMOTE_BASE2",
+				values: []string{"LOCAL_REMOTE_BASE2"},
+			},
+			{
 				module:    "base",
 				name:      "LOCAL_REMOTE_BASE",
 				baseNames: []string{"r:REMOTE_BASE"},
+			},
+			{
+				module:    "base",
+				name:      "LOCAL_REMOTE_BASE2",
+				baseNames: []string{"r2:REMOTE_BASE2"},
 			},
 		},
 	},
@@ -647,6 +705,7 @@ func TestIdentityTree(t *testing.T) {
 				if foundID == nil {
 					t.Errorf("Couldn't find identity %s in module %s", chkID.name,
 						chkID.module)
+					continue
 				}
 
 				if len(chkID.baseNames) > 0 {

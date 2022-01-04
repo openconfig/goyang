@@ -20,6 +20,7 @@ package yang
 
 import (
 	"fmt"
+	"sync"
 )
 
 // Modules contains information about all the top level modules and
@@ -28,7 +29,6 @@ type Modules struct {
 	Modules    map[string]*Module // All "module" nodes
 	SubModules map[string]*Module // All "submodule" nodes
 	includes   map[*Module]bool   // Modules we have already done include on
-	byPrefix   map[string]*Module // Cache of prefix lookup
 	byNS       map[string]*Module // Cache of namespace lookup
 	typeDict   *typeDictionary    // Cache for type definitions.
 	// entryCache is used to prevent unnecessary recursion into previously
@@ -43,6 +43,8 @@ type Modules struct {
 	// directly set by the caller to influence how goyang will behave in the presence
 	// of certain exceptional cases.
 	ParseOptions Options
+	// Mutex to protect byNS map
+	mu sync.Mutex
 }
 
 // NewModules returns a newly created and initialized Modules.
@@ -51,7 +53,6 @@ func NewModules() *Modules {
 		Modules:         map[string]*Module{},
 		SubModules:      map[string]*Module{},
 		includes:        map[*Module]bool{},
-		byPrefix:        map[string]*Module{},
 		byNS:            map[string]*Module{},
 		typeDict:        newTypeDictionary(),
 		mergedSubmodule: map[string]bool{},
@@ -223,6 +224,10 @@ func (ms *Modules) FindModule(n Node) *Module {
 // FindModuleByNamespace either returns the Module specified by the namespace
 // or returns an error.
 func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
+	// Protect the byNS map from concurrent accesses
+	ms.mu.Lock()
+	defer ms.mu.Unlock()
+
 	if m, ok := ms.byNS[ns]; ok {
 		return m, nil
 	}
@@ -240,38 +245,10 @@ func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
 		}
 	}
 	if found == nil {
-		return nil, fmt.Errorf("%s: no such namespace", ns)
+		return nil, fmt.Errorf("%q: no such namespace", ns)
 	}
 	// Don't cache negative results because new modules could be added.
 	ms.byNS[ns] = found
-	return found, nil
-}
-
-// FindModuleByPrefix either returns the Module specified by prefix or returns
-// an error.
-// TODO(wenovus): This should be deprecated since prefixes are not unique among
-// modules.
-func (ms *Modules) FindModuleByPrefix(prefix string) (*Module, error) {
-	if m, ok := ms.byPrefix[prefix]; ok {
-		return m, nil
-	}
-	var found *Module
-	for _, m := range ms.Modules {
-		if m.Prefix.Name == prefix {
-			switch {
-			case m == found:
-			case found != nil:
-				return nil, fmt.Errorf("prefix %s matches two or more modules (%s, %s)", prefix, found.Name, m.Name)
-			default:
-				found = m
-			}
-		}
-	}
-	if found == nil {
-		return nil, fmt.Errorf("%s: no such prefix", prefix)
-	}
-	// Don't cache negative results because new modules could be added.
-	ms.byPrefix[prefix] = found
 	return found, nil
 }
 

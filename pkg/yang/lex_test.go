@@ -277,6 +277,20 @@ without an ending.
 			`test.yang:1:1: missing closing */
 `,
 		},
+		{line(),
+			// Two errors too many.
+			`yang-version 1.1;description "\/\/\/\/\/\/\/\/\/\/";`,
+			9,
+			`test.yang:1:31: invalid escape sequence: \/
+test.yang:1:33: invalid escape sequence: \/
+test.yang:1:35: invalid escape sequence: \/
+test.yang:1:37: invalid escape sequence: \/
+test.yang:1:39: invalid escape sequence: \/
+test.yang:1:41: invalid escape sequence: \/
+test.yang:1:43: invalid escape sequence: \/
+test.yang:1:45: invalid escape sequence: \/
+` + tooMany,
+		},
 	} {
 		l := newLexer(tt.in, "test.yang")
 		errbuf := &bytes.Buffer{}
