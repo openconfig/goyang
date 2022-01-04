@@ -120,7 +120,7 @@ type Entry struct {
 	Uses            []*UsesStmt `json:",omitempty"` // Uses merged into this entry.
 
 	// Extra maps all the unsupported fields to their values
-	Extra map[string][]interface{} `json:"-"`
+	Extra map[string][]interface{} `json:"extra-unstable,omitempty"`
 
 	// Annotation stores annotated values, and is not populated by this
 	// library but rather can be used by calling code where additional
@@ -441,16 +441,6 @@ func (e *Entry) GetWhenXPath() (string, bool) {
 	return "", false
 }
 
-// entryCache is used to prevent unnecessary recursion into previously
-// converted nodes.
-var entryCache = map[Node]*Entry{}
-
-// mergedSubmodule is used to prevent re-parsing a submodule that has already
-// been merged into a particular entity when circular dependencies are being
-// ignored. The keys of the map are a string that is formed by concatenating
-// the name of the including (sub)module and the included submodule.
-var mergedSubmodule = map[string]bool{}
-
 // deviationType specifies an enumerated value covering the different substatements
 // to the deviate statement.
 type deviationType int64
@@ -542,11 +532,11 @@ func ToEntry(n Node) (e *Entry) {
 		}
 	}
 	ms := RootNode(n).Modules
-	if e := entryCache[n]; e != nil {
+	if e := ms.entryCache[n]; e != nil {
 		return e
 	}
 	defer func() {
-		entryCache[n] = e
+		ms.entryCache[n] = e
 	}()
 
 	// Copy in the extensions from our Node, if any.
@@ -626,7 +616,6 @@ func ToEntry(n Node) (e *Entry) {
 			e.addError(err)
 		}
 		e.Prefix = getRootPrefix(e)
-		addExtraKeywordsToLeafEntry(n, e)
 		return e
 	case *Uses:
 		g := FindGrouping(s, s.Name, map[string]bool{})
@@ -763,14 +752,14 @@ func ToEntry(n Node) (e *Entry) {
 				includedToSrc := n.NName() + ":" + a.Module.Name
 
 				switch {
-				case mergedSubmodule[srcToIncluded]:
+				case ms.mergedSubmodule[srcToIncluded]:
 					// We have already merged this module, so don't try and do it
 					// again.
 					continue
-				case !mergedSubmodule[includedToSrc] && a.Module.NName() != n.NName():
+				case !ms.mergedSubmodule[includedToSrc] && a.Module.NName() != n.NName():
 					// We have not merged A->B, and B != B hence go ahead and merge.
 					includedToParent := a.Module.Name + ":" + a.Module.BelongsTo.Name
-					if mergedSubmodule[includedToParent] {
+					if ms.mergedSubmodule[includedToParent] {
 						// Don't try and re-import submodules that have already been imported
 						// into the top-level module. Note that this ensures that we get to the
 						// top the tree (whichever the actual module for the chain of
@@ -779,8 +768,8 @@ func ToEntry(n Node) (e *Entry) {
 						// walking through a sub-cycle of the include graph.
 						continue
 					}
-					mergedSubmodule[srcToIncluded] = true
-					mergedSubmodule[includedToParent] = true
+					ms.mergedSubmodule[srcToIncluded] = true
+					ms.mergedSubmodule[includedToParent] = true
 					e.merge(a.Module.Prefix, nil, ToEntry(a.Module))
 				case ParseOptions.IgnoreSubmoduleCircularDependencies:
 					continue
@@ -980,7 +969,9 @@ func ToEntry(n Node) (e *Entry) {
 			"unique",
 			"when",
 			"yang-version":
-			e.Extra[name] = append(e.Extra[name], fv.Interface())
+			if !fv.IsNil() {
+				addToExtrasSlice(fv, name, e)
+			}
 			continue
 
 		case "Ext", "Name", "Parent", "Statement":
@@ -1024,8 +1015,20 @@ func addExtraKeywordsToLeafEntry(n Node, e *Entry) {
 			"reference",
 			"status",
 			"when":
-			e.Extra[name] = append(e.Extra[name], fv.Interface())
+			if !fv.IsNil() {
+				addToExtrasSlice(fv, name, e)
+			}
 		}
+	}
+}
+
+func addToExtrasSlice(fv reflect.Value, name string, e *Entry) {
+	if fv.Kind() == reflect.Slice {
+		for j := 0; j < fv.Len(); j++ {
+			e.Extra[name] = append(e.Extra[name], fv.Index(j).Interface())
+		}
+	} else {
+		e.Extra[name] = append(e.Extra[name], fv.Interface())
 	}
 }
 
