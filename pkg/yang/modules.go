@@ -20,7 +20,6 @@ package yang
 
 import (
 	"fmt"
-	"reflect"
 	"sync"
 )
 
@@ -44,7 +43,6 @@ func NewModules() *Modules {
 		byNS:       map[string]*Module{},
 		typeDict:   newTypeDictionary(),
 	}
-	initTypes(reflect.TypeOf(&meta{}), ms.typeDict)
 	return ms
 }
 
