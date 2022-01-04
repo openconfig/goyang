@@ -21,25 +21,21 @@ import (
 	"strings"
 )
 
-// trimPrefix trims the current module's prefix from the given name. If the
-// name is not prefixed with it, the same string is returned unchanged.
-// TODO(borman): we need to properly handle prefixs and not depend on
-// not having collisions.
-func trimPrefix(n Node, name string) string {
-	parts := strings.Split(name, ":")
-	if len(parts) == 1 {
-		return name
+// localPrefix returns the local prefix used by the containing (sub)module to
+// refer to its own module.
+func localPrefix(n Node) string {
+	return RootNode(n).GetPrefix()
+}
+
+// trimLocalPrefix trims the current module's prefix from the given name. If the
+// name is not prefixed with the local module's prefix or is unprefixed
+// entirely, then the same string is returned unchanged.
+func trimLocalPrefix(n Node, name string) string {
+	pfx := localPrefix(n)
+	if pfx != "" {
+		pfx += ":"
 	}
-	// We should have a single *Module parent.  It contains our prefix.
-	for {
-		if m, ok := n.(*Module); ok {
-			if m.Prefix != nil && m.Prefix.Name == parts[0] {
-				return parts[1]
-			}
-			return name
-		}
-		n = n.ParentNode()
-	}
+	return strings.TrimPrefix(name, pfx)
 }
 
 // FindGrouping finds the grouping named name in one of the parent node's
@@ -47,7 +43,7 @@ func trimPrefix(n Node, name string) string {
 // by FindGrouping during traversal.  If no parent has the named grouping,
 // nil is returned. Imported and included modules are also checked.
 func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
-	name = trimPrefix(n, name)
+	name = trimLocalPrefix(n, name)
 	for n != nil {
 		// Grab the Grouping field of the underlying structure.  n is
 		// always a pointer to a structure,
@@ -63,8 +59,8 @@ func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 		v = e.FieldByName("Import")
 		if v.IsValid() {
 			for _, i := range v.Interface().([]*Import) {
-				// TODO(borman): This is arguably wrong.  We
-				// need to do prefix matching.
+				// If the prefix matches the import statement,
+				// then search for the trimmed name in that module.
 				pname := strings.TrimPrefix(name, i.Prefix.Name+":")
 				if pname == name {
 					continue

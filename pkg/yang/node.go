@@ -96,29 +96,18 @@ func getPrefix(s string) (string, string) {
 // relative to where n was defined.  If the prefix cannot be resolved then nil
 // is returned.
 func FindModuleByPrefix(n Node, prefix string) *Module {
-	n = RootNode(n)
-
-	mod := n.(*Module)
-	if prefix == "" {
-		return mod
+	if n == nil {
+		return nil
 	}
+	mod := RootNode(n)
 
-	switch mod.Kind() {
-	case "module":
-		if mod.Prefix.Name == prefix {
-			return mod
-		}
-	case "submodule":
-		if prefix == mod.BelongsTo.Prefix.Name {
-			return mod
-		}
-	default:
-		panic("root that is not a module or submodule")
+	if prefix == "" || prefix == mod.GetPrefix() {
+		return mod
 	}
 
 	for _, i := range mod.Import {
 		if prefix == i.Prefix.Name {
-			return i.Module
+			return mod.Modules.FindModule(i)
 		}
 	}
 	return nil
@@ -163,6 +152,17 @@ func RootNode(n Node) *Module {
 	return nil
 }
 
+// module returns the Module to which n belongs. If n resides in a submodule,
+// the belonging module will be returned.
+// If n is nil or a module could not be find, nil is returned.
+func module(n Node) *Module {
+	m := RootNode(n)
+	if m.Kind() == "submodule" {
+		m = m.Modules.Modules[m.BelongsTo.Name]
+	}
+	return m
+}
+
 // NodePath returns the full path of the node from the module name.
 func NodePath(n Node) string {
 	var path string
@@ -199,9 +199,9 @@ func FindNode(n Node, path string) (Node, error) {
 		parts = parts[1:]
 
 		// TODO(borman): merge this with FindModuleByPrefix?
-		n = RootNode(n)
 		// The base is always a module
-		mod := n.(*Module)
+		mod := RootNode(n)
+		n = mod
 		prefix, _ := getPrefix(parts[0])
 		if mod.Kind() == "submodule" {
 			m := mod.Modules.Modules[mod.BelongsTo.Name]
