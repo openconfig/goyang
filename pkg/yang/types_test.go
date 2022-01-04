@@ -909,10 +909,12 @@ func TestTypeResolveUnions(t *testing.T) {
 	}}
 
 	getTestLeaf := func(ms *Modules) (*YangType, error) {
-		m, err := ms.FindModuleByPrefix("t")
-		if err != nil {
-			return nil, fmt.Errorf("can't find module in %v", ms)
+		const module = "test"
+		m, ok := ms.Modules[module]
+		if !ok {
+			return nil, fmt.Errorf("can't find module %q", module)
 		}
+
 		if len(m.Leaf) == 0 {
 			return nil, fmt.Errorf("node %v is missing imports", m)
 		}
@@ -1218,10 +1220,12 @@ func TestPattern(t *testing.T) {
 	}}
 
 	getTestLeaf := func(ms *Modules) (*YangType, error) {
-		m, err := ms.FindModuleByPrefix("t")
-		if err != nil {
-			return nil, fmt.Errorf("can't find module in %v", ms)
+		const module = "test"
+		m, ok := ms.Modules[module]
+		if !ok {
+			return nil, fmt.Errorf("can't find module %q", module)
 		}
+
 		if len(m.Leaf) == 0 {
 			return nil, fmt.Errorf("node %v is missing imports", m)
 		}
