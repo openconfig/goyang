@@ -120,7 +120,7 @@ type Entry struct {
 	Uses            []*UsesStmt `json:",omitempty"` // Uses merged into this entry.
 
 	// Extra maps all the unsupported fields to their values
-	Extra map[string][]interface{} `json:"-"`
+	Extra map[string][]interface{} `json:"extra-unstable,omitempty"`
 
 	// Annotation stores annotated values, and is not populated by this
 	// library but rather can be used by calling code where additional
@@ -626,7 +626,6 @@ func ToEntry(n Node) (e *Entry) {
 			e.addError(err)
 		}
 		e.Prefix = getRootPrefix(e)
-		addExtraKeywordsToLeafEntry(n, e)
 		return e
 	case *Uses:
 		g := FindGrouping(s, s.Name, map[string]bool{})
@@ -980,7 +979,9 @@ func ToEntry(n Node) (e *Entry) {
 			"unique",
 			"when",
 			"yang-version":
-			e.Extra[name] = append(e.Extra[name], fv.Interface())
+			if !fv.IsNil() {
+				addToExtrasSlice(fv, name, e)
+			}
 			continue
 
 		case "Ext", "Name", "Parent", "Statement":
@@ -1024,8 +1025,20 @@ func addExtraKeywordsToLeafEntry(n Node, e *Entry) {
 			"reference",
 			"status",
 			"when":
-			e.Extra[name] = append(e.Extra[name], fv.Interface())
+			if !fv.IsNil() {
+				addToExtrasSlice(fv, name, e)
+			}
 		}
+	}
+}
+
+func addToExtrasSlice(fv reflect.Value, name string, e *Entry) {
+	if fv.Kind() == reflect.Slice {
+		for j := 0; j < fv.Len(); j++ {
+			e.Extra[name] = append(e.Extra[name], fv.Index(j).Interface())
+		}
+	} else {
+		e.Extra[name] = append(e.Extra[name], fv.Interface())
 	}
 }
 
@@ -1093,7 +1106,16 @@ func (e *Entry) ApplyDeviate() []error {
 					}
 
 					if devSpec.Default != "" {
-						deviatedNode.Default = ""
+						switch dt {
+						case DeviationAdd:
+							if deviatedNode.Default != "" {
+								appendErr(fmt.Errorf("tried to deviate add a default statement when one already exists: %q", deviatedNode.Default))
+							} else {
+								deviatedNode.Default = devSpec.Default
+							}
+						case DeviationReplace:
+							deviatedNode.Default = devSpec.Default
+						}
 					}
 
 					if devSpec.Mandatory != TSUnset {
@@ -1136,8 +1158,12 @@ func (e *Entry) ApplyDeviate() []error {
 						deviatedNode.Config = TSUnset
 					}
 
-					if devSpec.Default == "" {
-						deviatedNode.Default = ""
+					if devSpec.Default != "" {
+						if devSpec.Default == deviatedNode.Default {
+							deviatedNode.Default = ""
+						} else {
+							appendErr(fmt.Errorf("%s: tried to deviate delete a default statement that doesn't exist or with a non-matching keyword", Source(e.Node)))
+						}
 					}
 
 					if devSpec.Mandatory != TSUnset {
@@ -1236,48 +1262,18 @@ func (e *Entry) Find(name string) *Entry {
 	// If parts[0] is "" then this path started with a /
 	// and we need to find our parent.
 	if parts[0] == "" {
+		parts = parts[1:]
+		contextNode := e.Node
 		for e.Parent != nil {
 			e = e.Parent
 		}
-		parts = parts[1:]
-
-		// Since this module might use a different prefix that isn't
-		// the prefix that the module itself uses then we need to resolve
-		// the module into its local prefix to find it.
-		pfxMap := map[string]string{
-			// Seed the map with the local module - we use GetPrefix just
-			// in case the module is a submodule.
-			e.Node.(*Module).GetPrefix(): e.Prefix.Name,
-		}
-
-		// Add a map between the prefix used in the import statement, and
-		// the prefix that is used in the module itself.
-		for _, i := range e.Node.(*Module).Import {
-			// Resolve the module using the current module set, since we may
-			// not have populated the Module for the entry yet.
-			m, ok := e.Node.(*Module).Modules.Modules[i.Name]
-			if !ok {
-				e.addError(fmt.Errorf("cannot find a module with name %s when looking at imports in %s", i.Name, e.Path()))
-				return nil
-			}
-
-			pfxMap[i.Prefix.Name] = m.Prefix.Name
-		}
-
 		if prefix, _ := getPrefix(parts[0]); prefix != "" {
-			pfx, ok := pfxMap[prefix]
-			if !ok {
-				// This is an undefined prefix within our context, so
-				// we can't do anything about resolving it.
-				e.addError(fmt.Errorf("invalid module prefix %s within module %s, defined prefix map: %v", prefix, e.Name, pfxMap))
+			m := module(FindModuleByPrefix(contextNode, prefix))
+			if m == nil {
+				e.addError(fmt.Errorf("cannot find module giving prefix %q within context entry %q", prefix, e.Path()))
 				return nil
 			}
-			m, err := e.Modules().FindModuleByPrefix(pfx)
-			if err != nil {
-				e.addError(err)
-				return nil
-			}
-			if e.Node.(*Module) != m {
+			if m != e.Node.(*Module) {
 				e = ToEntry(m)
 			}
 		}
@@ -1366,7 +1362,7 @@ func (e *Entry) InstantiatingModule() (string, error) {
 
 	module, err := e.Modules().FindModuleByNamespace(n.Name)
 	if err != nil {
-		return "", fmt.Errorf("could not find module %q when retrieving namespace for %s", n.Name, e.Name)
+		return "", fmt.Errorf("could not find module %q when retrieving namespace for %s: %v", n.Name, e.Name, err)
 	}
 	return module.Name, nil
 }
