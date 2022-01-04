@@ -55,6 +55,28 @@ func TestFindGrouping(t *testing.T) {
 		inName:            "gg",
 		wantGroupNodePath: "/dev/g/gg",
 	}, {
+		desc: "grouping that uses another grouping both within the same module",
+		inMods: map[string]string{
+			"dev": `
+				module dev {
+					prefix d;
+					namespace "urn:d";
+
+					revision 01-01-01 { description "the start of time"; }
+
+					grouping gg { leaf a { type string; } }
+
+					grouping g { uses gg; }
+
+					container c { leaf b { type string; } }
+				}`,
+		},
+		inNode: func(ms *Modules) (Node, error) {
+			return FindNode(ms.Modules["dev"], "g")
+		},
+		inName:            "gg",
+		wantGroupNodePath: "/dev/gg",
+	}, {
 		desc: "grouping in included submodule",
 		inMods: map[string]string{
 			"dev": `
