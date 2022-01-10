@@ -1553,27 +1553,27 @@ func errorSort(errors []error) []error {
 	return errors[:i]
 }
 
-// HasDefault indicates whether the leaf entry has a default value or not.
-func (e *Entry) HasDefault() bool {
-	return len(e.DefaultValues()) > 0
-}
-
-// SingleDefaultValue returns the schema default value for e, if any. This is
-// useful for determining the default values of a non-leaf-list leaf entry. If
-// the leaf has no explicit default, its type default (if any) will be used.
-// Note: if there is not default value, then the empty string will be returned.
-func (e *Entry) SingleDefaultValue() string {
-	if dvals := e.DefaultValues(); len(dvals) > 0 {
-		return dvals[0]
+// SingleDefaultValue returns the single schema default value for e and a bool
+// indicating whether the entry contains one and only one default value. The
+// empty string is returned when the entry has zero or multiple default values.
+// This function is useful for determining the default values of a
+// non-leaf-list leaf entry.  If the leaf has no explicit default, its type
+// default (if any) will be used.
+//
+// For a leaf-list entry, use DefaultValues() instead.
+func (e *Entry) SingleDefaultValue() (string, bool) {
+	if dvals := e.DefaultValues(); len(dvals) == 1 {
+		return dvals[0], true
 	}
-	return ""
+	return "", false
 }
 
 // DefaultValues returns all default values for the leaf entry. This is useful
 // for determining the default values for a leaf-list, which may have more than
 // one default value. If the entry has no explicit default, its type default
-// (if any) will be used.
-// For all but leaf-list nodes, there will at most one default value given.
+// (if any) will be used. nil is returned when no default value exists.
+//
+// For a leaf entry, use SingleDefaultValue() instead.
 func (e *Entry) DefaultValues() []string {
 	if len(e.Default) > 0 {
 		return append([]string{}, e.Default...)

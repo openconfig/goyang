@@ -1179,22 +1179,22 @@ module defaults {
 	}
 
 	for i, tc := range []struct {
-		wantSingle     string
-		wantDefaults   []string
-		wantHasDefault bool
-		path           []string
+		wantSingle   string
+		wantSingleOk bool
+		wantDefaults []string
+		path         []string
 	}{
 		{
-			path:           []string{"defaults", "string-withdefault"},
-			wantSingle:     "typedef default value",
-			wantDefaults:   []string{"typedef default value"},
-			wantHasDefault: true,
+			path:         []string{"defaults", "string-withdefault"},
+			wantSingle:   "typedef default value",
+			wantDefaults: []string{"typedef default value"},
+			wantSingleOk: true,
 		},
 		{
-			path:           []string{"defaults", "uint32-withdefault"},
-			wantSingle:     "13",
-			wantDefaults:   []string{"13"},
-			wantHasDefault: true,
+			path:         []string{"defaults", "uint32-withdefault"},
+			wantSingle:   "13",
+			wantDefaults: []string{"13"},
+			wantSingleOk: true,
 		},
 		{
 			path:         []string{"defaults", "nodefault"},
@@ -1202,28 +1202,28 @@ module defaults {
 			wantDefaults: nil,
 		},
 		{
-			path:           []string{"defaults", "common-withdefault", "string"},
-			wantSingle:     "default value",
-			wantDefaults:   []string{"default value"},
-			wantHasDefault: true,
+			path:         []string{"defaults", "common-withdefault", "string"},
+			wantSingle:   "default value",
+			wantDefaults: []string{"default value"},
+			wantSingleOk: true,
 		},
 		{
-			path:           []string{"defaults", "common-withemptydefault", "string"},
-			wantSingle:     "",
-			wantDefaults:   []string{""},
-			wantHasDefault: true,
+			path:         []string{"defaults", "common-withemptydefault", "string"},
+			wantSingle:   "",
+			wantDefaults: []string{""},
+			wantSingleOk: true,
 		},
 		{
-			path:           []string{"defaults", "common-typedef-withdefault", "string"},
-			wantSingle:     "typedef default value",
-			wantDefaults:   []string{"typedef default value"},
-			wantHasDefault: true,
+			path:         []string{"defaults", "common-typedef-withdefault", "string"},
+			wantSingle:   "typedef default value",
+			wantDefaults: []string{"typedef default value"},
+			wantSingleOk: true,
 		},
 		{
-			path:           []string{"defaults", "common-typedef-withemptydefault", "string"},
-			wantSingle:     "",
-			wantDefaults:   []string{""},
-			wantHasDefault: true,
+			path:         []string{"defaults", "common-typedef-withemptydefault", "string"},
+			wantSingle:   "",
+			wantDefaults: []string{""},
+			wantSingleOk: true,
 		},
 		{
 			path:         []string{"defaults", "common-nodefault", "string"},
@@ -1236,28 +1236,27 @@ module defaults {
 			wantDefaults: nil,
 		},
 		{
-			path:           []string{"defaults", "choice-default"},
-			wantSingle:     "zeta",
-			wantDefaults:   []string{"zeta"},
-			wantHasDefault: true,
+			path:         []string{"defaults", "choice-default"},
+			wantSingle:   "zeta",
+			wantDefaults: []string{"zeta"},
+			wantSingleOk: true,
 		},
 		{
-			path:           []string{"leaflist-defaults", "uint32-withdefault"},
-			wantSingle:     "13",
-			wantDefaults:   []string{"13", "14"},
-			wantHasDefault: true,
+			path:         []string{"leaflist-defaults", "uint32-withdefault"},
+			wantSingle:   "",
+			wantDefaults: []string{"13", "14"},
 		},
 		{
-			path:           []string{"leaflist-defaults", "stringlist-withdefault"},
-			wantSingle:     "typedef default value",
-			wantDefaults:   []string{"typedef default value"},
-			wantHasDefault: true,
+			path:         []string{"leaflist-defaults", "stringlist-withdefault"},
+			wantSingle:   "typedef default value",
+			wantDefaults: []string{"typedef default value"},
+			wantSingleOk: true,
 		},
 		{
-			path:           []string{"leaflist-defaults", "stringlist-withemptydefault"},
-			wantSingle:     "",
-			wantDefaults:   []string{""},
-			wantHasDefault: true,
+			path:         []string{"leaflist-defaults", "stringlist-withemptydefault"},
+			wantSingle:   "",
+			wantDefaults: []string{""},
+			wantSingleOk: true,
 		},
 		{
 			path:         []string{"leaflist-defaults", "stringlist-withdefault-withminelem"},
@@ -1265,10 +1264,10 @@ module defaults {
 			wantDefaults: nil,
 		},
 		{
-			path:           []string{"leaflist-defaults", "emptydefault"},
-			wantSingle:     "",
-			wantDefaults:   []string{""},
-			wantHasDefault: true,
+			path:         []string{"leaflist-defaults", "emptydefault"},
+			wantSingle:   "",
+			wantDefaults: []string{""},
+			wantSingleOk: true,
 		},
 		{
 			path:         []string{"leaflist-defaults", "nodefault"},
@@ -1281,16 +1280,16 @@ module defaults {
 			wantDefaults: nil,
 		},
 		{
-			path:           []string{"leaflist-defaults", "common-withdefault", "string"},
-			wantSingle:     "default value",
-			wantDefaults:   []string{"default value"},
-			wantHasDefault: true,
+			path:         []string{"leaflist-defaults", "common-withdefault", "string"},
+			wantSingle:   "default value",
+			wantDefaults: []string{"default value"},
+			wantSingleOk: true,
 		},
 		{
-			path:           []string{"leaflist-defaults", "common-typedef-withdefault", "string"},
-			wantSingle:     "typedef default value",
-			wantDefaults:   []string{"typedef default value"},
-			wantHasDefault: true,
+			path:         []string{"leaflist-defaults", "common-typedef-withdefault", "string"},
+			wantSingle:   "typedef default value",
+			wantDefaults: []string{"typedef default value"},
+			wantSingleOk: true,
 		},
 	} {
 		tname := strings.Join(tc.path, "/")
@@ -1304,14 +1303,11 @@ module defaults {
 		if err != nil {
 			t.Fatalf("[%d_%s] could not retrieve path: %v", i, tname, err)
 		}
-		if got := dir.SingleDefaultValue(); tc.wantSingle != got {
-			t.Errorf("[%d_%s] want SingleDefaultValue %q, got %q", i, tname, tc.wantSingle, got)
+		if got, gotOk := dir.SingleDefaultValue(); got != tc.wantSingle || gotOk != tc.wantSingleOk {
+			t.Errorf("[%d_%s] got SingleDefaultValue (%q, %v), want (%q, %v)", i, tname, got, gotOk, tc.wantSingle, tc.wantSingleOk)
 		}
 		if diff := cmp.Diff(dir.DefaultValues(), tc.wantDefaults); diff != "" {
 			t.Errorf("[%d_%s] DefaultValues (-got, +want):\n%s", i, tname, diff)
-		}
-		if got := dir.HasDefault(); got != tc.wantHasDefault {
-			t.Errorf("[%d_%s] want HasDefault %v, got %v", i, tname, tc.wantHasDefault, got)
 		}
 	}
 }
