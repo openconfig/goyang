@@ -38,10 +38,15 @@ func trimLocalPrefix(n Node, name string) string {
 	return strings.TrimPrefix(name, pfx)
 }
 
-// FindGrouping finds the grouping named name in one of the parent node's
-// grouping fields, seen provides a list of the modules previously seen
-// by FindGrouping during traversal.  If no parent has the named grouping,
-// nil is returned. Imported and included modules are also checked.
+// FindGrouping finds the grouping named name according to YANG namespace rules
+// using the input node as the initial context node. The seen parameter
+// provides a list of the modules previously seen by FindGrouping during
+// traversal. If the named grouping cannot be found, nil is returned.
+//
+// FindGrouping works by recursively looking through the context node's parent
+// nodes for grouping fields, or in included or imported submodules/modules for
+// externally-defined groupings. Note that any prefix in the name must match
+// the module prefix of its import statement in the context node's module.
 func FindGrouping(n Node, name string, seen map[string]bool) *Grouping {
 	name = trimLocalPrefix(n, name)
 	for n != nil {

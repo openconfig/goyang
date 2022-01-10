@@ -663,7 +663,19 @@ func TestParseAndMarshal(t *testing.T) {
     {
       "Name": "DERIVED"
     }
-  ]
+  ],
+  "extra-unstable": {
+    "namespace": [
+      {
+        "Name": "urn:t",
+        "Source": {
+          "Keyword": "namespace",
+          "HasArgument": true,
+          "Argument": "urn:t"
+        }
+      }
+    ]
+  }
 }`,
 		},
 	}, {
@@ -730,6 +742,18 @@ func TestParseAndMarshal(t *testing.T) {
         }
       ]
     }
+  },
+  "extra-unstable": {
+    "namespace": [
+      {
+        "Name": "urn:t",
+        "Source": {
+          "Keyword": "namespace",
+          "HasArgument": true,
+          "Argument": "urn:t"
+        }
+      }
+    ]
   }
 }`,
 			"ext": `{
@@ -743,6 +767,26 @@ func TestParseAndMarshal(t *testing.T) {
       "HasArgument": true,
       "Argument": "e"
     }
+  },
+  "extra-unstable": {
+    "extension": [
+      {
+        "Name": "foobar",
+        "Argument": {
+          "Name": "baz"
+        }
+      }
+    ],
+    "namespace": [
+      {
+        "Name": "urn:e",
+        "Source": {
+          "Keyword": "namespace",
+          "HasArgument": true,
+          "Argument": "urn:e"
+        }
+      }
+    ]
   }
 }`,
 		},

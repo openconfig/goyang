@@ -256,6 +256,10 @@ type YangType struct {
 // Equal returns true if y and t describe the same type.
 func (y *YangType) Equal(t *YangType) bool {
 	switch {
+	case y == t:
+		return true
+	case y == nil || t == nil:
+		return false
 	case
 		// Don't check the Name, it contains no information
 		y.Kind != t.Kind,
