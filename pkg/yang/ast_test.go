@@ -517,7 +517,7 @@ alt_node the_node {
 		}
 
 		typeDict := newTypeDictionary()
-		initTypes(reflect.TypeOf(&meta{}), typeDict)
+		initTypes(reflect.TypeOf(&meta{}))
 
 		ast, err := buildASTWithTypeDict(ss[0], typeDict)
 		switch {

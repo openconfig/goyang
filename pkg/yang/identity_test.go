@@ -217,7 +217,7 @@ func TestIdentityExtract(t *testing.T) {
 
 			foundIdentity := false
 			var thisID *Identity
-			for _, ri := range identities.dict {
+			for _, ri := range ms.typeDict.identities.dict {
 				moduleName := module(ri.Module).Name
 				if ri.Identity.Name == ti.name && moduleName == ti.module {
 					foundIdentity = true
@@ -227,7 +227,7 @@ func TestIdentityExtract(t *testing.T) {
 			}
 
 			if !foundIdentity {
-				t.Errorf("Could not find identity %s in module %s, identity dict:\n%+v", ti.name, ti.module, identities.dict)
+				t.Errorf("Could not find identity %s in module %s, identity dict:\n%+v", ti.name, ti.module, ms.typeDict.identities.dict)
 				continue
 			}
 
@@ -791,9 +791,5 @@ func TestIdentityTree(t *testing.T) {
 				}
 			}
 		})
-		// Reset this global after the test.
-		// TODO(wenovus): We should implement hermetic file analysis to
-		// prevent needing such hacks.
-		identities = identityDictionary{dict: map[string]resolvedIdentity{}}
 	}
 }
