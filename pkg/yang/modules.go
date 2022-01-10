@@ -29,6 +29,7 @@ type Modules struct {
 	Modules    map[string]*Module // All "module" nodes
 	SubModules map[string]*Module // All "submodule" nodes
 	includes   map[*Module]bool   // Modules we have already done include on
+	nsMu       sync.Mutex         // nsMu protects the byNS map.
 	byNS       map[string]*Module // Cache of namespace lookup
 	typeDict   *typeDictionary    // Cache for type definitions.
 	// entryCache is used to prevent unnecessary recursion into previously
@@ -43,8 +44,6 @@ type Modules struct {
 	// directly set by the caller to influence how goyang will behave in the presence
 	// of certain exceptional cases.
 	ParseOptions Options
-	// Mutex to protect byNS map
-	mu sync.Mutex
 }
 
 // NewModules returns a newly created and initialized Modules.
@@ -225,8 +224,8 @@ func (ms *Modules) FindModule(n Node) *Module {
 // or returns an error.
 func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
 	// Protect the byNS map from concurrent accesses
-	ms.mu.Lock()
-	defer ms.mu.Unlock()
+	ms.nsMu.Lock()
+	defer ms.nsMu.Unlock()
 
 	if m, ok := ms.byNS[ns]; ok {
 		return m, nil
