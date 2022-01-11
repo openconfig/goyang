@@ -3339,7 +3339,7 @@ func TestDeviation(t *testing.T) {
 			}},
 		},
 	}, {
-		// TODO(wenovus): Support deviate delete for leaf-lists once its semantics are clear.
+		// TODO(wenovus): Support deviate delete for leaf-lists for config-false leafs once its semantics are clear.
 		// https://github.com/mbj4668/pyang/issues/756
 		desc: "error case - deviation delete on a leaf-list",
 		inFiles: map[string]string{

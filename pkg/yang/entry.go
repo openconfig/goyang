@@ -1178,7 +1178,8 @@ func (e *Entry) ApplyDeviate() []error {
 						switch {
 						case deviatedNode.IsLeafList():
 							// It is unclear from RFC7950 on how deviate delete works
-							// when there are duplicate leaf-list values.
+							// when there are duplicate leaf-list values in config-false leafs.
+							// TODO(wenbli): Add support for deleting default values when the leaf-list is a config leaf (duplicates are not allowed).
 							appendErr(fmt.Errorf("%s: deviate delete on default statements unsupported for leaf-lists, please use replace instead", Source(e.Node)))
 						case len(deviatedNode.Default) == 0:
 							appendErr(fmt.Errorf("%s: tried to deviate delete a default statement that doesn't exist", Source(e.Node)))
