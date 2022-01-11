@@ -895,8 +895,10 @@ func ToEntry(n Node) (e *Entry) {
 		case "deviation":
 			if a := fv.Interface().([]*Deviation); a != nil {
 				for _, d := range a {
+					deviatedEntry := ToEntry(d)
+					e.importErrors(deviatedEntry)
 					e.Deviations = append(e.Deviations, &DeviatedEntry{
-						Entry:        ToEntry(d),
+						Entry:        deviatedEntry,
 						DeviatedPath: d.Statement().Argument,
 					})
 

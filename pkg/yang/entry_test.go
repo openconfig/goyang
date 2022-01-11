@@ -3540,17 +3540,24 @@ func TestDeviation(t *testing.T) {
 				}
 			}
 
-			if errs := ms.Process(); len(errs) > 0 {
-				var match bool
-				for _, err := range errs {
-					if diff := errdiff.Substring(err, tt.wantProcessErrSubstring); diff == "" {
-						match = true
-						break
-					}
+			errs := ms.Process()
+			if len(errs) == 0 {
+				// Add a nil error to compare against the wanted error string.
+				errs = append(errs, nil)
+			}
+			var match bool
+			for _, err := range errs {
+				if diff := errdiff.Substring(err, tt.wantProcessErrSubstring); diff == "" {
+					match = true
+					break
 				}
-				if !match {
-					t.Fatalf("got errs: %v, want: %v", errs, tt.wantProcessErrSubstring)
-				}
+			}
+			if !match {
+				t.Fatalf("got errs: %v, want: %v", errs, tt.wantProcessErrSubstring)
+			}
+
+			if tt.wantProcessErrSubstring == "" && len(tt.wants) == 0 {
+				t.Fatalf("test case expects no error and no entry. Please change your test case to contain one of them.")
 			}
 
 			for mod, tcs := range tt.wants {
