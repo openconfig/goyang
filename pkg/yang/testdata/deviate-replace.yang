@@ -11,6 +11,11 @@ module deviate {
             type string;
             default "fish";
         }
+        leaf-list default-list {
+            type string;
+            default "fish";
+            default "sticks";
+        }
         leaf mandatory {
             type string;
             mandatory false;
@@ -53,6 +58,12 @@ module deviate {
     deviation /target/replace/default {
         deviate replace {
             default "a default value";
+        }
+    }
+
+    deviation /target/replace/default-list {
+        deviate replace {
+            default "nematodes";
         }
     }
 
