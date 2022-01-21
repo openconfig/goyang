@@ -76,6 +76,50 @@ func TestYangTypeEqual(t *testing.T) {
 			Kind: Yint64,
 		},
 		wantEqual: false,
+	}, {
+		name: "defaults-equal",
+		inLeft: &YangType{
+			Name:       "foo",
+			Kind:       Ystring,
+			Default:    "bar",
+			HasDefault: true,
+		},
+		inRight: &YangType{
+			Name:       "foo",
+			Kind:       Ystring,
+			Default:    "bar",
+			HasDefault: true,
+		},
+		wantEqual: true,
+	}, {
+		name: "defaults-unequal",
+		inLeft: &YangType{
+			Name:       "foo",
+			Kind:       Ystring,
+			Default:    "bar",
+			HasDefault: true,
+		},
+		inRight: &YangType{
+			Name:       "foo",
+			Kind:       Ystring,
+			Default:    "baz",
+			HasDefault: true,
+		},
+		wantEqual: false,
+	}, {
+		name: "has-default-unequal",
+		inLeft: &YangType{
+			Name:    "foo",
+			Kind:    Ystring,
+			Default: "",
+		},
+		inRight: &YangType{
+			Name:       "foo",
+			Kind:       Ystring,
+			Default:    "",
+			HasDefault: true,
+		},
+		wantEqual: false,
 	}}
 
 	for _, tt := range tests {
