@@ -1054,6 +1054,11 @@ module defaults {
     default "typedef default value";
   }
 
+  typedef string-emptydefault {
+    type string;
+    default "";
+  }
+
   grouping common {
     container common-nodefault {
       leaf string {
@@ -1066,9 +1071,20 @@ module defaults {
         default "default value";
       }
     }
+    container common-withemptydefault {
+      leaf string {
+        type string;
+        default "";
+      }
+    }
     container common-typedef-withdefault {
       leaf string {
         type string-default;
+      }
+    }
+    container common-typedef-withemptydefault {
+      leaf string {
+        type string-emptydefault;
       }
     }
   }
@@ -1105,6 +1121,51 @@ module defaults {
     }
   }
 
+  grouping leaflist-common {
+    container common-nodefault {
+      leaf string {
+        type string;
+      }
+    }
+    container common-withdefault {
+      leaf-list string {
+        type string;
+        default "default value";
+      }
+    }
+    container common-typedef-withdefault {
+      leaf string {
+        type string-default;
+      }
+    }
+  }
+
+  container leaflist-defaults {
+    leaf-list uint32-withdefault {
+      type uint32;
+      default "13";
+      default 14;
+    }
+    leaf-list stringlist-withdefault {
+      type string-default;
+    }
+    leaf-list stringlist-withemptydefault {
+      type string-emptydefault;
+    }
+    leaf-list stringlist-withdefault-withminelem {
+      type string-default;
+      min-elements 1;
+    }
+    leaf-list emptydefault {
+      type string;
+      default "";
+    }
+    leaf-list nodefault {
+      type string;
+    }
+    uses leaflist-common;
+  }
+
 }
 `
 
@@ -1114,40 +1175,117 @@ module defaults {
 	}
 
 	for i, tc := range []struct {
-		want string
-		path []string
+		wantSingle   string
+		wantSingleOk bool
+		wantDefaults []string
+		path         []string
 	}{
 		{
-			path: []string{"defaults", "string-withdefault"},
-			want: "typedef default value",
+			path:         []string{"defaults", "string-withdefault"},
+			wantSingle:   "typedef default value",
+			wantDefaults: []string{"typedef default value"},
+			wantSingleOk: true,
 		},
 		{
-			path: []string{"defaults", "uint32-withdefault"},
-			want: "13",
+			path:         []string{"defaults", "uint32-withdefault"},
+			wantSingle:   "13",
+			wantDefaults: []string{"13"},
+			wantSingleOk: true,
 		},
 		{
-			path: []string{"defaults", "nodefault"},
-			want: "",
+			path:         []string{"defaults", "nodefault"},
+			wantSingle:   "",
+			wantDefaults: nil,
 		},
 		{
-			path: []string{"defaults", "common-withdefault", "string"},
-			want: "default value",
+			path:         []string{"defaults", "common-withdefault", "string"},
+			wantSingle:   "default value",
+			wantDefaults: []string{"default value"},
+			wantSingleOk: true,
 		},
 		{
-			path: []string{"defaults", "common-typedef-withdefault", "string"},
-			want: "typedef default value",
+			path:         []string{"defaults", "common-withemptydefault", "string"},
+			wantSingle:   "",
+			wantDefaults: []string{""},
+			wantSingleOk: true,
 		},
 		{
-			path: []string{"defaults", "common-nodefault", "string"},
-			want: "",
+			path:         []string{"defaults", "common-typedef-withdefault", "string"},
+			wantSingle:   "typedef default value",
+			wantDefaults: []string{"typedef default value"},
+			wantSingleOk: true,
 		},
 		{
-			path: []string{"defaults", "mandatory-default"},
-			want: "",
+			path:         []string{"defaults", "common-typedef-withemptydefault", "string"},
+			wantSingle:   "",
+			wantDefaults: []string{""},
+			wantSingleOk: true,
 		},
 		{
-			path: []string{"defaults", "choice-default"},
-			want: "zeta",
+			path:         []string{"defaults", "common-nodefault", "string"},
+			wantSingle:   "",
+			wantDefaults: nil,
+		},
+		{
+			path:         []string{"defaults", "mandatory-default"},
+			wantSingle:   "",
+			wantDefaults: nil,
+		},
+		{
+			path:         []string{"defaults", "choice-default"},
+			wantSingle:   "zeta",
+			wantDefaults: []string{"zeta"},
+			wantSingleOk: true,
+		},
+		{
+			path:         []string{"leaflist-defaults", "uint32-withdefault"},
+			wantSingle:   "",
+			wantDefaults: []string{"13", "14"},
+		},
+		{
+			path:         []string{"leaflist-defaults", "stringlist-withdefault"},
+			wantSingle:   "typedef default value",
+			wantDefaults: []string{"typedef default value"},
+			wantSingleOk: true,
+		},
+		{
+			path:         []string{"leaflist-defaults", "stringlist-withemptydefault"},
+			wantSingle:   "",
+			wantDefaults: []string{""},
+			wantSingleOk: true,
+		},
+		{
+			path:         []string{"leaflist-defaults", "stringlist-withdefault-withminelem"},
+			wantSingle:   "",
+			wantDefaults: nil,
+		},
+		{
+			path:         []string{"leaflist-defaults", "emptydefault"},
+			wantSingle:   "",
+			wantDefaults: []string{""},
+			wantSingleOk: true,
+		},
+		{
+			path:         []string{"leaflist-defaults", "nodefault"},
+			wantSingle:   "",
+			wantDefaults: nil,
+		},
+		{
+			path:         []string{"leaflist-defaults", "common-nodefault", "string"},
+			wantSingle:   "",
+			wantDefaults: nil,
+		},
+		{
+			path:         []string{"leaflist-defaults", "common-withdefault", "string"},
+			wantSingle:   "default value",
+			wantDefaults: []string{"default value"},
+			wantSingleOk: true,
+		},
+		{
+			path:         []string{"leaflist-defaults", "common-typedef-withdefault", "string"},
+			wantSingle:   "typedef default value",
+			wantDefaults: []string{"typedef default value"},
+			wantSingleOk: true,
 		},
 	} {
 		tname := strings.Join(tc.path, "/")
@@ -1161,8 +1299,11 @@ module defaults {
 		if err != nil {
 			t.Fatalf("[%d_%s] could not retrieve path: %v", i, tname, err)
 		}
-		if got := dir.DefaultValue(); tc.want != got {
-			t.Errorf("[%d_%s] want DefaultValue %q, got %q", i, tname, tc.want, got)
+		if got, gotOk := dir.SingleDefaultValue(); got != tc.wantSingle || gotOk != tc.wantSingleOk {
+			t.Errorf("[%d_%s] got SingleDefaultValue (%q, %v), want (%q, %v)", i, tname, got, gotOk, tc.wantSingle, tc.wantSingleOk)
+		}
+		if diff := cmp.Diff(dir.DefaultValues(), tc.wantDefaults); diff != "" {
+			t.Errorf("[%d_%s] DefaultValues (-got, +want):\n%s", i, tname, diff)
 		}
 	}
 }
@@ -2831,7 +2972,22 @@ func TestDeviation(t *testing.T) {
 			}, {
 				path: "/target/add/default",
 				entry: &Entry{
-					Default: "a default value",
+					Default: []string{"a default value"},
+				},
+			}, {
+				path: "/target/add/default-typedef",
+				entry: &Entry{
+					Default: nil,
+				},
+			}, {
+				path: "/target/add/default-list",
+				entry: &Entry{
+					Default: []string{"foo", "bar", "foo"},
+				},
+			}, {
+				path: "/target/add/default-list-typedef-default",
+				entry: &Entry{
+					Default: nil,
 				},
 			}, {
 				path: "/target/add/mandatory",
@@ -2897,7 +3053,7 @@ func TestDeviation(t *testing.T) {
 					}
 				}`,
 		},
-		wantProcessErrSubstring: "already exists",
+		wantProcessErrSubstring: "already has a default value",
 	}, {
 		desc: "error case - deviate type not recognized",
 		inFiles: map[string]string{
@@ -3063,7 +3219,12 @@ func TestDeviation(t *testing.T) {
 			}, {
 				path: "/target/replace/default",
 				entry: &Entry{
-					Default: "a default value",
+					Default: []string{"a default value"},
+				},
+			}, {
+				path: "/target/replace/default-list",
+				entry: &Entry{
+					Default: []string{"nematodes"},
 				},
 			}, {
 				path: "/target/replace/mandatory",
@@ -3174,6 +3335,29 @@ func TestDeviation(t *testing.T) {
 			}},
 		},
 	}, {
+		// TODO(wenovus): Support deviate delete for leaf-lists for config-false leafs once its semantics are clear.
+		// https://github.com/mbj4668/pyang/issues/756
+		desc: "error case - deviation delete on a leaf-list",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf-list a {
+						type string;
+						default "fish";
+					}
+
+					deviation /a {
+						deviate delete {
+							default "fishsticks";
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "deviate delete on default statements unsupported for leaf-lists",
+	}, {
 		desc: "error case - deviation delete of default has different keyword value",
 		inFiles: map[string]string{
 			"deviate": `
@@ -3194,6 +3378,26 @@ func TestDeviation(t *testing.T) {
 				}`,
 		},
 		wantProcessErrSubstring: "non-matching keyword",
+	}, {
+		desc: "error case - deviation delete where the default didn't exist",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a {
+						type string;
+					}
+
+					deviation /a {
+						deviate delete {
+							default "fishsticks";
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "default statement that doesn't exist",
 	}, {
 		desc: "error case - deviation delete of min-elements has different keyword value",
 		inFiles: map[string]string{
@@ -3332,17 +3536,24 @@ func TestDeviation(t *testing.T) {
 				}
 			}
 
-			if errs := ms.Process(); len(errs) > 0 {
-				var match bool
-				for _, err := range errs {
-					if diff := errdiff.Substring(err, tt.wantProcessErrSubstring); diff == "" {
-						match = true
-						break
-					}
+			errs := ms.Process()
+			if len(errs) == 0 {
+				// Add a nil error to compare against the wanted error string.
+				errs = append(errs, nil)
+			}
+			var match bool
+			for _, err := range errs {
+				if diff := errdiff.Substring(err, tt.wantProcessErrSubstring); diff == "" {
+					match = true
+					break
 				}
-				if !match {
-					t.Fatalf("got errs: %v, want: %v", errs, tt.wantProcessErrSubstring)
-				}
+			}
+			if !match {
+				t.Fatalf("got errs: %v, want: %v", errs, tt.wantProcessErrSubstring)
+			}
+
+			if tt.wantProcessErrSubstring == "" && len(tt.wants) == 0 {
+				t.Fatalf("test case expects no error and no entry. Please change your test case to contain one of them.")
 			}
 
 			for mod, tcs := range tt.wants {
@@ -3369,8 +3580,8 @@ func TestDeviation(t *testing.T) {
 						t.Errorf("%d (%s): did not get expected config statement, got: %v, want: %v", idx, want.path, got.Config, want.entry.Config)
 					}
 
-					if got.Default != want.entry.Default {
-						t.Errorf("%d (%s): did not get expected default statement, got: %v, want: %v", idx, want.path, got.Default, want.entry.Default)
+					if diff := cmp.Diff(got.Default, want.entry.Default, cmpopts.EquateEmpty()); diff != "" {
+						t.Errorf("%d (%s): did not get expected default statement, (-got, +want): %s", idx, want.path, diff)
 					}
 
 					if got.Mandatory != want.entry.Mandatory {
