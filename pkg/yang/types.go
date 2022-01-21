@@ -261,6 +261,12 @@ check:
 			errs = append(errs, fmt.Errorf("%s: %v", Source(t), err))
 		}
 		y.FractionDigits = int(i)
+		// We only know to how to populate Range after knowing the
+		// fractional digit value.
+		y.Range = YangRange{{
+			Number{Value: AbsMinInt64, Negative: true, FractionDigits: uint8(i)},
+			Number{Value: MaxInt64, FractionDigits: uint8(i)},
+		}}
 	case t.FractionDigits != nil:
 		errs = append(errs, fmt.Errorf("%s: fraction-digits only allowed for decimal64 values", Source(t)))
 	case y.Kind == Yidentityref:
@@ -290,12 +296,10 @@ check:
 	}
 
 	if t.Range != nil {
-		yr, err := parseRanges(t.Range.Name, isDecimal64, uint8(y.FractionDigits))
+		yr, err := y.Range.parseChildRanges(t.Range.Name, isDecimal64, uint8(y.FractionDigits))
 		switch {
 		case err != nil:
 			errs = append(errs, fmt.Errorf("%s: bad range: %v", Source(t.Range), err))
-		case !y.Range.Contains(yr):
-			errs = append(errs, fmt.Errorf("%s: bad range: %v not within %v", Source(t.Range), yr, y.Range))
 		case yr.Equal(y.Range):
 		default:
 			y.Range = yr
@@ -303,16 +307,18 @@ check:
 	}
 
 	if t.Length != nil {
-		yr, err := ParseRangesInt(t.Length.Name)
+		parentRange := Uint64Range
+		if y.Length != nil {
+			parentRange = y.Length
+		}
+		yr, err := parentRange.parseChildRanges(t.Length.Name, false, 0)
 		switch {
 		case err != nil:
 			errs = append(errs, fmt.Errorf("%s: bad length: %v", Source(t.Length), err))
-		case !y.Length.Contains(yr):
-			errs = append(errs, fmt.Errorf("%s: bad length: %v not within %v", Source(t.Length), yr, y.Length))
 		case yr.Equal(y.Length):
 		default:
 			for _, r := range yr {
-				if r.Min.Kind == Negative {
+				if r.Min.Negative {
 					errs = append(errs, fmt.Errorf("%s: negative length: %v", Source(t.Length), yr))
 					break
 				}

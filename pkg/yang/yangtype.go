@@ -118,9 +118,8 @@ var (
 		},
 
 		"decimal64": {
-			Name:  "decimal64",
-			Kind:  Ydecimal64,
-			Range: Decimal64Range,
+			Name: "decimal64",
+			Kind: Ydecimal64,
 		},
 		"string": {
 			Name: "string",

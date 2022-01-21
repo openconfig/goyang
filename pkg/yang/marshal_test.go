@@ -221,14 +221,14 @@ func TestMarshalJSON(t *testing.T) {
             "Length": [
               {
                 "Min": {
-                  "Kind": 0,
                   "Value": 10,
-                  "FractionDigits": 0
+                  "FractionDigits": 0,
+                  "Negative": false
                 },
                 "Max": {
-                  "Kind": 0,
                   "Value": 20,
-                  "FractionDigits": 0
+                  "FractionDigits": 0,
+                  "Negative": false
                 }
               }
             ],
@@ -497,14 +497,14 @@ func TestParseAndMarshal(t *testing.T) {
                 "Length": [
                   {
                     "Min": {
-                      "Kind": 0,
                       "Value": 10,
-                      "FractionDigits": 0
+                      "FractionDigits": 0,
+                      "Negative": false
                     },
                     "Max": {
-                      "Kind": 0,
                       "Value": 10,
-                      "FractionDigits": 0
+                      "FractionDigits": 0,
+                      "Negative": false
                     }
                   }
                 ]
@@ -554,14 +554,14 @@ func TestParseAndMarshal(t *testing.T) {
             "Range": [
               {
                 "Min": {
-                  "Kind": 2,
-                  "Value": 0,
-                  "FractionDigits": 0
+                  "Value": 9223372036854775808,
+                  "FractionDigits": 8,
+                  "Negative": true
                 },
                 "Max": {
-                  "Kind": 3,
-                  "Value": 0,
-                  "FractionDigits": 0
+                  "Value": 9223372036854775807,
+                  "FractionDigits": 8,
+                  "Negative": false
                 }
               }
             ]
