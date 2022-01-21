@@ -81,7 +81,7 @@ func TestTypeResolve(t *testing.T) {
 			Name:   "string",
 			Length: &Length{Name: "-42..42"},
 		},
-		err: "unknown: negative length: -42..42",
+		err: `unknown: bad length: -42..42 not within 0..18446744073709551615`,
 	}, {
 		desc: "basic binary with a length",
 		in: &Type{
@@ -136,7 +136,7 @@ func TestTypeResolve(t *testing.T) {
 			Name:           "decimal64",
 			Kind:           Ydecimal64,
 			FractionDigits: 7,
-			Range:          Decimal64Range,
+			Range:          YangRange{Rf(MinInt64, MaxInt64, 7)},
 		},
 	}, {
 		desc: "instance-identifier with unspecified require-instance value (default true)",
@@ -456,7 +456,7 @@ func TestTypeResolveUnions(t *testing.T) {
 	tests := []struct {
 		desc          string
 		leafNode      string
-		wantType      *testTypeStruct
+		wantType      *testEnumTypeStruct
 		wantErrSubstr string
 	}{{
 		desc: "simple union",
@@ -479,9 +479,9 @@ func TestTypeResolveUnions(t *testing.T) {
 				type alpha;
 			}
 		} // end module`,
-		wantType: &testTypeStruct{
+		wantType: &testEnumTypeStruct{
 			Name: "alpha",
-			Type: []*testTypeStruct{{
+			Type: []*testEnumTypeStruct{{
 				Name: "string",
 			}, {
 				Name: "uint32",
@@ -526,9 +526,9 @@ func TestTypeResolveUnions(t *testing.T) {
 				type alpha;
 			}
 		} // end module`,
-		wantType: &testTypeStruct{
+		wantType: &testEnumTypeStruct{
 			Name: "alpha",
-			Type: []*testTypeStruct{{
+			Type: []*testEnumTypeStruct{{
 				Name: "string",
 			}, {
 				Name: "uint32",
@@ -537,7 +537,7 @@ func TestTypeResolveUnions(t *testing.T) {
 				ToInt: map[string]int64{"one": 1, "seven": 7, "zero": 0},
 			}, {
 				Name: "bravo",
-				Type: []*testTypeStruct{{
+				Type: []*testEnumTypeStruct{{
 					Name: "uint8",
 				}, {
 					Name: "uint16",
@@ -585,11 +585,11 @@ func TestTypeResolveUnions(t *testing.T) {
 				type alpha;
 			}
 		} // end module`,
-		wantType: &testTypeStruct{
+		wantType: &testEnumTypeStruct{
 			Name: "alpha",
-			Type: []*testTypeStruct{{
+			Type: []*testEnumTypeStruct{{
 				Name: "union",
-				Type: []*testTypeStruct{{
+				Type: []*testEnumTypeStruct{{
 					Name: "uint32",
 				}, {
 					Name: "string",
@@ -599,7 +599,7 @@ func TestTypeResolveUnions(t *testing.T) {
 				}},
 			}, {
 				Name: "bravo",
-				Type: []*testTypeStruct{{
+				Type: []*testEnumTypeStruct{{
 					Name: "uint8",
 				}, {
 					Name: "uint16",
@@ -633,9 +633,9 @@ func TestTypeResolveUnions(t *testing.T) {
 				}
 			}
 		} // end module`,
-		wantType: &testTypeStruct{
+		wantType: &testEnumTypeStruct{
 			Name: "union",
-			Type: []*testTypeStruct{{
+			Type: []*testEnumTypeStruct{{
 				Name: "string",
 			}, {
 				Name: "uint32",
@@ -675,9 +675,9 @@ func TestTypeResolveUnions(t *testing.T) {
 				type alpha;
 			}
 		} // end module`,
-		wantType: &testTypeStruct{
+		wantType: &testEnumTypeStruct{
 			Name: "alpha",
-			Type: []*testTypeStruct{{
+			Type: []*testEnumTypeStruct{{
 				Name: "string",
 			}, {
 				Name: "uint32",
@@ -719,11 +719,11 @@ func TestTypeResolveUnions(t *testing.T) {
 				}
 			}
 		} // end module`,
-		wantType: &testTypeStruct{
+		wantType: &testEnumTypeStruct{
 			Name: "union",
-			Type: []*testTypeStruct{{
+			Type: []*testEnumTypeStruct{{
 				Name: "alpha",
-				Type: []*testTypeStruct{{
+				Type: []*testEnumTypeStruct{{
 					Name: "string",
 				}, {
 					Name: "uint32",
@@ -855,9 +855,9 @@ func TestTypeResolveUnions(t *testing.T) {
 				}
 			}
 		} // end module`,
-		wantType: &testTypeStruct{
+		wantType: &testEnumTypeStruct{
 			Name: "union",
-			Type: []*testTypeStruct{{
+			Type: []*testEnumTypeStruct{{
 				Name: "uint8",
 			}, {
 				Name:  "enumeration",
@@ -873,7 +873,7 @@ func TestTypeResolveUnions(t *testing.T) {
 				ToInt: map[string]int64{"trois": 3, "quatre": 4},
 			}, {
 				Name: "alpha",
-				Type: []*testTypeStruct{{
+				Type: []*testEnumTypeStruct{{
 					Name: "uint16",
 				}, {
 					Name:  "enumeration",
@@ -889,7 +889,7 @@ func TestTypeResolveUnions(t *testing.T) {
 					ToInt: map[string]int64{"huit": 8, "neuf": 9},
 				}, {
 					Name: "bravo",
-					Type: []*testTypeStruct{{
+					Type: []*testEnumTypeStruct{{
 						Name: "uint32",
 					}, {
 						Name:  "enumeration",
@@ -966,20 +966,20 @@ func TestTypeResolveUnions(t *testing.T) {
 	}
 }
 
-type testTypeStruct struct {
+type testEnumTypeStruct struct {
 	Name string
 	// ToInt is the toInt map representing the enum value (if present).
 	ToInt map[string]int64
-	Type  []*testTypeStruct
+	Type  []*testEnumTypeStruct
 }
 
-// filterTypeNames returns a testTypeStruct with only the
+// filterTypeNames returns a testEnumTypeStruct with only the
 // YangType.Name fields of the given type, preserving
 // the recursive structure of the type, to work around cmp not
 // having an allowlist way of specifying which fields to
 // compare and YangType having a custom Equal function.
-func filterTypeNames(ytype *YangType) *testTypeStruct {
-	filteredNames := &testTypeStruct{Name: ytype.Name}
+func filterTypeNames(ytype *YangType) *testEnumTypeStruct {
+	filteredNames := &testEnumTypeStruct{Name: ytype.Name}
 	if ytype.Enum != nil {
 		filteredNames.ToInt = ytype.Enum.toInt
 	}
@@ -1327,4 +1327,394 @@ func populatePatterns(ytype *YangType, targetType *YangType) {
 		targetType.Type = append(targetType.Type, targetSubtype)
 		populatePatterns(subtype, targetSubtype)
 	}
+}
+
+func TestTypeLengthRange(t *testing.T) {
+	tests := []struct {
+		desc          string
+		leafNode      string
+		wantType      *testRangeTypeStruct
+		wantErrSubstr string
+	}{{
+		desc: "simple uint32",
+		leafNode: `
+			typedef alpha {
+				type uint32 {
+					range "1..4 | 10..20";
+				}
+			}
+			leaf test-leaf {
+				type alpha;
+			}
+		} // end module`,
+		wantType: &testRangeTypeStruct{
+			Name:  "alpha",
+			Range: YangRange{R(1, 4), R(10, 20)},
+		},
+	}, {
+		desc: "inherited uint32",
+		leafNode: `
+			typedef alpha {
+				type uint32 {
+					range "1..4 | 10..20";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					range "min..3 | 12..max";
+				}
+			}
+			leaf test-leaf {
+				type bravo;
+			}
+		} // end module`,
+		wantType: &testRangeTypeStruct{
+			Name:  "bravo",
+			Range: YangRange{R(1, 3), R(12, 20)},
+		},
+	}, {
+		desc: "inherited uint32 range violation",
+		leafNode: `
+			typedef alpha {
+				type uint32 {
+					range "1..4 | 10..20";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					range "min..max";
+				}
+			}
+			leaf test-leaf {
+				type bravo;
+			}
+		} // end module`,
+		wantErrSubstr: "not within",
+	}, {
+		desc: "unrestricted decimal64",
+		leafNode: `
+			typedef alpha {
+				type decimal64 {
+					fraction-digits 2;
+				}
+			}
+			leaf test-leaf {
+				type alpha;
+			}
+		} // end module`,
+		wantType: &testRangeTypeStruct{
+			Name:  "alpha",
+			Range: YangRange{Rf(MinInt64, MaxInt64, 2)},
+		},
+	}, {
+		desc: "simple restricted decimal64",
+		leafNode: `
+			typedef alpha {
+				type decimal64 {
+					fraction-digits 2;
+					range "1 .. 3.14 | 10 | 20..max";
+				}
+			}
+			leaf test-leaf {
+				type alpha;
+			}
+		} // end module`,
+		wantType: &testRangeTypeStruct{
+			Name:  "alpha",
+			Range: YangRange{Rf(100, 314, 2), Rf(1000, 1000, 2), Rf(2000, MaxInt64, 2)},
+		},
+	}, {
+		desc: "simple decimal64 with inherited ranges",
+		leafNode: `
+			typedef alpha {
+				type decimal64 {
+					fraction-digits 3;
+					range "1 .. 3.14 | 10 | 20..max";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					range "min .. 2.72 | 42 .. max";
+				}
+			}
+			leaf test-leaf {
+				type bravo;
+			}
+		} // end module`,
+		wantType: &testRangeTypeStruct{
+			Name:  "bravo",
+			Range: YangRange{Rf(1000, 2720, 3), Rf(42000, MaxInt64, 3)},
+		},
+	}, {
+		desc: "triple-inherited decimal64",
+		leafNode: `
+			typedef alpha {
+				type decimal64 {
+					fraction-digits 2;
+				}
+			}
+			typedef bravo {
+				type alpha {
+					range "1 .. 3.14 | 10 | 20..max";
+				}
+			}
+			typedef charlie {
+				type bravo {
+					range "min .. 2.72 | 42 .. max";
+				}
+			}
+			leaf test-leaf {
+				type charlie;
+			}
+		} // end module`,
+		wantType: &testRangeTypeStruct{
+			Name:  "charlie",
+			Range: YangRange{Rf(100, 272, 2), Rf(4200, MaxInt64, 2)},
+		},
+	}, {
+		desc: "simple decimal64 with inherited ranges",
+		leafNode: `
+			typedef alpha {
+				type decimal64 {
+					fraction-digits 2;
+					range "1 .. 3.14 | 10 | 20..max";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					range "min..max";
+				}
+			}
+			leaf test-leaf {
+				type alpha;
+			}
+		} // end module`,
+		wantErrSubstr: "not within",
+	}, {
+		desc: "simple decimal64 with too few fractional digits",
+		leafNode: `
+			typedef alpha {
+				type decimal64 {
+					fraction-digits 1;
+					range "1 .. 3.14 | 10 | 20..max";
+				}
+			}
+			leaf test-leaf {
+				type alpha;
+			}
+		} // end module`,
+		wantErrSubstr: "has too much precision",
+	}, {
+		desc: "simple decimal64 fractional digit on inherited decimal64 type",
+		leafNode: `
+			typedef alpha {
+				type decimal64 {
+					fraction-digits 2;
+					range "1 .. 3.14 | 10 | 20..max";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					fraction-digits 2;
+					range "25..max";
+				}
+			}
+			leaf test-leaf {
+				type bravo;
+			}
+		} // end module`,
+		wantErrSubstr: "overriding of fraction-digits not allowed",
+	}, {
+		desc: "simple string with length",
+		leafNode: `
+			typedef alpha {
+				type string {
+					length "1..4 | 10..20 | 30..max";
+				}
+			}
+			leaf test-leaf {
+				type alpha;
+			}
+		} // end module`,
+		wantType: &testRangeTypeStruct{
+			Name:   "alpha",
+			Length: YangRange{R(1, 4), R(10, 20), YRange{FromInt(30), FromUint(maxUint64)}},
+		},
+	}, {
+		desc: "inherited string",
+		leafNode: `
+			typedef alpha {
+				type string {
+					length "1..4 | 10..20 | 30..max";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					length "min..3 | 42..max";
+				}
+			}
+			leaf test-leaf {
+				type bravo;
+			}
+		} // end module`,
+		wantType: &testRangeTypeStruct{
+			Name:   "bravo",
+			Length: YangRange{R(1, 3), YRange{FromInt(42), FromUint(maxUint64)}},
+		},
+	}, {
+		desc: "inherited binary",
+		leafNode: `
+			typedef alpha {
+				type binary {
+					length "1..4 | 10..20 | 30..max";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					length "min..3 | 42..max";
+				}
+			}
+			leaf test-leaf {
+				type bravo;
+			}
+		} // end module`,
+		wantType: &testRangeTypeStruct{
+			Name:   "bravo",
+			Length: YangRange{R(1, 3), YRange{FromInt(42), FromUint(maxUint64)}},
+		},
+	}, {
+		desc: "inherited string length violation",
+		leafNode: `
+			typedef alpha {
+				type string {
+					length "1..4 | 10..20 | 30..max";
+				}
+			}
+			typedef bravo {
+				type alpha {
+					length "min..max";
+				}
+			}
+			leaf test-leaf {
+				type bravo;
+			}
+		} // end module`,
+		wantErrSubstr: "not within",
+	}, {
+		desc: "simple union",
+		leafNode: `
+				typedef alpha {
+					type union {
+						type string;
+						type binary {
+							length "min..5|999..max";
+						}
+						type int8 {
+							range "min..-42|42..max";
+						}
+						type enumeration {
+							enum zero;
+							enum one;
+							enum seven {
+								value 7;
+							}
+						}
+					}
+				}
+				leaf test-leaf {
+					type alpha;
+				}
+			} // end module`,
+		wantType: &testRangeTypeStruct{
+			Name: "alpha",
+			Type: []*testRangeTypeStruct{{
+				Name: "string",
+			}, {
+				Name:   "binary",
+				Length: YangRange{R(0, 5), YRange{FromInt(999), FromUint(maxUint64)}},
+			}, {
+				Name:  "int8",
+				Range: YangRange{R(minInt8, -42), R(42, maxInt8)},
+			}, {
+				Name: "enumeration",
+			}},
+		},
+	}}
+
+	getTestLeaf := func(ms *Modules) (*YangType, error) {
+		const moduleName = "test"
+		m, ok := ms.Modules[moduleName]
+		if !ok {
+			return nil, fmt.Errorf("module not found: %q", moduleName)
+		}
+		if len(m.Leaf) == 0 {
+			return nil, fmt.Errorf("node %v is missing imports", m)
+		}
+		e := ToEntry(m)
+		return e.Dir["test-leaf"].Type, nil
+	}
+
+	for _, tt := range tests {
+		inModules := map[string]string{
+			"test": `
+				module test {
+					prefix "t";
+					namespace "urn:t";
+					` + tt.leafNode,
+		}
+
+		t.Run(tt.desc, func(t *testing.T) {
+			ms := NewModules()
+			for n, m := range inModules {
+				if err := ms.Parse(m, n); err != nil {
+					t.Fatalf("error parsing module %s, got: %v, want: nil", n, err)
+				}
+			}
+			errs := ms.Process()
+			var err error
+			if len(errs) > 1 {
+				t.Fatalf("Got more than 1 error: %v", errs)
+			} else if len(errs) == 1 {
+				err = errs[0]
+			}
+			if diff := errdiff.Substring(err, tt.wantErrSubstr); diff != "" {
+				t.Errorf("Did not get expected error: %s", diff)
+			}
+			if err != nil {
+				return
+			}
+
+			gotType, err := getTestLeaf(ms)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if diff := cmp.Diff(filterRanges(gotType), tt.wantType); diff != "" {
+				t.Errorf("Type.resolve() union types test (-got, +want):\n%s", diff)
+			}
+		})
+	}
+}
+
+// testRangeTypeStruct is a filtered-down version of YangType where only certain
+// fields are preserved for targeted testing.
+type testRangeTypeStruct struct {
+	Name   string
+	Length YangRange
+	Range  YangRange
+	Type   []*testRangeTypeStruct
+}
+
+// filterRanges returns a testRangeTypeStruct with only the Name, Length, and Range
+// fields of the given YangType, preserving the recursive structure of the
+// type, to work around cmp not having an allowlist way of specifying which
+// fields to compare and YangType having a custom Equal function.
+func filterRanges(ytype *YangType) *testRangeTypeStruct {
+	filteredType := &testRangeTypeStruct{Name: ytype.Name}
+	filteredType.Length = ytype.Length
+	filteredType.Range = ytype.Range
+	for _, subtype := range ytype.Type {
+		filteredType.Type = append(filteredType.Type, filterRanges(subtype))
+	}
+	return filteredType
 }
