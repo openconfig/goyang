@@ -145,6 +145,7 @@ func (t *Typedef) resolve(d *typeDictionary) []error {
 		y.Units = t.Units.Name
 	}
 	if t.Default != nil {
+		y.HasDefault = true
 		y.Default = t.Default.Name
 	}
 

@@ -394,9 +394,10 @@ func TestTypedefResolve(t *testing.T) {
 			Base: &Type{
 				Name: "int64",
 			},
-			Units:   "nanoseconds",
-			Default: "42",
-			Range:   Int64Range,
+			Units:      "nanoseconds",
+			Default:    "42",
+			HasDefault: true,
+			Range:      Int64Range,
 		},
 	}, {
 		desc: "uint32 with more specific range",
