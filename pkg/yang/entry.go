@@ -779,7 +779,7 @@ func ToEntry(n Node) (e *Entry) {
 					ms.mergedSubmodule[srcToIncluded] = true
 					ms.mergedSubmodule[includedToParent] = true
 					e.merge(a.Module.Prefix, nil, ToEntry(a.Module))
-				case ParseOptions.IgnoreSubmoduleCircularDependencies:
+				case ms.ParseOptions.IgnoreSubmoduleCircularDependencies:
 					continue
 				default:
 					e.addError(fmt.Errorf("%s: has a circular dependency, importing %s", n.NName(), a.Module.NName()))
@@ -850,7 +850,7 @@ func ToEntry(n Node) (e *Entry) {
 			for _, a := range fv.Interface().([]*Uses) {
 				grouping := ToEntry(a)
 				e.merge(nil, nil, grouping)
-				if ParseOptions.StoreUses {
+				if ms.ParseOptions.StoreUses {
 					e.Uses = append(e.Uses, &UsesStmt{a, grouping.shallowDup()})
 				}
 			}

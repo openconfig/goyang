@@ -504,10 +504,8 @@ module when {
 }
 
 func TestGetWhenXPath(t *testing.T) {
-	ParseOptions.StoreUses = true
-	defer func() { ParseOptions.StoreUses = false }()
-
 	ms := NewModules()
+	ms.ParseOptions.StoreUses = true
 	for _, tt := range testWhenModules {
 		if err := ms.Parse(tt.in, tt.name); err != nil {
 			t.Fatalf("could not parse module %s: %v", tt.name, err)
@@ -775,10 +773,8 @@ func TestAugmentedEntry(t *testing.T) {
 }
 
 func TestUsesEntry(t *testing.T) {
-	ParseOptions.StoreUses = true
-	defer func() { ParseOptions.StoreUses = false }()
-
 	ms := NewModules()
+	ms.ParseOptions.StoreUses = true
 	for _, tt := range testAugmentAndUsesModules {
 		if err := ms.Parse(tt.in, tt.name); err != nil {
 			t.Fatalf("could not parse module %s: %v", tt.name, err)
@@ -1024,7 +1020,7 @@ func TestIgnoreCircularDependencies(t *testing.T) {
 
 	for _, tt := range tests {
 		ms := NewModules()
-		ParseOptions.IgnoreSubmoduleCircularDependencies = tt.inIgnoreCircDep
+		ms.ParseOptions.IgnoreSubmoduleCircularDependencies = tt.inIgnoreCircDep
 		for n, m := range tt.inModules {
 			if err := ms.Parse(m, n); err != nil {
 				if !tt.wantErrs {
@@ -1674,7 +1670,7 @@ func TestFullModuleProcess(t *testing.T) {
 	for _, tt := range tests {
 		ms := NewModules()
 
-		ParseOptions.IgnoreSubmoduleCircularDependencies = tt.inIgnoreCircDeps
+		ms.ParseOptions.IgnoreSubmoduleCircularDependencies = tt.inIgnoreCircDeps
 		for n, m := range tt.inModules {
 			if err := ms.Parse(m, n); err != nil {
 				t.Errorf("%s: error parsing module %s, got: %v, want: nil", tt.name, n, err)
