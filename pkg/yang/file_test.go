@@ -23,15 +23,7 @@ import (
 	"testing"
 )
 
-func testPathReset() {
-	Path = []string{}
-	pathMap = map[string]bool{}
-}
-
 func TestFindFile(t *testing.T) {
-	// clean up global state
-	defer testPathReset()
-
 	sep := string(os.PathSeparator)
 
 	for _, tt := range []struct {
@@ -58,7 +50,8 @@ func TestFindFile(t *testing.T) {
 		},
 	} {
 		var checked []string
-		Path = tt.path
+		ms := NewModules()
+		ms.Path = tt.path
 		readFile = func(path string) ([]byte, error) {
 			checked = append(checked, path)
 			return nil, errors.New("no such file")
@@ -66,7 +59,7 @@ func TestFindFile(t *testing.T) {
 		scanDir = func(dir, name string, recurse bool) string {
 			return filepath.Join(dir, name)
 		}
-		if _, _, err := findFile(tt.name); err == nil {
+		if _, _, err := ms.findFile(tt.name); err == nil {
 			t.Errorf("%s unexpectedly succeeded", tt.name)
 			continue
 		}
@@ -77,9 +70,6 @@ func TestFindFile(t *testing.T) {
 }
 
 func TestScanForPathsAndAddModules(t *testing.T) {
-	// clean up global state
-	defer testPathReset()
-
 	// disable any readFile mock setup by other tests
 	readFile = ioutil.ReadFile
 
@@ -93,13 +83,13 @@ func TestScanForPathsAndAddModules(t *testing.T) {
 	if len(paths) != 2 {
 		t.Errorf("got %d paths imported, want 2", len(paths))
 	}
+	ms := NewModules()
 	// add the paths found in the scan to the module path
-	AddPath(paths...)
+	ms.AddPath(paths...)
 
 	// confirm we can load the four modules that exist in
 	// the two paths we scanned.
 	modules := []string{"aug", "base", "other", "subdir1"}
-	ms := NewModules()
 	for _, name := range modules {
 		if _, err := ms.GetModule(name); err != nil {
 			t.Errorf("getting %s: %v", name, err)

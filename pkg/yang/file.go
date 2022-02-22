@@ -24,33 +24,11 @@ import (
 	"strings"
 )
 
-// TODO(borman): encapsulate all of this someday so you can parse
-// two completely independent yang files with different Paths.
-
 var (
-	// Path is the list of directories to look for .yang files in.
-	Path []string
-	// pathMap is used to prevent adding dups in Path.
-	pathMap = map[string]bool{}
-
 	// revisionDateSuffixRegex matches on the revision-date portion of a YANG
 	// file's name.
 	revisionDateSuffixRegex = regexp.MustCompile(`^@\d{4}-\d{2}-\d{2}\.yang$`)
 )
-
-// AddPath adds the directories specified in p, a colon separated list
-// of directory names, to Path, if they are not already in Path. Using
-// multiple arguments is also supported.
-func AddPath(paths ...string) {
-	for _, path := range paths {
-		for _, p := range strings.Split(path, ":") {
-			if !pathMap[p] {
-				pathMap[p] = true
-				Path = append(Path, p)
-			}
-		}
-	}
-}
 
 // PathsWithModules returns all paths under and including the
 // root containing files with a ".yang" extension, as well as
@@ -77,6 +55,20 @@ func PathsWithModules(root string) (paths []string, err error) {
 	return
 }
 
+// AddPath adds the directories specified in p, a colon separated list
+// of directory names, to Path, if they are not already in Path. Using
+// multiple arguments is also supported.
+func (ms *Modules) AddPath(paths ...string) {
+	for _, path := range paths {
+		for _, p := range strings.Split(path, ":") {
+			if !ms.pathMap[p] {
+				ms.pathMap[p] = true
+				ms.Path = append(ms.Path, p)
+			}
+		}
+	}
+}
+
 // readFile makes testing of findFile easier.
 var readFile = ioutil.ReadFile
 
@@ -96,7 +88,7 @@ var scanDir = findInDir
 //
 // The current directory (.) is always checked first, no matter the value of
 // Path.
-func findFile(name string) (string, string, error) {
+func (ms *Modules) findFile(name string) (string, string, error) {
 	slash := strings.Index(name, "/")
 	if slash < 0 && !strings.HasSuffix(name, ".yang") {
 		name += ".yang"
@@ -108,14 +100,14 @@ func findFile(name string) (string, string, error) {
 
 	switch data, err := readFile(name); true {
 	case err == nil:
-		AddPath(filepath.Dir(name))
+		ms.AddPath(filepath.Dir(name))
 		return name, string(data), nil
 	case slash >= 0:
 		// If there are any /'s in the name then don't search Path.
 		return "", "", fmt.Errorf("no such file: %s", name)
 	}
 
-	for _, dir := range Path {
+	for _, dir := range ms.Path {
 		var n string
 		if filepath.Base(dir) == "..." {
 			n = scanDir(filepath.Dir(dir), name, true)

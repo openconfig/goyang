@@ -44,6 +44,10 @@ type Modules struct {
 	// directly set by the caller to influence how goyang will behave in the presence
 	// of certain exceptional cases.
 	ParseOptions Options
+	// Path is the list of directories to look for .yang files in.
+	Path []string
+	// pathMap is used to prevent adding dups in Path.
+	pathMap map[string]bool
 }
 
 // NewModules returns a newly created and initialized Modules.
@@ -56,6 +60,7 @@ func NewModules() *Modules {
 		typeDict:        newTypeDictionary(),
 		mergedSubmodule: map[string]bool{},
 		entryCache:      map[Node]*Entry{},
+		pathMap:         map[string]bool{},
 	}
 	return ms
 }
@@ -65,7 +70,7 @@ func NewModules() *Modules {
 // e.g., foo.yang is named foo).  An error is returned if the file is not
 // found or there was an error parsing the file.
 func (ms *Modules) Read(name string) error {
-	name, data, err := findFile(name)
+	name, data, err := ms.findFile(name)
 	if err != nil {
 		return err
 	}
