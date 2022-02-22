@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package util contains goyang utility functions that could be useful for
-// external users.
-package util
+// Package yangentry contains high-level helpers for using yang.Entry objects.
+package yangentry
 
 import (
 	"fmt"
@@ -22,13 +21,13 @@ import (
 	"github.com/openconfig/goyang/pkg/yang"
 )
 
-// ProcessModules takes a list of either module/submodule names or .yang file
+// Parse takes a list of either module/submodule names or .yang file
 // paths, and a list of include paths. It runs the yang parser on the YANG
 // files by searching for them in the include paths or in the current
 // directory, returning a slice of yang.Entry pointers which represent the
 // parsed top level modules. It also returns a list of errors encountered while
 // parsing, if any.
-func ProcessModules(yangfiles, path []string) (map[string]*yang.Entry, []error) {
+func Parse(yangfiles, path []string) (map[string]*yang.Entry, []error) {
 	ms := yang.NewModules()
 
 	for _, p := range path {
