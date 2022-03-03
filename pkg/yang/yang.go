@@ -487,6 +487,7 @@ type Choice struct {
 	Anydata     []*AnyData   `yang:"anydata"`
 	Anyxml      []*AnyXML    `yang:"anyxml"`
 	Case        []*Case      `yang:"case"`
+	Choice      []*Choice    `yang:"choice"`
 	Config      *Value       `yang:"config"`
 	Container   []*Container `yang:"container"`
 	Default     *Value       `yang:"default"`
