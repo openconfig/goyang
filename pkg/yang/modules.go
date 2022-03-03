@@ -165,10 +165,16 @@ func (ms *Modules) add(n Node) error {
 	fullName := mod.FullName()
 	mod.Modules = ms
 
+	// Fix for issue where we get a false error message about duplicates in the same directory
+	// referencing the same file like such:
+	// duplicate module etsi-nfv-descriptors@2019-04-25 at /tmp/yangcache/etsi-nfv-descriptors.yang:1:1 and /tmp/yangcache/etsi-nfv-descriptors.yang:1:1
 	if o := m[fullName]; o != nil {
-		return fmt.Errorf("duplicate %s %s at %s and %s", kind, fullName, Source(o), Source(n))
+		if Source(o) != Source(n) {
+			return fmt.Errorf("duplicate %s %s at %s and %s", kind, fullName, Source(o), Source(n))
+		}
+	} else {
+		m[fullName] = mod
 	}
-	m[fullName] = mod
 	if fullName == name {
 		return nil
 	}
