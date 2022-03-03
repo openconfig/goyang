@@ -1281,18 +1281,18 @@ func (e *Entry) Find(name string) *Entry {
 	if e == nil || name == "" {
 		return nil
 	}
+	context := e
 	parts := strings.Split(name, "/")
 
 	// If parts[0] is "" then this path started with a /
 	// and we need to find our parent.
 	if parts[0] == "" {
 		parts = parts[1:]
-		contextNode := e.Node
 		for e.Parent != nil {
 			e = e.Parent
 		}
 		if prefix, _ := getPrefix(parts[0]); prefix != "" {
-			m := module(FindModuleByPrefix(contextNode, prefix))
+			m := module(FindModuleByPrefix(context.Node, prefix))
 			if m == nil {
 				e.addError(fmt.Errorf("cannot find module giving prefix %q within context entry %q", prefix, e.Path()))
 				return nil
@@ -1306,7 +1306,7 @@ func (e *Entry) Find(name string) *Entry {
 	for _, part := range parts {
 		switch {
 		case e == nil:
-			return nil
+			// return nil
 		case part == ".":
 		case part == "..":
 			e = e.Parent
@@ -1326,6 +1326,23 @@ func (e *Entry) Find(name string) *Entry {
 				return nil
 			default:
 				e = e.Dir[part]
+			}
+		}
+	}
+	// this may be an augment of a sibling submodule
+	// also check the other submodules included as well
+	// get the entry's module/submodule
+	if e == nil {
+		e = context
+		for e.Parent != nil {
+			// get the entries module/submodule
+			e = e.Parent
+		}
+		for _, m := range e.Node.(*Module).Include {
+			me := ToEntry(m.Module)
+			e = me.Find(name)
+			if e != nil {
+				break
 			}
 		}
 	}
