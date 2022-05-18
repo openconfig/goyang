@@ -198,12 +198,12 @@ func TestTypeResolve(t *testing.T) {
 				min:    MinEnum,
 				max:    MaxEnum,
 				unique: true,
-				toString: map[int64]string{
+				ToString: map[int64]string{
 					0: "MERCURY",
 					1: "VENUS",
 					2: "EARTH",
 				},
-				toInt: map[string]int64{
+				ToInt: map[string]int64{
 					"MERCURY": 0,
 					"VENUS":   1,
 					"EARTH":   2,
@@ -228,12 +228,12 @@ func TestTypeResolve(t *testing.T) {
 				min:    MinEnum,
 				max:    MaxEnum,
 				unique: true,
-				toString: map[int64]string{
+				ToString: map[int64]string{
 					-1: "MERCURY",
 					10: "VENUS",
 					30: "EARTH",
 				},
-				toInt: map[string]int64{
+				ToInt: map[string]int64{
 					"MERCURY": -1,
 					"VENUS":   10,
 					"EARTH":   30,
@@ -258,12 +258,12 @@ func TestTypeResolve(t *testing.T) {
 				min:    MinEnum,
 				max:    MaxEnum,
 				unique: true,
-				toString: map[int64]string{
+				ToString: map[int64]string{
 					-1: "MERCURY",
 					10: "VENUS",
 					11: "EARTH",
 				},
-				toInt: map[string]int64{
+				ToInt: map[string]int64{
 					"MERCURY": -1,
 					"VENUS":   10,
 					"EARTH":   11,
@@ -968,7 +968,7 @@ func TestTypeResolveUnions(t *testing.T) {
 
 type testEnumTypeStruct struct {
 	Name string
-	// ToInt is the toInt map representing the enum value (if present).
+	// ToInt is the ToInt map representing the enum value (if present).
 	ToInt map[string]int64
 	Type  []*testEnumTypeStruct
 }
@@ -981,7 +981,7 @@ type testEnumTypeStruct struct {
 func filterTypeNames(ytype *YangType) *testEnumTypeStruct {
 	filteredNames := &testEnumTypeStruct{Name: ytype.Name}
 	if ytype.Enum != nil {
-		filteredNames.ToInt = ytype.Enum.toInt
+		filteredNames.ToInt = ytype.Enum.ToInt
 	}
 	for _, subtype := range ytype.Type {
 		filteredNames.Type = append(filteredNames.Type, filterTypeNames(subtype))
