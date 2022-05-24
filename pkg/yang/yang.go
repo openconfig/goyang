@@ -51,12 +51,6 @@ func (s *Value) asRangeInt(min, max int64) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	switch n.Kind {
-	case MinNumber:
-		return min, nil
-	case MaxNumber:
-		return max, nil
-	}
 	i, err := n.Int()
 	if err != nil {
 		return 0, err
@@ -101,8 +95,8 @@ func (s *Value) asString() string {
 // A SubModule is defined in: http://tools.ietf.org/html/rfc6020#section-7.2
 type Module struct {
 	Name       string       `yang:"Name,nomerge"`
-	Source     *Statement   `yang:"Statement,nomerge"`
-	Parent     Node         `yang:"Parent,nomerge"`
+	Source     *Statement   `yang:"Statement,nomerge" json:"-"`
+	Parent     Node         `yang:"Parent,nomerge" json:"-"`
 	Extensions []*Statement `yang:"Ext"`
 
 	Anydata      []*AnyData      `yang:"anydata"`
@@ -134,12 +128,9 @@ type Module struct {
 	Uses         []*Uses         `yang:"uses"`
 	YangVersion  *Value          `yang:"yang-version,nomerge"`
 
-	// modules is used to get back to the Modules structure
-	// when searching for a rooted element in the schema tree
-	// as the schema tree has multiple root elements.
-	// typedefs is a list of all top level typedefs in this
-	// module.
-	modules *Modules
+	// Modules references the Modules object from which this Module node
+	// was parsed.
+	Modules *Modules
 }
 
 func (s *Module) Kind() string {
@@ -188,13 +179,14 @@ func (s *Module) GetPrefix() string {
 	return pfx.Name
 }
 
+// getPrefix returns the local prefix of the module used to refer to itself.
 func (s *Module) getPrefix() *Value {
 	switch {
 	case s == nil:
 		return nil
-	case s.Prefix != nil:
+	case s.Kind() == "module" && s.Prefix != nil:
 		return s.Prefix
-	case s.BelongsTo != nil:
+	case s.Kind() == "submodule" && s.BelongsTo != nil:
 		return s.BelongsTo.Prefix
 	default:
 		return nil
@@ -204,8 +196,8 @@ func (s *Module) getPrefix() *Value {
 // An Import is defined in: http://tools.ietf.org/html/rfc6020#section-7.1.5
 type Import struct {
 	Name       string       `yang:"Name,nomerge"`
-	Source     *Statement   `yang:"Statement,nomerge"`
-	Parent     Node         `yang:"Parent,nomerge"`
+	Source     *Statement   `yang:"Statement,nomerge" json:"-"`
+	Parent     Node         `yang:"Parent,nomerge" json:"-"`
 	Extensions []*Statement `yang:"Ext"`
 
 	Prefix       *Value `yang:"prefix,required"`
@@ -227,9 +219,9 @@ func (s *Import) Exts() []*Statement    { return s.Extensions }
 // An Include is defined in: http://tools.ietf.org/html/rfc6020#section-7.1.6
 type Include struct {
 	Name       string       `yang:"Name,nomerge"`
-	Source     *Statement   `yang:"Statement,nomerge"`
-	Parent     Node         `yang:"Parent,nomerge"`
-	Extensions []*Statement `yang:"Ext"`
+	Source     *Statement   `yang:"Statement,nomerge" json:"-"`
+	Parent     Node         `yang:"Parent,nomerge" json:"-"`
+	Extensions []*Statement `yang:"Ext" json:",omitempty"`
 
 	RevisionDate *Value `yang:"revision-date"`
 
@@ -247,9 +239,9 @@ func (s *Include) Exts() []*Statement    { return s.Extensions }
 // A Revision is defined in: http://tools.ietf.org/html/rfc6020#section-7.1.9
 type Revision struct {
 	Name       string       `yang:"Name,nomerge"`
-	Source     *Statement   `yang:"Statement,nomerge"`
-	Parent     Node         `yang:"Parent,nomerge"`
-	Extensions []*Statement `yang:"Ext"`
+	Source     *Statement   `yang:"Statement,nomerge" json:"-"`
+	Parent     Node         `yang:"Parent,nomerge" json:"-"`
+	Extensions []*Statement `yang:"Ext" json:",omitempty"`
 
 	Description *Value `yang:"description"`
 	Reference   *Value `yang:"reference"`
@@ -264,9 +256,9 @@ func (s *Revision) Exts() []*Statement    { return s.Extensions }
 // A BelongsTo is defined in: http://tools.ietf.org/html/rfc6020#section-7.2.2
 type BelongsTo struct {
 	Name       string       `yang:"Name,nomerge"`
-	Source     *Statement   `yang:"Statement,nomerge"`
-	Parent     Node         `yang:"Parent,nomerge"`
-	Extensions []*Statement `yang:"Ext"`
+	Source     *Statement   `yang:"Statement,nomerge" json:"-"`
+	Parent     Node         `yang:"Parent,nomerge" json:"-"`
+	Extensions []*Statement `yang:"Ext" json:",omitempty"`
 
 	Prefix *Value `yang:"prefix,required"`
 }
@@ -369,15 +361,15 @@ func (s *Container) Typedefs() []*Typedef   { return s.Typedef }
 
 // A Must is defined in: http://tools.ietf.org/html/rfc6020#section-7.5.3
 type Must struct {
-	Name       string       `yang:"Name,nomerge"`
-	Source     *Statement   `yang:"Statement,nomerge"`
-	Parent     Node         `yang:"Parent,nomerge"`
-	Extensions []*Statement `yang:"Ext"`
+	Name       string       `yang:"Name,nomerge" json:",omitempty"`
+	Source     *Statement   `yang:"Statement,nomerge" json:"-"`
+	Parent     Node         `yang:"Parent,nomerge" json:"-"`
+	Extensions []*Statement `yang:"Ext" json:",omitempty"`
 
-	Description  *Value `yang:"description"`
-	ErrorAppTag  *Value `yang:"error-app-tag"`
-	ErrorMessage *Value `yang:"error-message"`
-	Reference    *Value `yang:"reference"`
+	Description  *Value `yang:"description" json:",omitempty"`
+	ErrorAppTag  *Value `yang:"error-app-tag" json:",omitempty"`
+	ErrorMessage *Value `yang:"error-message" json:",omitempty"`
+	Reference    *Value `yang:"reference" json:",omitempty"`
 }
 
 func (Must) Kind() string             { return "must" }
@@ -412,7 +404,9 @@ func (s *Leaf) NName() string         { return s.Name }
 func (s *Leaf) Statement() *Statement { return s.Source }
 func (s *Leaf) Exts() []*Statement    { return s.Extensions }
 
-// A LeafList is defined in: http://tools.ietf.org/html/rfc6020#section-7.7
+// A LeafList is defined in:
+// YANG 1:   http://tools.ietf.org/html/rfc6020#section-7.7
+// YANG 1.1: https://tools.ietf.org/html/rfc7950#section-7.7
 // It this is supposed to be an array of nodes..
 type LeafList struct {
 	Name       string       `yang:"Name,nomerge"`
@@ -421,6 +415,7 @@ type LeafList struct {
 	Extensions []*Statement `yang:"Ext"`
 
 	Config      *Value   `yang:"config"`
+	Default     []*Value `yang:"default"`
 	Description *Value   `yang:"description"`
 	IfFeature   []*Value `yang:"if-feature"`
 	MaxElements *Value   `yang:"max-elements"`
@@ -837,6 +832,11 @@ func (s *Identity) PrefixedName() string {
 	return fmt.Sprintf("%s:%s", RootNode(s).GetPrefix(), s.Name)
 }
 
+// modulePrefixedName returns the module-qualified name for the identity.
+func (s *Identity) modulePrefixedName() string {
+	return fmt.Sprintf("%s:%s", module(s).Name, s.Name)
+}
+
 // IsDefined behaves the same as the implementation for Enum - it returns
 // true if an identity with the name is defined within the Values of the
 // identity
@@ -858,14 +858,14 @@ func (s *Identity) GetValue(name string) *Identity {
 // An Extension is defined in: http://tools.ietf.org/html/rfc6020#section-7.17
 type Extension struct {
 	Name       string       `yang:"Name,nomerge"`
-	Source     *Statement   `yang:"Statement,nomerge"`
-	Parent     Node         `yang:"Parent,nomerge"`
-	Extensions []*Statement `yang:"Ext"`
+	Source     *Statement   `yang:"Statement,nomerge" json:"-"`
+	Parent     Node         `yang:"Parent,nomerge" json:"-"`
+	Extensions []*Statement `yang:"Ext" json:",omitempty"`
 
-	Argument    *Argument `yang:"argument"`
-	Description *Value    `yang:"description"`
-	Reference   *Value    `yang:"reference"`
-	Status      *Value    `yang:"status"`
+	Argument    *Argument `yang:"argument" json:",omitempty"`
+	Description *Value    `yang:"description" json:",omitempty"`
+	Reference   *Value    `yang:"reference" json:",omitempty"`
+	Status      *Value    `yang:"status" json:",omitempty"`
 }
 
 func (Extension) Kind() string             { return "extension" }
@@ -877,11 +877,11 @@ func (s *Extension) Exts() []*Statement    { return s.Extensions }
 // An Argument is defined in: http://tools.ietf.org/html/rfc6020#section-7.17.2
 type Argument struct {
 	Name       string       `yang:"Name,nomerge"`
-	Source     *Statement   `yang:"Statement,nomerge"`
-	Parent     Node         `yang:"Parent,nomerge"`
-	Extensions []*Statement `yang:"Ext"`
+	Source     *Statement   `yang:"Statement,nomerge" json:"-"`
+	Parent     Node         `yang:"Parent,nomerge" json:"-"`
+	Extensions []*Statement `yang:"Ext" json:",omitempty"`
 
-	YinElement *Value `yang:"yin-element"`
+	YinElement *Value `yang:"yin-element" json:",omitempty"`
 }
 
 func (Argument) Kind() string             { return "argument" }
@@ -909,14 +909,14 @@ func (s *Element) Exts() []*Statement    { return s.Extensions }
 // A Feature is defined in: http://tools.ietf.org/html/rfc6020#section-7.18.1
 type Feature struct {
 	Name       string       `yang:"Name,nomerge"`
-	Source     *Statement   `yang:"Statement,nomerge"`
-	Parent     Node         `yang:"Parent,nomerge"`
-	Extensions []*Statement `yang:"Ext"`
+	Source     *Statement   `yang:"Statement,nomerge" json:"-"`
+	Parent     Node         `yang:"Parent,nomerge" json:"-"`
+	Extensions []*Statement `yang:"Ext" json:",omitempty"`
 
-	Description *Value   `yang:"description"`
-	IfFeature   []*Value `yang:"if-feature"`
-	Status      *Value   `yang:"status"`
-	Reference   *Value   `yang:"reference"`
+	Description *Value   `yang:"description" json:",omitempty"`
+	IfFeature   []*Value `yang:"if-feature" json:",omitempty"`
+	Status      *Value   `yang:"status" json:",omitempty"`
+	Reference   *Value   `yang:"reference" json:",omitempty"`
 }
 
 func (Feature) Kind() string             { return "feature" }

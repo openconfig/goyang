@@ -20,7 +20,7 @@ package yang
 //    tError       // an error was encountered
 //    tEOF         // end-of-file
 //    tString      // A de-quoted string (e.g., "\"bob\"" becomes "bob")
-//    tIdentifier  // An un-quoted string
+//    tUnquoted    // An un-quoted string
 //    '{'
 //    ';'
 //    '}'
@@ -40,9 +40,6 @@ const (
 	eof       = 0x7fffffff // end of file, also an invalid rune
 	maxErrors = 8
 	tooMany   = "too many errors...\n"
-
-	openBrace  = '{'
-	closeBrace = '}'
 )
 
 // stateFn represents a state in the lexer as a function, returning the next
@@ -76,10 +73,10 @@ type lexer struct {
 type code int
 
 const (
-	tEOF        = code(-1 - iota) // Reached end of file
-	tError                        // An error
-	tString                       // A dequoted string
-	tIdentifier                   // A non-quoted string
+	tEOF      = code(-1 - iota) // Reached end of file
+	tError                      // An error
+	tString                     // A dequoted string
+	tUnquoted                   // A non-quoted string
 )
 
 // String returns c as a string.
@@ -89,8 +86,8 @@ func (c code) String() string {
 		return "Error"
 	case tString:
 		return "String"
-	case tIdentifier:
-		return "Identifier"
+	case tUnquoted:
+		return "Unquoted"
 	}
 	if c < 0 || c > '~' {
 		return fmt.Sprintf("%d", c)
@@ -137,8 +134,7 @@ func (t *token) String() string {
 // in a single Write call.  The test code makes this assumption for testing
 // expected errors.
 
-// newLexer imports the provided input into the lexer l at its the current
-// location, returning the lexer.  If l is nil then a new lexer is returned.
+// newLexer returns a new lexer, importing into it the provided input and path.
 // The provided path should indicate where the source originated.
 func newLexer(input, path string) *lexer {
 	// Force input to be newline terminated.
@@ -149,7 +145,7 @@ func newLexer(input, path string) *lexer {
 		file:   path,
 		input:  input,
 		line:   1, // humans start with 1
-		items:  make(chan *token, 3),
+		items:  make(chan *token, maxErrors),
 		state:  lexGround,
 		errout: os.Stderr,
 	}
@@ -191,12 +187,15 @@ func (l *lexer) emitText(c code, text string) {
 	if l.debug {
 		fmt.Fprintf(os.Stderr, "%v: %q\n", c, text)
 	}
-	l.items <- &token{
+	select {
+	case l.items <- &token{
 		code: c,
 		Text: text,
 		File: l.file,
 		Line: l.sline,
 		Col:  l.scol + 1,
+	}:
+	default:
 	}
 	l.consume()
 }
@@ -237,7 +236,7 @@ func (l *lexer) peek() rune {
 // next returns the next rune in the input.  If next encounters the end of input
 // then it will return eof.
 func (l *lexer) next() (rune rune) {
-	for l.pos >= len(l.input) {
+	if l.pos >= len(l.input) {
 		l.width = 0
 		return eof
 	}
@@ -271,6 +270,7 @@ func (l *lexer) acceptRun(valid string) bool {
 }
 
 // skipTo moves the cursor up to, but not including, s.
+// Returns whether s was found in the remaining input.
 func (l *lexer) skipTo(s string) bool {
 	if x := strings.Index(l.input[l.pos:], s); x >= 0 {
 		l.updateCursor(x)
@@ -280,7 +280,7 @@ func (l *lexer) skipTo(s string) bool {
 }
 
 // updateCursor moves the cursor forward n bytes.  updateCursor does not
-// correctly handle tabs.  This is okay as it is only used by skipTo and skipTo
+// correctly handle tabs.  This is okay as it is only used by skipTo, and skipTo
 // is never used to skip to an initial " (which is the only time that tcol is
 // necessary, as per YANG's multi-line quoted string requirement).
 func (l *lexer) updateCursor(n int) {
@@ -333,11 +333,14 @@ func (l *lexer) ErrorfAt(line, col int, f string, v ...interface{}) {
 // If more than maxErrors are encountered, a "too many errors" message is
 // displayed and processing stops (by clearing the input).
 func (l *lexer) adderror(err []byte) {
-	if l.errcnt >= maxErrors {
+	if l.errcnt == maxErrors {
 		l.pos = 0
 		l.start = 0
 		l.input = ""
 		l.errout.Write([]byte(tooMany))
+		l.errcnt++
+		return
+	} else if l.errcnt == maxErrors+1 {
 		return
 	}
 	l.errout.Write(err)
@@ -358,14 +361,17 @@ func lexGround(l *lexer) stateFn {
 	switch c := l.peek(); c {
 	case eof:
 		return nil
-	case ';', openBrace, closeBrace:
+	case ';', '{', '}':
 		l.next()
 		l.emit(code(c))
 		return lexGround
 	case '\'':
 		l.next()
 		l.consume() // Toss the leading '
-		l.skipTo("'")
+		if !l.skipTo("'") {
+			l.ErrorfAt(l.line, l.col-1, `missing closing '`)
+			return nil
+		}
 		l.emit(tString)
 		l.next() // Either EOF or the matching '
 		return lexGround
@@ -377,19 +383,37 @@ func lexGround(l *lexer) stateFn {
 		switch l.peek() {
 		case '/':
 			// Start of a // comment
-			l.skipTo("\n")
+			if !l.skipTo("\n") {
+				// Here "\n" should always be found, since we force all
+				// input to be "\n" terminated.
+				l.ErrorfAt(l.line, l.col-1, `lexer internal error: all lines should be newline-terminated.`)
+				return nil
+			}
 			return lexGround
 		case '*':
 			// Start of a /* comment
-			l.skipTo("*/")
+			if !l.skipTo("*/") {
+				l.ErrorfAt(l.line, l.col-1, `missing closing */`)
+				return nil
+			}
 			// Now actually skip the */
 			l.next()
 			l.next()
 			return lexGround
+		default:
+			return lexUnquoted
 		}
-		fallthrough
+	case '+':
+		l.next()
+		switch l.peek() {
+		case '"', '\'':
+			l.emit(tUnquoted)
+			return lexGround
+		default:
+			return lexUnquoted
+		}
 	default:
-		return lexIdentifier
+		return lexUnquoted
 	}
 }
 
@@ -449,8 +473,6 @@ func lexQString(l *lexer) stateFn {
 			text = append(text, []byte(string(c))...)
 		case '\\':
 			switch c = l.next(); c {
-			case eof:
-				l.ErrorfAt(line, col, `missing closing "`)
 			case 'n':
 				c = '\n'
 			case 't':
@@ -465,7 +487,7 @@ func lexQString(l *lexer) stateFn {
 				// (e..g., \{) or to be part of of a special
 				// sequence such as \S.
 				if !l.inPattern {
-					l.ErrorfAt(line, col, `invalid escape sequence: \`+string(c))
+					l.ErrorfAt(l.line, l.col-2, `invalid escape sequence: \`+string(c))
 				}
 				text = append(text, '\\')
 			}
@@ -477,12 +499,21 @@ func lexQString(l *lexer) stateFn {
 	}
 }
 
-// lexIdentifier reads one identifier/number/un-quoted-string/...
-func lexIdentifier(l *lexer) stateFn {
+// lexUnquoted reads one identifier/number/un-quoted-string/...
+//
+// From https://tools.ietf.org/html/rfc7950#section-6.1.3:
+// An unquoted string is any sequence of characters that does not
+// contain any space, tab, carriage return, or line feed characters, a
+// single or double quote character, a semicolon (";"), braces ("{" or
+// "}"), or comment sequences ("//", "/*", or "*/").
+func lexUnquoted(l *lexer) stateFn {
 	for {
 		switch c := l.peek(); c {
-		case ' ', '\r', '\n', '\t', ';', '"', openBrace, closeBrace, eof:
-			l.emit(tIdentifier)
+		// TODO: Support detection of comment immediately following an
+		// unquoted string, likely through supporting two peeks instead
+		// of just one.
+		case ' ', '\r', '\n', '\t', ';', '"', '\'', '{', '}', eof:
+			l.emit(tUnquoted)
 			return lexGround
 		default:
 			l.next()

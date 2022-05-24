@@ -14,7 +14,11 @@
 
 package yang
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/google/go-cmp/cmp"
+)
 
 var (
 	// TypeKindFromName maps the string name used in a YANG file to the enumerated
@@ -114,9 +118,8 @@ var (
 		},
 
 		"decimal64": {
-			Name:  "decimal64",
-			Kind:  Ydecimal64,
-			Range: Decimal64Range,
+			Name: "decimal64",
+			Kind: Ydecimal64,
 		},
 		"string": {
 			Name: "string",
@@ -238,6 +241,7 @@ type YangType struct {
 	Enum             *EnumType   `json:",omitempty"` // enum name to value, "status" is lost
 	Units            string      `json:",omitempty"` // units to be used for this type
 	Default          string      `json:",omitempty"` // default value, if any
+	HasDefault       bool        `json:",omitempty"` // whether the type has a default.
 	FractionDigits   int         `json:",omitempty"` // decimal64 fixed point precision
 	Length           YangRange   `json:",omitempty"` // this should be processed by section 12
 	OptionalInstance bool        `json:",omitempty"` // !require-instances which defaults to true
@@ -251,11 +255,16 @@ type YangType struct {
 // Equal returns true if y and t describe the same type.
 func (y *YangType) Equal(t *YangType) bool {
 	switch {
+	case y == t:
+		return true
+	case y == nil || t == nil:
+		return false
 	case
 		// Don't check the Name, it contains no information
 		y.Kind != t.Kind,
 		y.Units != t.Units,
 		y.Default != t.Default,
+		y.HasDefault != t.HasDefault,
 		y.FractionDigits != t.FractionDigits,
 		y.IdentityBase != t.IdentityBase,
 		len(y.Length) != len(t.Length),
@@ -266,11 +275,14 @@ func (y *YangType) Equal(t *YangType) bool {
 		!ssEqual(y.POSIXPattern, t.POSIXPattern),
 		len(y.Range) != len(t.Range),
 		!y.Range.Equal(t.Range),
-		!tsEqual(y.Type, t.Type):
+		!tsEqual(y.Type, t.Type),
+		!cmp.Equal(y.Enum, t.Enum, cmp.Comparer(func(t, u EnumType) bool {
+			return cmp.Equal(t.unique, u.unique) && cmp.Equal(t.toInt, u.toInt) && cmp.Equal(t.toString, u.toString)
+		})):
 
 		return false
 	}
-	// TODO(borman): Base, Bit, Enum
+	// TODO(borman): Base, Bit
 	return true
 }
 

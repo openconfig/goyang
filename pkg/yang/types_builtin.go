@@ -39,8 +39,6 @@ var (
 	Uint16Range = mustParseRangesInt("0..65535")
 	Uint32Range = mustParseRangesInt("0..4294967295")
 	Uint64Range = mustParseRangesInt("0..18446744073709551615")
-
-	Decimal64Range = mustParseRangesDecimal("min..max", 1)
 )
 
 const (
@@ -48,6 +46,9 @@ const (
 	MaxInt64 = 1<<63 - 1
 	// MinInt64 corresponds to the maximum value of a signed int64.
 	MinInt64 = -1 << 63
+	// Min/MaxDecimal64 are the max/min decimal64 values.
+	MinDecimal64 float64 = -922337203685477580.8
+	MaxDecimal64 float64 = 922337203685477580.7
 	// AbsMinInt64 is the absolute value of MinInt64.
 	AbsMinInt64 = 1 << 63
 	// MaxEnum is the maximum value of an enumeration.
@@ -62,32 +63,17 @@ const (
 	space18 = "000000000000000000" // used for prepending 0's
 )
 
-type NumberKind int
-
-const (
-	// Positive indicates that a Number is non-negative.
-	Positive = NumberKind(iota)
-	// Negative indicates that a Number is negative.
-	Negative
-	// MinNumber indicates that the Number is the minimum value allowed for the range.
-	MinNumber
-	// MaxNumber indicates that the Number is the maximum value allowed for the range.
-	MaxNumber
-)
-
 // A Number is either an integer the range of [-(1<<64) - 1, (1<<64)-1], or a
 // YANG decimal conforming to https://tools.ietf.org/html/rfc6020#section-9.3.4.
 type Number struct {
-	// Kind is the kind of number (+/-ve, min/max).
-	Kind NumberKind
 	// Absolute value of the number.
 	Value uint64
 	// Number of fractional digits.
+	// 0 means it's an integer. For decimal64 it falls within [1, 18].
 	FractionDigits uint8
+	// Negative indicates whether the number is negative.
+	Negative bool
 }
-
-var maxNumber = Number{Kind: MaxNumber}
-var minNumber = Number{Kind: MinNumber}
 
 // IsDecimal reports whether n is a decimal number.
 func (n Number) IsDecimal() bool {
@@ -96,19 +82,10 @@ func (n Number) IsDecimal() bool {
 
 // String returns n as a string in decimal.
 func (n Number) String() string {
-	var out string
-	switch n.Kind {
-	case MinNumber:
-		return "min"
-	case MaxNumber:
-		return "max"
-	}
-
-	out += strconv.FormatUint(n.Value, 10)
+	out := strconv.FormatUint(n.Value, 10)
 
 	if n.IsDecimal() {
-		fd := int(n.FractionDigits)
-		if fd > 0 {
+		if fd := int(n.FractionDigits); fd > 0 {
 			ofd := len(out) - fd
 			if ofd <= 0 {
 				// We want 0.1 not .1
@@ -118,60 +95,40 @@ func (n Number) String() string {
 			out = out[:ofd] + "." + out[ofd:]
 		}
 	}
-	if n.Kind == Negative {
+	if n.Negative {
 		out = "-" + out
 	}
 
 	return out
 }
 
-// Int returns n as an int64.  It returns an error if n overflows an int64 or
+// Int returns n as an int64. It returns an error if n overflows an int64 or
 // the number is decimal.
 func (n Number) Int() (int64, error) {
-	nv := n.Value
 	if n.IsDecimal() {
-		nv = n.Value / uint64(math.Pow10(int(n.FractionDigits)))
+		return 0, errors.New("called Int() on decimal64 value")
 	}
-	switch n.Kind {
-	case MinNumber:
-		return MinInt64, nil
-	case MaxNumber:
-		return MaxInt64, nil
-	case Negative:
-		switch {
-		case nv == AbsMinInt64:
-			return MinInt64, nil
-		case nv < AbsMinInt64:
-			return -int64(nv), nil
-		}
-	case Positive:
-		if n.Value <= MaxInt64 {
-			return int64(nv), nil
-		}
-		return 0, errors.New("signed integer overflow")
-	default:
+	if n.Negative {
+		return -int64(n.Value), nil
 	}
-	return 0, errors.New("unknown number type")
+	if n.Value <= MaxInt64 {
+		return int64(n.Value), nil
+	}
+	return 0, errors.New("signed integer overflow")
 }
 
 // addQuantum adds the smallest quantum to n without checking overflow.
 func (n Number) addQuantum(i uint64) Number {
-	switch n.Kind {
-	case MinNumber:
-		return n
-	case MaxNumber:
-		return n
-	case Negative:
+	switch n.Negative {
+	case true:
 		if n.Value <= i {
 			n.Value = i - n.Value
-			n.Kind = Positive
+			n.Negative = false
 		} else {
 			n.Value -= i
 		}
-	case Positive:
+	case false:
 		n.Value += i
-	default:
-		panic("add to unknown number type")
 	}
 	return n
 }
@@ -180,17 +137,9 @@ func (n Number) addQuantum(i uint64) Number {
 // and decimal.
 func (n Number) Less(m Number) bool {
 	switch {
-	case m.Kind == MinNumber:
-		return false
-	case n.Kind == MinNumber:
+	case n.Negative && !m.Negative:
 		return true
-	case n.Kind == MaxNumber:
-		return false
-	case m.Kind == MaxNumber:
-		return true
-	case n.Kind == Negative && m.Kind != Negative:
-		return true
-	case n.Kind != Negative && m.Kind == Negative:
+	case !n.Negative && m.Negative:
 		return false
 	}
 
@@ -204,7 +153,7 @@ func (n Number) Less(m Number) bool {
 		lt = nf < mf
 	}
 
-	if n.Kind == Negative {
+	if n.Negative {
 		return !lt
 	}
 	return lt
@@ -250,6 +199,7 @@ func (r YRange) String() string {
 	return r.Min.String() + ".." + r.Max.String()
 }
 
+// Equal compares whether two YRanges are equal.
 func (r YRange) Equal(s YRange) bool {
 	return r.Min.Equal(s.Min) && r.Max.Equal(s.Max)
 }
@@ -323,14 +273,10 @@ func (r YangRange) Equal(q YangRange) bool {
 }
 
 // Contains returns true if all possible values in s are also possible values
-// in r.  An empty range is assumed to be min..max.
-// TODO(wenbli): The current behaviour of this is confusing and unexplained by
-// comments: why does the presence of min/max always cause the range to be
-// considered as contained? Should test on current schema, and if there are no
-// problems, change it to its natural definition.
+// in r. An empty range is assumed to be min..max when it is the receiver
+// argument.
 func (r YangRange) Contains(s YangRange) bool {
-	// No range means allow everything in range for the type.
-	if len(s) == 0 || len(r) == 0 {
+	if len(r) == 0 || len(s) == 0 {
 		return true
 	}
 
@@ -338,17 +284,11 @@ func (r YangRange) Contains(s YangRange) bool {
 	// Both range lists should be in order and non-adjacent (coalesced).
 	ri := 0
 	for _, ss := range s {
-		// min is always within range
-		if ss.Min.Kind != MinNumber {
-			for r[ri].Max.Less(ss.Min) {
-				ri += 1
-				if ri == len(r) {
-					return false
-				}
+		for r[ri].Max.Less(ss.Min) {
+			ri++
+			if ri == len(r) {
+				return false
 			}
-		}
-		if (ss.Max.Kind == MaxNumber) || (ss.Min.Kind == MinNumber) {
-			continue
 		}
 		if ss.Min.Less(r[ri].Min) || r[ri].Max.Less(ss.Max) {
 			return false
@@ -360,24 +300,32 @@ func (r YangRange) Contains(s YangRange) bool {
 // FromInt creates a Number from an int64.
 func FromInt(i int64) Number {
 	if i < 0 {
-		return Number{Kind: Negative, Value: uint64(-i)}
+		return Number{Negative: true, Value: uint64(-i)}
 	}
-	return Number{Kind: Positive, Value: uint64(i)}
+	return Number{Value: uint64(i)}
 }
 
 // FromUint creates a Number from a uint64.
 func FromUint(i uint64) Number {
-	return Number{Kind: Positive, Value: i}
+	return Number{Value: i}
 }
 
 // FromFloat creates a Number from a float64. Input values with absolute value
-// larger than MaxInt64/MinInt64 are converted into maxNumber/minNumber.
+// outside the boundaries specified for the decimal64 value specified in
+// RFC6020/RFC7950 are clamped down to the closest boundary value.
 func FromFloat(f float64) Number {
-	if f > float64(MaxInt64) {
-		return maxNumber
+	if f > MaxDecimal64 {
+		return Number{
+			Value:          FromInt(MaxInt64).Value,
+			FractionDigits: 1,
+		}
 	}
-	if f < float64(MinInt64) {
-		return minNumber
+	if f < MinDecimal64 {
+		return Number{
+			Negative:       true,
+			Value:          FromInt(MaxInt64).Value,
+			FractionDigits: 1,
+		}
 	}
 
 	// Per RFC7950/6020, fraction-digits must be at least 1.
@@ -387,15 +335,13 @@ func FromFloat(f float64) Number {
 		f *= 10.0
 	}
 	v := uint64(f)
-	kind := Positive
+	negative := false
 	if f < 0 {
-		kind = Negative
+		negative = true
 		v = -v
 	}
 
-	n := Number{Kind: kind, Value: v, FractionDigits: fracDig}
-
-	return n
+	return Number{Negative: negative, Value: v, FractionDigits: fracDig}
 }
 
 // ParseInt returns s as a Number with FractionDigits=0.
@@ -404,23 +350,18 @@ func ParseInt(s string) (Number, error) {
 	s = strings.TrimSpace(s)
 	var n Number
 	switch s {
-	case "max":
-		return maxNumber, nil
-	case "min":
-		return minNumber, nil
 	case "":
 		return n, errors.New("converting empty string to number")
 	case "+", "-":
 		return n, errors.New("sign with no value")
 	}
 
-	n.Kind = Positive
 	ns := s
 	switch s[0] {
 	case '+':
 		ns = s[1:]
 	case '-':
-		n.Kind = Negative
+		n.Negative = true
 		ns = s[1:]
 	}
 
@@ -434,10 +375,6 @@ func ParseInt(s string) (Number, error) {
 func ParseDecimal(s string, fracDigRequired uint8) (n Number, err error) {
 	s = strings.TrimSpace(s)
 	switch s {
-	case "max":
-		return maxNumber, nil
-	case "min":
-		return minNumber, nil
 	case "":
 		return n, errors.New("converting empty string to number")
 	case "+", "-":
@@ -477,13 +414,13 @@ func decimalValueFromString(numStr string, fracDigRequired uint8) (n Number, err
 		return n, fmt.Errorf("%s is not a valid decimal number: %s", numStr, err)
 	}
 
-	kind := Positive
+	negative := false
 	if v < 0 {
-		kind = Negative
+		negative = true
 		v = -v
 	}
 
-	return Number{Kind: kind, Value: uint64(v), FractionDigits: fracDigRequired}, nil
+	return Number{Value: uint64(v), FractionDigits: fracDigRequired, Negative: negative}, nil
 }
 
 // ParseRangesInt parses s into a series of ranges. Each individual range is in s
@@ -491,7 +428,7 @@ func decimalValueFromString(numStr string, fracDigRequired uint8) (n Number, err
 // are separated by "..".  An error is returned if the range is invalid. The
 // output range is sorted and coalesced.
 func ParseRangesInt(s string) (YangRange, error) {
-	return parseRanges(s, false, 0)
+	return YangRange{}.parseChildRanges(s, false, 0)
 }
 
 // ParseRangesDecimal parses s into a series of ranges. Each individual range is in s
@@ -499,19 +436,36 @@ func ParseRangesInt(s string) (YangRange, error) {
 // are separated by "..".  An error is returned if the range is invalid. The
 // output range is sorted and coalesced.
 func ParseRangesDecimal(s string, fracDigRequired uint8) (YangRange, error) {
-	return parseRanges(s, true, fracDigRequired)
+	return YangRange{}.parseChildRanges(s, true, fracDigRequired)
 }
 
-// parseRanges parses s into a series of ranges. Each individual range is in s
-// is separated by the pipe character (|).  The min and max value of a range
-// are separated by "..".  An error is returned if the range is invalid. The
-// output range is sorted and coalesced. fracDigRequired is ignored when
-// decimal=false.
-func parseRanges(s string, decimal bool, fracDigRequired uint8) (YangRange, error) {
+// parseChildRanges parses a child ranges statement 's' into a series of ranges
+// based on an already-parsed parent YangRange. Each individual range is in s
+// is separated by the pipe character (|). The min and max value of a range are
+// separated by "..". An error is returned if the child ranges are not
+// equally-limiting or more limiting than the parent range
+// (rfc7950#section-9.2.5). The output range is sorted and coalesced.
+// fracDigRequired is ignored when decimal=false.
+func (y YangRange) parseChildRanges(s string, decimal bool, fracDigRequired uint8) (YangRange, error) {
 	parseNumber := func(s string) (Number, error) {
-		if decimal {
+		switch {
+		case s == "max":
+			if len(y) == 0 {
+				return Number{}, errors.New("cannot resolve 'max' keyword using an empty YangRange parent object")
+			}
+			max := y[len(y)-1].Max
+			max.FractionDigits = fracDigRequired
+			return max, nil
+		case s == "min":
+			if len(y) == 0 {
+				return Number{}, errors.New("cannot resolve 'min' keyword using an empty YangRange parent object")
+			}
+			min := y[0].Min
+			min.FractionDigits = fracDigRequired
+			return min, nil
+		case decimal:
 			return ParseDecimal(s, fracDigRequired)
-		} else {
+		default:
 			return ParseInt(s)
 		}
 	}
@@ -520,7 +474,7 @@ func parseRanges(s string, decimal bool, fracDigRequired uint8) (YangRange, erro
 	r := make(YangRange, len(parts))
 	for i, s := range parts {
 		parts := strings.Split(s, "..")
-		min, err := parseNumber(parts[0])
+		min, err := parseNumber(strings.TrimSpace(parts[0]))
 		if err != nil {
 			return nil, err
 		}
@@ -529,8 +483,7 @@ func parseRanges(s string, decimal bool, fracDigRequired uint8) (YangRange, erro
 		case 1:
 			max = min
 		case 2:
-			max, err = parseNumber(parts[1])
-			if err != nil {
+			if max, err = parseNumber(strings.TrimSpace(parts[1])); err != nil {
 				return nil, err
 			}
 		default:
@@ -543,6 +496,10 @@ func parseRanges(s string, decimal bool, fracDigRequired uint8) (YangRange, erro
 	}
 	r.Sort()
 	r = coalesce(r)
+
+	if !y.Contains(r) {
+		return nil, fmt.Errorf("%v not within %v", s, y)
+	}
 
 	if err := r.Validate(); err != nil {
 		return nil, err
@@ -674,7 +631,7 @@ func (e *EnumType) Set(name string, value int64) error {
 // all previous values.
 func (e *EnumType) SetNext(name string) error {
 	if e.last == MaxEnum {
-		return fmt.Errorf("enum must specify value")
+		return fmt.Errorf("enum %q must specify a value since previous enum is the maximum value allowed", name)
 	}
 	return e.Set(name, e.last+1)
 }

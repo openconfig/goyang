@@ -17,6 +17,8 @@ package yang
 import (
 	"strings"
 	"testing"
+
+	"github.com/openconfig/gnmi/errdiff"
 )
 
 var testdataFindModulesText = map[string]string{
@@ -27,6 +29,36 @@ var testdataFindModulesText = map[string]string{
 	"dup-pre-two": `module dup-pre-two { prefix duplicate; namespace urn:duplicate:two; }`,
 	"dup-ns-one":  `module dup-ns-one { prefix ns-one; namespace urn:duplicate; }`,
 	"dup-ns-two":  `module dup-ns-two { prefix ns-two; namespace urn:duplicate; }`,
+}
+
+func TestDupModule(t *testing.T) {
+	tests := []struct {
+		desc      string
+		inModules map[string]string
+		wantErr   bool
+	}{{
+		desc: "two modules with the same name",
+		inModules: map[string]string{
+			"foo": `module foo { prefix "foo"; namespace "urn:foo"; }`,
+			"bar": `module foo { prefix "foo"; namespace "urn:foo"; }`,
+		},
+		wantErr: true,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			ms := NewModules()
+			var err error
+			for name, modtext := range tt.inModules {
+				if err = ms.Parse(modtext, name+".yang"); err != nil {
+					break
+				}
+			}
+			if gotErr := err != nil; gotErr != tt.wantErr {
+				t.Fatalf("wantErr: %v, got error: %v", tt.wantErr, err)
+			}
+		})
+	}
 }
 
 func testModulesForTestdataModulesText(t *testing.T) *Modules {
@@ -62,40 +94,6 @@ func testModulesFindByCommonHandler(t *testing.T, i int, got, want *Module, want
 	}
 }
 
-func TestModulesFindByPrefix(t *testing.T) {
-	ms := testModulesForTestdataModulesText(t)
-
-	for i, tc := range []struct {
-		prefix    string
-		want      *Module
-		wantError string
-	}{
-		{
-			prefix:    "does-not-exist",
-			wantError: "does-not-exist: no such prefix",
-		},
-		{
-			prefix: "foo",
-			want:   ms.Modules["foo"],
-		},
-		{
-			prefix: "bar",
-			want:   ms.Modules["bar"],
-		},
-		{
-			prefix: "baz",
-			want:   ms.Modules["baz"],
-		},
-		{
-			prefix:    "duplicate",
-			wantError: "prefix duplicate matches two or more modules (dup-pre-",
-		},
-	} {
-		got, err := ms.FindModuleByPrefix(tc.prefix)
-		testModulesFindByCommonHandler(t, i, got, tc.want, tc.wantError, err)
-	}
-}
-
 func TestModulesFindByNamespace(t *testing.T) {
 	ms := testModulesForTestdataModulesText(t)
 
@@ -106,7 +104,7 @@ func TestModulesFindByNamespace(t *testing.T) {
 	}{
 		{
 			namespace: "does-not-exist",
-			wantError: "does-not-exist: no such namespace",
+			wantError: `"does-not-exist": no such namespace`,
 		},
 		{
 			namespace: "urn:foo",
@@ -127,6 +125,238 @@ func TestModulesFindByNamespace(t *testing.T) {
 	} {
 		got, err := ms.FindModuleByNamespace(tc.namespace)
 		testModulesFindByCommonHandler(t, i, got, tc.want, tc.wantError, err)
+	}
+}
+
+func TestModuleLinkage(t *testing.T) {
+	tests := []struct {
+		desc          string
+		inMods        map[string]string
+		wantErrSubstr string
+	}{{
+		desc: "invalid import",
+		inMods: map[string]string{
+			"dev": `
+				module dev {
+					prefix d;
+					namespace "urn:d";
+					import sys { prefix sys; }
+
+					revision 01-01-01 { description "the start of time"; }
+
+					deviation /sys:sys/sys:hostname {
+						deviate not-supported;
+					}
+				}`,
+		},
+		wantErrSubstr: "no such module",
+	}, {
+		desc: "valid include",
+		inMods: map[string]string{
+			"dev": `
+				module dev {
+					prefix d;
+					namespace "urn:d";
+					include sys;
+
+					revision 01-01-01 { description "the start of time"; }
+				}`,
+			"sys": `
+				submodule sys {
+					belongs-to dev {
+						prefix "d";
+					}
+
+					revision 01-01-01 { description "the start of time"; }
+
+					container sys { leaf hostname { type string; } }
+				}`,
+		},
+	}, {
+		desc: "invalid include",
+		inMods: map[string]string{
+			"dev": `
+				module dev {
+					prefix d;
+					namespace "urn:d";
+					include sys;
+
+					revision 01-01-01 { description "the start of time"; }
+				}`,
+			"sysdb": `
+				submodule sysdb {
+					belongs-to dev {
+						prefix "d";
+					}
+
+					revision 01-01-01 { description "the start of time"; }
+
+					container sys { leaf hostname { type string; } }
+				}`,
+		},
+		wantErrSubstr: "no such submodule",
+	}, {
+		desc: "valid include in submodule",
+		inMods: map[string]string{
+			"dev": `
+				module dev {
+					prefix d;
+					namespace "urn:d";
+					include sys;
+
+					revision 01-01-01 { description "the start of time"; }
+				}`,
+			"sys": `
+				submodule sys {
+					belongs-to dev {
+						prefix "d";
+					}
+					include sysdb;
+
+					revision 01-01-01 { description "the start of time"; }
+
+					container sys { leaf hostname { type string; } }
+				}`,
+			"sysdb": `
+				submodule sysdb {
+					belongs-to dev {
+						prefix "d";
+					}
+
+					revision 01-01-01 { description "the start of time"; }
+
+					container sysdb { leaf hostname { type string; } }
+				}`,
+		},
+	}, {
+		desc: "invalid include in submodule",
+		inMods: map[string]string{
+			"dev": `
+				module dev {
+					prefix d;
+					namespace "urn:d";
+					include sys;
+
+					revision 01-01-01 { description "the start of time"; }
+				}`,
+			"sys": `
+				submodule sys {
+					belongs-to dev {
+						prefix "d";
+					}
+					include sysdb;
+
+					revision 01-01-01 { description "the start of time"; }
+
+					container sys { leaf hostname { type string; } }
+				}`,
+			"syyysdb": `
+				submodule syyysdb {
+					belongs-to dev {
+						prefix "d";
+					}
+
+					revision 01-01-01 { description "the start of time"; }
+
+					container sysdb { leaf hostname { type string; } }
+				}`,
+		},
+		wantErrSubstr: "no such submodule",
+	}, {
+		desc: "valid import in submodule",
+		inMods: map[string]string{
+			"dev": `
+				module dev {
+					prefix d;
+					namespace "urn:d";
+					include sys;
+
+					revision 01-01-01 { description "the start of time"; }
+				}`,
+			"sys": `
+				submodule sys {
+					belongs-to dev {
+						prefix "d";
+					}
+					import sysdb {
+						prefix "sd";
+					}
+
+					revision 01-01-01 { description "the start of time"; }
+
+					container sys { leaf hostname { type string; } }
+				}`,
+			"sysdb": `
+				module sysdb {
+					prefix sd;
+					namespace "urn:sd";
+
+					revision 01-01-01 { description "the start of time"; }
+
+					container sysdb { leaf hostname { type string; } }
+				}`,
+		},
+	}, {
+		desc: "invalid import in submodule",
+		inMods: map[string]string{
+			"dev": `
+				module dev {
+					prefix d;
+					namespace "urn:d";
+					include sys;
+
+					revision 01-01-01 { description "the start of time"; }
+				}`,
+			"sys": `
+				submodule sys {
+					belongs-to dev {
+						prefix "d";
+					}
+					import sysdb {
+						prefix "sd";
+					}
+
+					revision 01-01-01 { description "the start of time"; }
+
+					container sys { leaf hostname { type string; } }
+				}`,
+			"syyysdb": `
+				module syyysdb {
+					prefix sd;
+					namespace "urn:sd";
+
+					revision 01-01-01 { description "the start of time"; }
+
+					container sysdb { leaf hostname { type string; } }
+				}`,
+		},
+		wantErrSubstr: "no such module",
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			ms := NewModules()
+
+			for n, m := range tt.inMods {
+				if err := ms.Parse(m, n); err != nil {
+					t.Fatalf("cannot parse module %s, err: %v", n, err)
+				}
+			}
+
+			errs := ms.Process()
+			var err error
+			switch len(errs) {
+			case 1:
+				err = errs[0]
+				fallthrough
+			case 0:
+				if diff := errdiff.Substring(err, tt.wantErrSubstr); diff != "" {
+					t.Fatalf("%s", diff)
+				}
+			default:
+				t.Fatalf("got multiple errors: %v", errs)
+			}
+		})
 	}
 }
 

@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package util
+package yangentry
 
 import "testing"
 
-// TestProcessModules tests the ProcessModules function - which takes an input
+// TestParse tests the Parse function - which takes an input
 // set of modules and processes them using the goyang compiler into a set of
 // yang.Entry pointers.
-func TestProcessModules(t *testing.T) {
+func TestParse(t *testing.T) {
 	tests := []struct {
 		name     string
 		inFiles  []string
@@ -29,6 +29,11 @@ func TestProcessModules(t *testing.T) {
 	}{{
 		name:     "simple valid module",
 		inFiles:  []string{"testdata/00-valid-module.yang"},
+		inPath:   []string{"testdata"},
+		wantMods: []string{"test-module"},
+	}, {
+		name:     "simple valid module without .yang extension",
+		inFiles:  []string{"00-valid-module"},
 		inPath:   []string{"testdata"},
 		wantMods: []string{"test-module"},
 	}, {
@@ -54,7 +59,7 @@ func TestProcessModules(t *testing.T) {
 	}}
 
 	for _, tt := range tests {
-		entries, errs := ProcessModules(tt.inFiles, tt.inPath)
+		entries, errs := Parse(tt.inFiles, tt.inPath)
 		if len(errs) != 0 && !tt.wantErr {
 			t.Errorf("%s: unexpected error processing modules: %v", tt.name, errs)
 			continue

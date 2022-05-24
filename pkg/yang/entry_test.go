@@ -44,7 +44,7 @@ func TestNilEntry(t *testing.T) {
 		fallthrough
 	case 1:
 		got := errs[0].Error()
-		want := "ToEntry called with nil"
+		want := "ToEntry called on nil AST node"
 		if got != want {
 			t.Fatalf("got error %q, want %q", got, want)
 		}
@@ -161,7 +161,6 @@ module base {
 
 func TestBadYang(t *testing.T) {
 	for _, tt := range badInputs {
-		typeDict = typeDictionary{dict: map[Node]map[string]*Typedef{}}
 		ms := NewModules()
 		if err := ms.Parse(tt.in, tt.name); err != nil {
 			t.Fatalf("unexpected error %s", err)
@@ -274,6 +273,22 @@ module baz {
 		}
 		`,
 	},
+	{
+		name: "qux-augment.yang",
+		in: `
+		submodule qux-augment {
+		  belongs-to qux {
+		    prefix "qux";
+		  }
+
+		  import foo { prefix "f"; }
+
+		  augment "/f:foo-c" {
+			leaf qux-submod-leaf { type string; }
+		  }
+	    }
+		`,
+	},
 }
 
 func TestUsesParent(t *testing.T) {
@@ -344,10 +359,11 @@ func TestEntryNamespace(t *testing.T) {
 	bar, _ := ms.GetModule("bar")
 
 	for _, tc := range []struct {
-		descr   string
-		entry   *Entry
-		ns      string
-		wantMod string
+		descr        string
+		entry        *Entry
+		ns           string
+		wantMod      string
+		wantModError string
 	}{
 		{
 			descr:   "grouping used in foo always have foo's namespace, even if it was defined in bar",
@@ -380,6 +396,18 @@ func TestEntryNamespace(t *testing.T) {
 			wantMod: "baz",
 		},
 		{
+			descr:   "leaf directly defined within an augment to foo from submodule baz-augment of baz has baz's namespace",
+			entry:   foo.Dir["foo-c"].Dir["baz-submod-leaf"],
+			ns:      "urn:baz",
+			wantMod: "baz",
+		},
+		{
+			descr:        "leaf directly defined within an augment to foo from orphan submodule qux-augment has empty namespace",
+			entry:        foo.Dir["foo-c"].Dir["qux-submod-leaf"],
+			ns:           "",
+			wantModError: `could not find module "" when retrieving namespace for qux-submod-leaf: "": no such namespace`,
+		},
+		{
 			descr:   "children of a container within an augment to from baz have baz's namespace",
 			entry:   foo.Dir["foo-c"].Dir["baz-dir"].Dir["aardvark"],
 			ns:      "urn:baz",
@@ -395,7 +423,14 @@ func TestEntryNamespace(t *testing.T) {
 
 		m, err := tc.entry.InstantiatingModule()
 		if err != nil {
-			t.Errorf("%s: %s.InstantiatingModule(): got unexpected error: %v", tc.descr, tc.entry.Path(), err)
+			if tc.wantModError == "" {
+				t.Errorf("%s: %s.InstantiatingModule(): got unexpected error: %v", tc.descr, tc.entry.Path(), err)
+			} else if got := err.Error(); got != tc.wantModError {
+				t.Errorf("%s: %s.InstantiatingModule(): got error: %q, want: %q", tc.descr, tc.entry.Path(), got, tc.wantModError)
+			}
+			continue
+		} else if tc.wantModError != "" {
+			t.Errorf("%s: %s.InstantiatingModule(): got no error, want: %q", tc.descr, tc.entry.Path(), tc.wantModError)
 			continue
 		}
 
@@ -469,10 +504,8 @@ module when {
 }
 
 func TestGetWhenXPath(t *testing.T) {
-	ParseOptions.StoreUses = true
-	defer func() { ParseOptions.StoreUses = false }()
-
 	ms := NewModules()
+	ms.ParseOptions.StoreUses = true
 	for _, tt := range testWhenModules {
 		if err := ms.Parse(tt.in, tt.name); err != nil {
 			t.Fatalf("could not parse module %s: %v", tt.name, err)
@@ -740,10 +773,8 @@ func TestAugmentedEntry(t *testing.T) {
 }
 
 func TestUsesEntry(t *testing.T) {
-	ParseOptions.StoreUses = true
-	defer func() { ParseOptions.StoreUses = false }()
-
 	ms := NewModules()
+	ms.ParseOptions.StoreUses = true
 	for _, tt := range testAugmentAndUsesModules {
 		if err := ms.Parse(tt.in, tt.name); err != nil {
 			t.Fatalf("could not parse module %s: %v", tt.name, err)
@@ -989,7 +1020,7 @@ func TestIgnoreCircularDependencies(t *testing.T) {
 
 	for _, tt := range tests {
 		ms := NewModules()
-		ParseOptions.IgnoreSubmoduleCircularDependencies = tt.inIgnoreCircDep
+		ms.ParseOptions.IgnoreSubmoduleCircularDependencies = tt.inIgnoreCircDep
 		for n, m := range tt.inModules {
 			if err := ms.Parse(m, n); err != nil {
 				if !tt.wantErrs {
@@ -1023,6 +1054,11 @@ module defaults {
     default "typedef default value";
   }
 
+  typedef string-emptydefault {
+    type string;
+    default "";
+  }
+
   grouping common {
     container common-nodefault {
       leaf string {
@@ -1035,9 +1071,20 @@ module defaults {
         default "default value";
       }
     }
+    container common-withemptydefault {
+      leaf string {
+        type string;
+        default "";
+      }
+    }
     container common-typedef-withdefault {
       leaf string {
         type string-default;
+      }
+    }
+    container common-typedef-withemptydefault {
+      leaf string {
+        type string-emptydefault;
       }
     }
   }
@@ -1058,6 +1105,65 @@ module defaults {
       type string;
     }
     uses common;
+
+    choice choice-default {
+      case alpha {
+        leaf alpha {
+          type string;
+        }
+      }
+      case zeta {
+        leaf zeta {
+          type string;
+        }
+      }
+      default zeta;
+    }
+  }
+
+  grouping leaflist-common {
+    container common-nodefault {
+      leaf string {
+        type string;
+      }
+    }
+    container common-withdefault {
+      leaf-list string {
+        type string;
+        default "default value";
+      }
+    }
+    container common-typedef-withdefault {
+      leaf string {
+        type string-default;
+      }
+    }
+  }
+
+  container leaflist-defaults {
+    leaf-list uint32-withdefault {
+      type uint32;
+      default "13";
+      default 14;
+    }
+    leaf-list stringlist-withdefault {
+      type string-default;
+    }
+    leaf-list stringlist-withemptydefault {
+      type string-emptydefault;
+    }
+    leaf-list stringlist-withdefault-withminelem {
+      type string-default;
+      min-elements 1;
+    }
+    leaf-list emptydefault {
+      type string;
+      default "";
+    }
+    leaf-list nodefault {
+      type string;
+    }
+    uses leaflist-common;
   }
 
 }
@@ -1069,51 +1175,135 @@ module defaults {
 	}
 
 	for i, tc := range []struct {
-		want string
-		path []string
+		wantSingle   string
+		wantSingleOk bool
+		wantDefaults []string
+		path         []string
 	}{
 		{
-			path: []string{"defaults", "string-withdefault"},
-			want: "typedef default value",
+			path:         []string{"defaults", "string-withdefault"},
+			wantSingle:   "typedef default value",
+			wantDefaults: []string{"typedef default value"},
+			wantSingleOk: true,
 		},
 		{
-			path: []string{"defaults", "uint32-withdefault"},
-			want: "13",
+			path:         []string{"defaults", "uint32-withdefault"},
+			wantSingle:   "13",
+			wantDefaults: []string{"13"},
+			wantSingleOk: true,
 		},
 		{
-			path: []string{"defaults", "nodefault"},
-			want: "",
+			path:         []string{"defaults", "nodefault"},
+			wantSingle:   "",
+			wantDefaults: nil,
 		},
 		{
-			path: []string{"defaults", "common-withdefault", "string"},
-			want: "default value",
+			path:         []string{"defaults", "common-withdefault", "string"},
+			wantSingle:   "default value",
+			wantDefaults: []string{"default value"},
+			wantSingleOk: true,
 		},
 		{
-			path: []string{"defaults", "common-typedef-withdefault", "string"},
-			want: "typedef default value",
+			path:         []string{"defaults", "common-withemptydefault", "string"},
+			wantSingle:   "",
+			wantDefaults: []string{""},
+			wantSingleOk: true,
 		},
 		{
-			path: []string{"defaults", "common-nodefault", "string"},
-			want: "",
+			path:         []string{"defaults", "common-typedef-withdefault", "string"},
+			wantSingle:   "typedef default value",
+			wantDefaults: []string{"typedef default value"},
+			wantSingleOk: true,
 		},
 		{
-			path: []string{"defaults", "mandatory-default"},
-			want: "",
+			path:         []string{"defaults", "common-typedef-withemptydefault", "string"},
+			wantSingle:   "",
+			wantDefaults: []string{""},
+			wantSingleOk: true,
+		},
+		{
+			path:         []string{"defaults", "common-nodefault", "string"},
+			wantSingle:   "",
+			wantDefaults: nil,
+		},
+		{
+			path:         []string{"defaults", "mandatory-default"},
+			wantSingle:   "",
+			wantDefaults: nil,
+		},
+		{
+			path:         []string{"defaults", "choice-default"},
+			wantSingle:   "zeta",
+			wantDefaults: []string{"zeta"},
+			wantSingleOk: true,
+		},
+		{
+			path:         []string{"leaflist-defaults", "uint32-withdefault"},
+			wantSingle:   "",
+			wantDefaults: []string{"13", "14"},
+		},
+		{
+			path:         []string{"leaflist-defaults", "stringlist-withdefault"},
+			wantSingle:   "typedef default value",
+			wantDefaults: []string{"typedef default value"},
+			wantSingleOk: true,
+		},
+		{
+			path:         []string{"leaflist-defaults", "stringlist-withemptydefault"},
+			wantSingle:   "",
+			wantDefaults: []string{""},
+			wantSingleOk: true,
+		},
+		{
+			path:         []string{"leaflist-defaults", "stringlist-withdefault-withminelem"},
+			wantSingle:   "",
+			wantDefaults: nil,
+		},
+		{
+			path:         []string{"leaflist-defaults", "emptydefault"},
+			wantSingle:   "",
+			wantDefaults: []string{""},
+			wantSingleOk: true,
+		},
+		{
+			path:         []string{"leaflist-defaults", "nodefault"},
+			wantSingle:   "",
+			wantDefaults: nil,
+		},
+		{
+			path:         []string{"leaflist-defaults", "common-nodefault", "string"},
+			wantSingle:   "",
+			wantDefaults: nil,
+		},
+		{
+			path:         []string{"leaflist-defaults", "common-withdefault", "string"},
+			wantSingle:   "default value",
+			wantDefaults: []string{"default value"},
+			wantSingleOk: true,
+		},
+		{
+			path:         []string{"leaflist-defaults", "common-typedef-withdefault", "string"},
+			wantSingle:   "typedef default value",
+			wantDefaults: []string{"typedef default value"},
+			wantSingleOk: true,
 		},
 	} {
 		tname := strings.Join(tc.path, "/")
 
-		mod, err := ms.FindModuleByPrefix("defaults")
-		if err != nil {
-			t.Fatalf("[%d_%s] module not found: %v", i, tname, err)
+		mod, ok := ms.Modules["defaults"]
+		if !ok {
+			t.Fatalf("[%d] module not found: %q", i, tname)
 		}
 		defaults := ToEntry(mod)
 		dir, err := getdir(defaults, tc.path...)
 		if err != nil {
 			t.Fatalf("[%d_%s] could not retrieve path: %v", i, tname, err)
 		}
-		if got := dir.DefaultValue(); tc.want != got {
-			t.Errorf("[%d_%s] want DefaultValue %q, got %q", i, tname, tc.want, got)
+		if got, gotOk := dir.SingleDefaultValue(); got != tc.wantSingle || gotOk != tc.wantSingleOk {
+			t.Errorf("[%d_%s] got SingleDefaultValue (%q, %v), want (%q, %v)", i, tname, got, gotOk, tc.wantSingle, tc.wantSingleOk)
+		}
+		if diff := cmp.Diff(dir.DefaultValues(), tc.wantDefaults); diff != "" {
+			t.Errorf("[%d_%s] DefaultValues (-got, +want):\n%s", i, tname, diff)
 		}
 	}
 }
@@ -1479,9 +1669,8 @@ func TestFullModuleProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		ms := NewModules()
-		mergedSubmodule = map[string]bool{}
 
-		ParseOptions.IgnoreSubmoduleCircularDependencies = tt.inIgnoreCircDeps
+		ms.ParseOptions.IgnoreSubmoduleCircularDependencies = tt.inIgnoreCircDeps
 		for n, m := range tt.inModules {
 			if err := ms.Parse(m, n); err != nil {
 				t.Errorf("%s: error parsing module %s, got: %v, want: nil", tt.name, n, err)
@@ -1953,13 +2142,18 @@ func TestIfFeature(t *testing.T) {
 		if len(extra) == 0 {
 			return nil
 		}
-		return extra[0].([]*Value)
+		values := make([]*Value, len(extra))
+		for i, ex := range extra {
+			values[i] = ex.(*Value)
+		}
+		return values
 	}
 
 	featureByName := func(e *Entry, name string) *Feature {
-		for _, f := range e.Extra["feature"][0].([]*Feature) {
-			if f.Name == name {
-				return f
+		for _, f := range e.Extra["feature"] {
+			ft := f.(*Feature)
+			if ft.Name == name {
+				return ft
 			}
 		}
 		return nil
@@ -2221,6 +2415,74 @@ func TestEntryFind(t *testing.T) {
 			`,
 		},
 		inBaseEntryPath: "/test/a",
+		wantEntryPath: map[string]string{
+			// Absolute path with no prefixes.
+			"/b": "/test/b",
+			// Relative path with no prefixes.
+			"../b": "/test/b",
+			// Absolute path with prefixes.
+			"/t:b": "/test/b",
+			// Relative path with prefixes.
+			"../t:b": "/test/b",
+			// Find within a directory.
+			"/c/d": "/test/c/d",
+			// Find within a directory specified relatively.
+			"../c/d": "/test/c/d",
+			// Find within a relative directory with prefixes.
+			"../t:c/t:d": "/test/c/d",
+			"../t:c/d":   "/test/c/d",
+			"../c/t:d":   "/test/c/d",
+			// Find within an absolute directory with prefixes.
+			"/t:c/d":                    "/test/c/d",
+			"/c/t:d":                    "/test/c/d",
+			"../t:rpc1/input":           "/test/rpc1/input",
+			"/t:rpc1/input":             "/test/rpc1/input",
+			"/t:rpc1/t:input":           "/test/rpc1/input",
+			"/t:e/operation/input":      "/test/e/operation/input",
+			"/t:e/operation/output":     "/test/e/operation/output",
+			"/t:e/t:operation/t:input":  "/test/e/operation/input",
+			"/t:e/t:operation/t:output": "/test/e/operation/output",
+		},
+	}, {
+		name: "submodule find",
+		inModules: map[string]string{
+			"test.yang": `
+				module test {
+					prefix "t";
+					namespace "urn:t";
+
+					include test1;
+
+					leaf a { type string; }
+					leaf b { type string; }
+
+					container c { leaf d { type string; } }
+
+                    rpc rpc1 {
+                        input { leaf input1 { type string; } }
+                    }
+
+                    container e {
+                        action operation {
+                          description "action";
+                          input { leaf input1 { type string; } }
+                          output { leaf output1 { type string; } }
+                        }
+                    }
+
+				}
+			`,
+			"test1.yang": `
+				submodule test1 {
+					belongs-to test {
+						prefix "t";
+					}
+
+					leaf d { type string; }
+				}
+			`,
+		},
+		inBaseEntryPath: "/test/d",
 		wantEntryPath: map[string]string{
 			// Absolute path with no prefixes.
 			"/b": "/test/b",
@@ -2660,7 +2922,7 @@ func TestFixChoice(t *testing.T) {
 			}
 
 			if insertedNode.Statement() != originalNode.Statement() {
-				t.Errorf("Got inserted node's statement %v, expected %s",
+				t.Errorf("Got inserted node's statement %v, expected %v",
 					insertedNode.Statement(), originalNode.Statement())
 			}
 
@@ -2708,6 +2970,26 @@ func TestDeviation(t *testing.T) {
 					Config: TSFalse,
 				},
 			}, {
+				path: "/target/add/default",
+				entry: &Entry{
+					Default: []string{"a default value"},
+				},
+			}, {
+				path: "/target/add/default-typedef",
+				entry: &Entry{
+					Default: nil,
+				},
+			}, {
+				path: "/target/add/default-list",
+				entry: &Entry{
+					Default: []string{"foo", "bar", "foo"},
+				},
+			}, {
+				path: "/target/add/default-list-typedef-default",
+				entry: &Entry{
+					Default: nil,
+				},
+			}, {
 				path: "/target/add/mandatory",
 				entry: &Entry{
 					Mandatory: TSTrue,
@@ -2751,6 +3033,45 @@ func TestDeviation(t *testing.T) {
 				},
 			}},
 		},
+	}, {
+		desc: "error case - deviation add that already has a default",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a {
+						type string;
+						default "fish";
+					}
+
+					deviation /a {
+						deviate add {
+							default "fishsticks";
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "already has a default value",
+	}, {
+		desc: "error case - deviate type not recognized",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a { type string; }
+
+					deviation /a {
+						deviate shrink {
+							max-elements 42;
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "unknown deviation type",
 	}, {
 		desc: "error case - deviation add max-element to non-list",
 		inFiles: map[string]string{
@@ -2896,6 +3217,16 @@ func TestDeviation(t *testing.T) {
 					Config: TSFalse,
 				},
 			}, {
+				path: "/target/replace/default",
+				entry: &Entry{
+					Default: []string{"a default value"},
+				},
+			}, {
+				path: "/target/replace/default-list",
+				entry: &Entry{
+					Default: []string{"nematodes"},
+				},
+			}, {
 				path: "/target/replace/mandatory",
 				entry: &Entry{
 					Mandatory: TSTrue,
@@ -2957,6 +3288,9 @@ func TestDeviation(t *testing.T) {
 					Config: TSUnset,
 				},
 			}, {
+				path:  "/target/delete/default",
+				entry: &Entry{},
+			}, {
 				path: "/target/delete/mandatory",
 				entry: &Entry{
 					Mandatory: TSUnset,
@@ -3000,6 +3334,70 @@ func TestDeviation(t *testing.T) {
 				},
 			}},
 		},
+	}, {
+		// TODO(wenovus): Support deviate delete for leaf-lists for config-false leafs once its semantics are clear.
+		// https://github.com/mbj4668/pyang/issues/756
+		desc: "error case - deviation delete on a leaf-list",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf-list a {
+						type string;
+						default "fish";
+					}
+
+					deviation /a {
+						deviate delete {
+							default "fishsticks";
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "deviate delete on default statements unsupported for leaf-lists",
+	}, {
+		desc: "error case - deviation delete of default has different keyword value",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a {
+						type string;
+						default "fish";
+					}
+
+					deviation /a {
+						deviate delete {
+							default "fishsticks";
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "non-matching keyword",
+	}, {
+		desc: "error case - deviation delete where the default didn't exist",
+		inFiles: map[string]string{
+			"deviate": `
+				module deviate {
+					prefix "d";
+					namespace "urn:d";
+
+					leaf a {
+						type string;
+					}
+
+					deviation /a {
+						deviate delete {
+							default "fishsticks";
+						}
+					}
+				}`,
+		},
+		wantProcessErrSubstring: "default statement that doesn't exist",
 	}, {
 		desc: "error case - deviation delete of min-elements has different keyword value",
 		inFiles: map[string]string{
@@ -3129,7 +3527,6 @@ func TestDeviation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			ms := NewModules()
-			mergedSubmodule = map[string]bool{}
 
 			for name, mod := range tt.inFiles {
 				if err := ms.Parse(mod, name); err != nil {
@@ -3139,17 +3536,24 @@ func TestDeviation(t *testing.T) {
 				}
 			}
 
-			if errs := ms.Process(); len(errs) > 0 {
-				var match bool
-				for _, err := range errs {
-					if diff := errdiff.Substring(err, tt.wantProcessErrSubstring); diff == "" {
-						match = true
-						break
-					}
+			errs := ms.Process()
+			if len(errs) == 0 {
+				// Add a nil error to compare against the wanted error string.
+				errs = append(errs, nil)
+			}
+			var match bool
+			for _, err := range errs {
+				if diff := errdiff.Substring(err, tt.wantProcessErrSubstring); diff == "" {
+					match = true
+					break
 				}
-				if !match {
-					t.Fatalf("got errs: %v, want: %v", errs, tt.wantProcessErrSubstring)
-				}
+			}
+			if !match {
+				t.Fatalf("got errs: %v, want: %v", errs, tt.wantProcessErrSubstring)
+			}
+
+			if tt.wantProcessErrSubstring == "" && len(tt.wants) == 0 {
+				t.Fatalf("test case expects no error and no entry. Please change your test case to contain one of them.")
 			}
 
 			for mod, tcs := range tt.wants {
@@ -3176,8 +3580,8 @@ func TestDeviation(t *testing.T) {
 						t.Errorf("%d (%s): did not get expected config statement, got: %v, want: %v", idx, want.path, got.Config, want.entry.Config)
 					}
 
-					if got.Default != want.entry.Default {
-						t.Errorf("%d (%s): did not get expected default statement, got: %v, want: %v", idx, want.path, got.Default, want.entry.Default)
+					if diff := cmp.Diff(got.Default, want.entry.Default, cmpopts.EquateEmpty()); diff != "" {
+						t.Errorf("%d (%s): did not get expected default statement, (-got, +want): %s", idx, want.path, diff)
 					}
 
 					if got.Mandatory != want.entry.Mandatory {
@@ -3358,6 +3762,28 @@ func TestLeafEntry(t *testing.T) {
 				t.Errorf("got %d, want %d", got, want)
 			}
 		},
+	}, {
+		name: "leaf description",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				leaf "mandatory" {
+					type "string" {
+					}
+					description "I am a leaf";
+				}
+			}
+			`,
+		},
+		wantEntryPath: "/test/mandatory",
+		wantEntryCustomTest: func(t *testing.T, e *Entry) {
+			if got, want := e.Description, "I am a leaf"; got != want {
+				t.Errorf("got %q, want %q", got, want)
+			}
+		},
 	}}
 
 	for _, tt := range tests {
@@ -3407,6 +3833,7 @@ func TestLess(t *testing.T) {
 		{"testfile2:1:1", errors.New("test error4")},
 		{"testfile3:1:1:error5", errors.New("test error5")},
 		{"testfile3:1:2:error6", errors.New("test error6")},
+		{"testfile3:1:1:error7", errors.New("test error7")},
 	}
 
 	tests := []struct {
@@ -3479,6 +3906,16 @@ func TestLess(t *testing.T) {
 		i:    5,
 		j:    5,
 		want: false,
+	}, {
+		desc: "compare different strings with four slices",
+		i:    7,
+		j:    5,
+		want: false,
+	}, {
+		desc: "compare different strings with four slices",
+		i:    5,
+		j:    7,
+		want: true,
 	}}
 	var cmpSymbol byte
 	for _, tt := range tests {

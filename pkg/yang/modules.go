@@ -18,7 +18,10 @@ package yang
 // include and import statements, which must be done prior to turning the
 // module into an Entry tree.
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 // Modules contains information about all the top level modules and
 // submodules that are read into it via its Read method.
@@ -26,19 +29,40 @@ type Modules struct {
 	Modules    map[string]*Module // All "module" nodes
 	SubModules map[string]*Module // All "submodule" nodes
 	includes   map[*Module]bool   // Modules we have already done include on
-	byPrefix   map[string]*Module // Cache of prefix lookup
+	nsMu       sync.Mutex         // nsMu protects the byNS map.
 	byNS       map[string]*Module // Cache of namespace lookup
+	typeDict   *typeDictionary    // Cache for type definitions.
+	// entryCache is used to prevent unnecessary recursion into previously
+	// converted nodes.
+	entryCache map[Node]*Entry
+	// mergedSubmodule is used to prevent re-parsing a submodule that has already
+	// been merged into a particular entity when circular dependencies are being
+	// ignored. The keys of the map are a string that is formed by concatenating
+	// the name of the including (sub)module and the included submodule.
+	mergedSubmodule map[string]bool
+	// ParseOptions sets the options for the current YANG module parsing. It can be
+	// directly set by the caller to influence how goyang will behave in the presence
+	// of certain exceptional cases.
+	ParseOptions Options
+	// Path is the list of directories to look for .yang files in.
+	Path []string
+	// pathMap is used to prevent adding dups in Path.
+	pathMap map[string]bool
 }
 
 // NewModules returns a newly created and initialized Modules.
 func NewModules() *Modules {
-	return &Modules{
-		Modules:    map[string]*Module{},
-		SubModules: map[string]*Module{},
-		includes:   map[*Module]bool{},
-		byPrefix:   map[string]*Module{},
-		byNS:       map[string]*Module{},
+	ms := &Modules{
+		Modules:         map[string]*Module{},
+		SubModules:      map[string]*Module{},
+		includes:        map[*Module]bool{},
+		byNS:            map[string]*Module{},
+		typeDict:        newTypeDictionary(),
+		mergedSubmodule: map[string]bool{},
+		entryCache:      map[Node]*Entry{},
+		pathMap:         map[string]bool{},
 	}
+	return ms
 }
 
 // Read reads the named yang module into ms.  The name can be the name of an
@@ -46,7 +70,7 @@ func NewModules() *Modules {
 // e.g., foo.yang is named foo).  An error is returned if the file is not
 // found or there was an error parsing the file.
 func (ms *Modules) Read(name string) error {
-	name, data, err := findFile(name)
+	name, data, err := ms.findFile(name)
 	if err != nil {
 		return err
 	}
@@ -55,17 +79,21 @@ func (ms *Modules) Read(name string) error {
 
 // Parse parses data as YANG source and adds it to ms.  The name should reflect
 // the source of data.
+// Note: If an error is returned, valid modules might still have been added to
+// the Modules cache.
 func (ms *Modules) Parse(data, name string) error {
 	ss, err := Parse(data, name)
 	if err != nil {
 		return err
 	}
 	for _, s := range ss {
-		n, err := BuildAST(s)
+		n, err := buildASTWithTypeDict(s, ms.typeDict)
 		if err != nil {
 			return err
 		}
-		ms.add(n)
+		if err := ms.add(n); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -135,7 +163,7 @@ func (ms *Modules) add(n Node) error {
 
 	mod := n.(*Module)
 	fullName := mod.FullName()
-	mod.modules = ms
+	mod.Modules = ms
 
 	if o := m[fullName]; o != nil {
 		return fmt.Errorf("duplicate %s %s at %s and %s", kind, fullName, Source(o), Source(n))
@@ -200,10 +228,11 @@ func (ms *Modules) FindModule(n Node) *Module {
 // FindModuleByNamespace either returns the Module specified by the namespace
 // or returns an error.
 func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
+	// Protect the byNS map from concurrent accesses
+	ms.nsMu.Lock()
+	defer ms.nsMu.Unlock()
+
 	if m, ok := ms.byNS[ns]; ok {
-		if m == nil {
-			return nil, fmt.Errorf("%s: no such namespace", ns)
-		}
 		return m, nil
 	}
 	var found *Module
@@ -219,38 +248,11 @@ func (ms *Modules) FindModuleByNamespace(ns string) (*Module, error) {
 			}
 		}
 	}
+	if found == nil {
+		return nil, fmt.Errorf("%q: no such namespace", ns)
+	}
+	// Don't cache negative results because new modules could be added.
 	ms.byNS[ns] = found
-	if found == nil {
-		return nil, fmt.Errorf("%s: no such namespace", ns)
-	}
-	return found, nil
-}
-
-// FindModuleByPrefix either returns the Module specified by prefix or returns
-// an error.
-func (ms *Modules) FindModuleByPrefix(prefix string) (*Module, error) {
-	if m, ok := ms.byPrefix[prefix]; ok {
-		if m == nil {
-			return nil, fmt.Errorf("%s: no such prefix", prefix)
-		}
-		return m, nil
-	}
-	var found *Module
-	for _, m := range ms.Modules {
-		if m.Prefix.Name == prefix {
-			switch {
-			case m == found:
-			case found != nil:
-				return nil, fmt.Errorf("prefix %s matches two or more modules (%s, %s)", prefix, found.Name, m.Name)
-			default:
-				found = m
-			}
-		}
-	}
-	ms.byPrefix[prefix] = found
-	if found == nil {
-		return nil, fmt.Errorf("%s: no such prefix", prefix)
-	}
 	return found, nil
 }
 
@@ -283,7 +285,7 @@ func (ms *Modules) process() []error {
 	// has not yet been built.
 	errs = append(errs, ms.resolveIdentities()...)
 	// Append any errors found trying to resolve typedefs
-	errs = append(errs, resolveTypedefs()...)
+	errs = append(errs, ms.typeDict.resolveTypedefs()...)
 
 	return errs
 }
@@ -320,8 +322,8 @@ func (ms *Modules) process() []error {
 func (ms *Modules) Process() []error {
 	// Reset globals that may remain stale if multiple Process() calls are
 	// made by the same caller.
-	mergedSubmodule = map[string]bool{}
-	entryCache = map[Node]*Entry{}
+	ms.mergedSubmodule = map[string]bool{}
+	ms.entryCache = map[Node]*Entry{}
 
 	errs := ms.process()
 	if len(errs) > 0 {

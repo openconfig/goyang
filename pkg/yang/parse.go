@@ -17,9 +17,6 @@ package yang
 // This file implements Parse, which  parses the input as generic YANG and
 // returns a slice of base Statements (which in turn may contain more
 // Statements, i.e., a slice of Statement trees.)
-//
-// TODO(borman): remove this TODO once ast.go is part of of this package.
-// See ast.go for the conversion of Statements into an AST tree of Nodes.
 
 import (
 	"bytes"
@@ -47,8 +44,13 @@ type parser struct {
 	hitBrace *Statement
 }
 
-// A Statement is a generic YANG statement.  A Statement may have optional
-// sub-statement (i.e., a Statement is a tree).
+// Statement is a generic YANG statement that may have sub-statements.
+// It implements the Node interface.
+//
+// Within the parser, it represents a non-terminal token.
+// From https://tools.ietf.org/html/rfc7950#section-6.3:
+// statement = keyword [argument] (";" / "{" *statement "}")
+// The argument is a string.
 type Statement struct {
 	Keyword     string
 	HasArgument bool
@@ -58,16 +60,6 @@ type Statement struct {
 	file string
 	line int // 1's based line number
 	col  int // 1's based column number
-}
-
-// FakeStatement returns a statement filled in with keyword, file, line and col.
-func FakeStatement(keyword, file string, line, col int) *Statement {
-	return &Statement{
-		Keyword: keyword,
-		file:    file,
-		line:    line,
-		col:     col,
-	}
 }
 
 func (s *Statement) NName() string         { return s.Argument }
@@ -80,18 +72,8 @@ func (s *Statement) Exts() []*Statement    { return nil }
 // argument.
 func (s *Statement) Arg() (string, bool) { return s.Argument, s.HasArgument }
 
-// Keyword returns the keyword of s.
-//func (s *Statement) Keyword() string { return s.Keyword }
-
 // SubStatements returns a slice of Statements found in s.
 func (s *Statement) SubStatements() []*Statement { return s.statements }
-
-// String returns s's tree as a string.
-func (s *Statement) String() string {
-	var b bytes.Buffer
-	s.Write(&b, "")
-	return b.String()
-}
 
 // Location returns the location in the source where s was defined.
 func (s *Statement) Location() string {
@@ -162,8 +144,8 @@ func (s *Statement) Write(w io.Writer, indent string) error {
 	return nil
 }
 
-// ignoreMe is returned to continue processing after an error (the parse will
-// fail, but we want to look for more errors).
+// ignoreMe is an error recovery token used by the parser in order
+// to continue processing for other errors in the file.
 var ignoreMe = &Statement{}
 
 // Parse parses the input as generic YANG and returns the statements parsed.
@@ -185,19 +167,18 @@ Loop:
 		case nil:
 			break Loop
 		case p.hitBrace:
-			fmt.Fprintf(p.errout, "%s:%d:%d: unexpected %c\n", ns.file, ns.line, ns.col, closeBrace)
+			fmt.Fprintf(p.errout, "%s:%d:%d: unexpected %c\n", ns.file, ns.line, ns.col, '}')
 		default:
 			statements = append(statements, ns)
 		}
 	}
 
-	p.checkStatementDepth()
+	p.checkStatementDepthIsZero()
 
 	if p.errout.Len() == 0 {
 		return statements, nil
 	}
 	return nil, errors.New(strings.TrimSpace(p.errout.String()))
-
 }
 
 // push pushes tokens t back on the input stream so they will be the next
@@ -217,12 +198,13 @@ func (p *parser) pop() *token {
 	return nil
 }
 
-// next returns the next token from the lexer.  It also handles string
-// concatenation.
+// next returns the next token from the lexer. If the next token is a
+// concatenated string, it returns the concatenated string as the token.
 func (p *parser) next() *token {
 	if t := p.pop(); t != nil {
 		return t
 	}
+	// next returns the next unprocessed lexer token.
 	next := func() *token {
 		for {
 			if t := p.lex.NextToken(); t.Code() != tError {
@@ -234,13 +216,15 @@ func (p *parser) next() *token {
 	if t.Code() != tString {
 		return t
 	}
-	// Handle `"string" + "string"`
+	// Process string concatenation (both single and double quote).
+	// See https://tools.ietf.org/html/rfc7950#section-6.1.3.1
+	// The lexer trimmed the quotes already.
 	for {
 		nt := next()
 		switch nt.Code() {
 		case tEOF:
 			return t
-		case tIdentifier:
+		case tUnquoted:
 			if nt.Text != "+" {
 				p.push(nt)
 				return t
@@ -249,42 +233,44 @@ func (p *parser) next() *token {
 			p.push(nt)
 			return t
 		}
-		// We found a +, now look for a following string
-		st := next()
-		switch st.Code() {
+		// Invariant: nt is a + sign.
+		nnt := next()
+		switch nnt.Code() {
 		case tEOF:
 			p.push(nt)
 			return t
 		case tString:
-			// concatenate the text and drop the nt and st tokens
-			// try again
-			t.Text += st.Text
+			// Accumulate the concatenation.
+			t.Text += nnt.Text
 		default:
-			p.push(st, nt)
+			p.push(nnt, nt)
 			return t
 		}
-
 	}
 }
 
 // nextStatement returns the next statement in the input, which may in turn
 // recurse to read sub statements.
+// nil is returned when EOF has been reached, or is reached halfway through
+// parsing the next statement (with associated syntax errors printed to
+// errout).
 func (p *parser) nextStatement() *Statement {
 	t := p.next()
 	switch t.Code() {
 	case tEOF:
 		return nil
-	case closeBrace:
+	case '}':
 		p.statementDepth -= 1
 		p.hitBrace.file = t.File
 		p.hitBrace.line = t.Line
 		p.hitBrace.col = t.Col
 		return p.hitBrace
-	case tIdentifier:
+	case tUnquoted:
 	default:
-		fmt.Fprintf(p.errout, "%v: not an identifier\n", t)
+		fmt.Fprintf(p.errout, "%v: keyword token not an unquoted string\n", t)
 		return ignoreMe
 	}
+	// Invariant: t represents a keyword token.
 
 	s := &Statement{
 		Keyword: t.Text,
@@ -293,29 +279,31 @@ func (p *parser) nextStatement() *Statement {
 		col:     t.Col,
 	}
 
-	// The keyword "pattern" must be treated special.  When
+	// The keyword "pattern" must be treated specially. When
 	// parsing the argument for "pattern", escape sequences
 	// must be expanded differently.
 	p.lex.inPattern = t.Text == "pattern"
 	t = p.next()
 	p.lex.inPattern = false
 	switch t.Code() {
-	case tString, tIdentifier:
+	case tString, tUnquoted:
 		s.HasArgument = true
 		s.Argument = t.Text
 		t = p.next()
 	}
+
 	switch t.Code() {
 	case tEOF:
 		fmt.Fprintf(p.errout, "%s: unexpected EOF\n", s.file)
 		return nil
 	case ';':
 		return s
-	case openBrace:
+	case '{':
 		p.statementDepth += 1
 		for {
 			switch ns := p.nextStatement(); ns {
 			case nil:
+				// Signal EOF reached.
 				return nil
 			case p.hitBrace:
 				return s
@@ -324,21 +312,20 @@ func (p *parser) nextStatement() *Statement {
 			}
 		}
 	default:
-		fmt.Fprintf(p.errout, "%v: syntax error\n", t)
+		fmt.Fprintf(p.errout, "%v: syntax error, expected ';' or '{'\n", t)
 		return ignoreMe
 	}
 }
 
-// Checks that we have a statement depth of 0. It's an error to exit
-// the parser with a depth of > 0, it means we are missing closing
+// checkStatementDepthIsZero checks that we aren't missing closing
 // braces. Note: the parser will error out for the case where we
-// start with an unmatched close brace, eg. depth < 0
+// start with an unmatched close brace, i.e. depth < 0
 //
-// This test is only done if there are no other errors as
+// This test should only be done if there are no other errors as
 // we may exit early due to those errors -- and therefore there *might*
 // not really be a mismatched brace issue.
-func (p *parser) checkStatementDepth() {
-	if p.errout.Len() > 0 || p.statementDepth < 1 {
+func (p *parser) checkStatementDepthIsZero() {
+	if p.errout.Len() > 0 || p.statementDepth == 0 {
 		return
 	}
 

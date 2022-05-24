@@ -99,7 +99,7 @@ foo "bar";
 		{line: line(), in: `
 foo "\\ \S \n";
 `,
-			err: `test.yang:2:5: invalid escape sequence: \S`,
+			err: `test.yang:2:9: invalid escape sequence: \S`,
 		},
 		{line: line(), in: `
 pattern "\\ \S \n";
@@ -121,6 +121,114 @@ pattern '\\ \S \n';
 `,
 			out: []*Statement{
 				SA("pattern", `\\ \S \n`),
+			},
+		},
+		{line: line(), in: `
+foo "bar" + "baz";
+`,
+			out: []*Statement{
+				SA("foo", "barbaz"),
+			},
+		},
+		{line: line(), in: `
+foo "bar" + "+" + "baz";
+`,
+			out: []*Statement{
+				SA("foo", "bar+baz"),
+			},
+		},
+		{line: line(), in: `
+foo "bar"
+`,
+			err: `test.yang: unexpected EOF`,
+		},
+		{line: line(), in: `
+foo "bar" + "baz"
+`,
+			err: `test.yang: unexpected EOF`,
+		},
+		{line: line(), in: `
+foo "bar" baz;
+`,
+			err: `test.yang:2:11: baz: syntax error, expected ';' or '{'
+test.yang:2:14: ;: keyword token not an unquoted string`,
+		},
+		{line: line(), in: `
+foo "bar" + baz;
+`,
+			err: `test.yang:2:11: +: syntax error, expected ';' or '{'`,
+		},
+		{line: line(), in: `
+foo "bar" +
+`,
+			err: `test.yang:2:11: +: syntax error, expected ';' or '{'`,
+		},
+		{line: line(), in: `
+foo "bar";
+`,
+			out: []*Statement{
+				SA("foo", "bar"),
+			},
+		},
+		{line: line(), in: `
+foo "bar" {}
+`,
+			out: []*Statement{
+				SA("foo", "bar"),
+			},
+		},
+		{line: line(), in: `
+foo 'bar' + 'baz';
+`,
+			out: []*Statement{
+				SA("foo", "barbaz"),
+			},
+		},
+		{line: line(), in: `
+foo 'bar' + '+' + 'baz';
+`,
+			out: []*Statement{
+				SA("foo", "bar+baz"),
+			},
+		},
+		{line: line(), in: `
+foo 'bar'
+`,
+			err: `test.yang: unexpected EOF`,
+		},
+		{line: line(), in: `
+foo 'bar' + 'baz'
+`,
+			err: `test.yang: unexpected EOF`,
+		},
+		{line: line(), in: `
+foo 'bar' baz;
+`,
+			err: `test.yang:2:11: baz: syntax error, expected ';' or '{'
+test.yang:2:14: ;: keyword token not an unquoted string`,
+		},
+		{line: line(), in: `
+foo 'bar' + baz;
+`,
+			err: `test.yang:2:11: +: syntax error, expected ';' or '{'`,
+		},
+		{line: line(), in: `
+foo 'bar' +
+`,
+			err: `test.yang:2:11: +: syntax error, expected ';' or '{'`,
+		},
+		{line: line(), in: `
+foo 'bar';
+`,
+			out: []*Statement{
+				SA("foo", "bar"),
+			},
+		},
+		{line: line(), in: `
+foo 'bar' {}
+`,
+			out: []*Statement{
+				SA("foo", "bar"),
 			},
 		},
 		{line: line(), in: `
@@ -217,6 +325,27 @@ foo1 {
 			},
 		},
 		{line: line(), in: `
+foo1 {
+    key value1;
+    foo2 {
+      pattern '[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+'
+            + '(\.[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+)*'
+            + '@'
+            + '[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+'
+            + '(\.[a-zA-Z0-9!#$%&'+"'"+'*+/=?^_` + "`" + `{|}~-]+)*';
+    }
+}
+`,
+			out: []*Statement{
+				S("foo1",
+					SA("key", "value1"),
+					S("foo2",
+						SA("pattern", "[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(\\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*@[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+(\\.[a-zA-Z0-9!#$%&'*+/=?^_`{|}~-]+)*"),
+					),
+				),
+			},
+		},
+		{line: line(), in: `
  }
 `,
 			err: `test.yang:2:2: unexpected }`,
@@ -229,18 +358,18 @@ id
 		{line: line(), in: `
    {
 `,
-			err: `test.yang:2:4: {: not an identifier`,
+			err: `test.yang:2:4: {: keyword token not an unquoted string`,
 		},
 		{line: line(), in: `
 ;
 `,
-			err: `test.yang:2:1: ;: not an identifier`,
+			err: `test.yang:2:1: ;: keyword token not an unquoted string`,
 		},
 		{line: line(), in: `
 statement one two { }
 `,
-			err: `test.yang:2:15: two: syntax error
-test.yang:2:19: {: not an identifier
+			err: `test.yang:2:15: two: syntax error, expected ';' or '{'
+test.yang:2:19: {: keyword token not an unquoted string
 test.yang:2:21: unexpected }`,
 		},
 		{line: line(), in: `
@@ -262,10 +391,10 @@ foo {
 		key3: "value\3;
 	}
 }`,
-			err: `test.yang:2:1: {: not an identifier
+			err: `test.yang:2:1: {: keyword token not an unquoted string
 test.yang:4:1: unexpected }
-test.yang:6:7: invalid escape sequence: \V
-test.yang:9:9: invalid escape sequence: \3
+test.yang:6:8: invalid escape sequence: \V
+test.yang:9:15: invalid escape sequence: \3
 test.yang:9:9: missing closing "
 test.yang: unexpected EOF`,
 		},
@@ -292,9 +421,9 @@ module base {
 		s, err := Parse(tt.in, "test.yang")
 		if (s == nil) != (tt.out == nil) {
 			if s == nil {
-				t.Errorf("%d: did not get expected statements: %s", tt.line, tt.out)
+				t.Errorf("%d: did not get expected statements: %v", tt.line, tt.out)
 			} else {
-				t.Errorf("%d: get unexpected statements: %s", tt.line, s)
+				t.Errorf("%d: get unexpected statements: %v", tt.line, s)
 			}
 		}
 		switch {
@@ -314,7 +443,7 @@ module base {
 		s1 := &Statement{statements: s}
 		s2 := &Statement{statements: tt.out}
 		if !s1.equal(s2) {
-			t.Errorf("%d: got:\n%s\nwant:\n%s", tt.line, s1, s2)
+			t.Errorf("%d: got:\n%v\nwant:\n%v", tt.line, s1, s2)
 		}
 	}
 }

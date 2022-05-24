@@ -96,29 +96,18 @@ func getPrefix(s string) (string, string) {
 // relative to where n was defined.  If the prefix cannot be resolved then nil
 // is returned.
 func FindModuleByPrefix(n Node, prefix string) *Module {
-	n = RootNode(n)
-
-	mod := n.(*Module)
-	if prefix == "" {
-		return mod
+	if n == nil {
+		return nil
 	}
+	mod := RootNode(n)
 
-	switch mod.Kind() {
-	case "module":
-		if mod.Prefix.Name == prefix {
-			return mod
-		}
-	case "submodule":
-		if prefix == mod.BelongsTo.Prefix.Name {
-			return mod
-		}
-	default:
-		panic("root that is not a module or submodule")
+	if prefix == "" || prefix == mod.GetPrefix() {
+		return mod
 	}
 
 	for _, i := range mod.Import {
 		if prefix == i.Prefix.Name {
-			return i.Module
+			return mod.Modules.FindModule(i)
 		}
 	}
 	return nil
@@ -127,12 +116,24 @@ func FindModuleByPrefix(n Node, prefix string) *Module {
 // MatchingExtensions returns the subset of the given node's extensions
 // that match the given module and identifier.
 func MatchingExtensions(n Node, module, identifier string) ([]*Statement, error) {
+	return matchingExtensions(n, n.Exts(), module, identifier)
+}
+
+// MatchingEntryExtensions returns the subset of the given entry's extensions
+// that match the given module and identifier.
+func MatchingEntryExtensions(e *Entry, module, identifier string) ([]*Statement, error) {
+	return matchingExtensions(e.Node, e.Exts, module, identifier)
+}
+
+// matchingEntryExtensions returns the subset of the given node's extensions
+// that match the given module and identifier.
+func matchingExtensions(n Node, exts []*Statement, module, identifier string) ([]*Statement, error) {
 	var matchingExtensions []*Statement
-	for _, ext := range n.Exts() {
+	for _, ext := range exts {
 		names := strings.SplitN(ext.Keyword, ":", 2)
 		mod := FindModuleByPrefix(n, names[0])
 		if mod == nil {
-			return nil, fmt.Errorf("MatchingExtensions: module prefix %q not found", names[0])
+			return nil, fmt.Errorf("matchingExtensions: module prefix %q not found", names[0])
 		}
 		if len(names) == 2 && names[1] == identifier && mod.Name == module {
 			matchingExtensions = append(matchingExtensions, ext)
@@ -149,6 +150,17 @@ func RootNode(n Node) *Module {
 		return mod
 	}
 	return nil
+}
+
+// module returns the Module to which n belongs. If n resides in a submodule,
+// the belonging module will be returned.
+// If n is nil or a module could not be find, nil is returned.
+func module(n Node) *Module {
+	m := RootNode(n)
+	if m.Kind() == "submodule" {
+		m = m.Modules.Modules[m.BelongsTo.Name]
+	}
+	return m
 }
 
 // NodePath returns the full path of the node from the module name.
@@ -187,12 +199,12 @@ func FindNode(n Node, path string) (Node, error) {
 		parts = parts[1:]
 
 		// TODO(borman): merge this with FindModuleByPrefix?
-		n = RootNode(n)
 		// The base is always a module
-		mod := n.(*Module)
+		mod := RootNode(n)
+		n = mod
 		prefix, _ := getPrefix(parts[0])
 		if mod.Kind() == "submodule" {
-			m := mod.modules.Modules[mod.BelongsTo.Name]
+			m := mod.Modules.Modules[mod.BelongsTo.Name]
 			if m == nil {
 				return nil, fmt.Errorf("%s: unknown module %s", m.Name, mod.BelongsTo.Name)
 			}

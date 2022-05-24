@@ -37,7 +37,7 @@ func TestMarshalJSON(t *testing.T) {
 				Name: "leaf",
 			},
 			Description: "This is a fake leaf.",
-			Default:     "default-leaf-value",
+			Default:     []string{"default-leaf-value"},
 			Errors:      []error{fmt.Errorf("error one")},
 			Kind:        LeafEntry,
 			Config:      TSTrue,
@@ -61,7 +61,9 @@ func TestMarshalJSON(t *testing.T) {
 		want: `{
   "Name": "leaf",
   "Description": "This is a fake leaf.",
-  "Default": "default-leaf-value",
+  "Default": [
+    "default-leaf-value"
+  ],
   "Kind": 0,
   "Config": 1,
   "Prefix": {
@@ -221,14 +223,14 @@ func TestMarshalJSON(t *testing.T) {
             "Length": [
               {
                 "Min": {
-                  "Kind": 0,
                   "Value": 10,
-                  "FractionDigits": 0
+                  "FractionDigits": 0,
+                  "Negative": false
                 },
                 "Max": {
-                  "Kind": 0,
                   "Value": 20,
-                  "FractionDigits": 0
+                  "FractionDigits": 0,
+                  "Negative": false
                 }
               }
             ],
@@ -497,14 +499,14 @@ func TestParseAndMarshal(t *testing.T) {
                 "Length": [
                   {
                     "Min": {
-                      "Kind": 0,
                       "Value": 10,
-                      "FractionDigits": 0
+                      "FractionDigits": 0,
+                      "Negative": false
                     },
                     "Max": {
-                      "Kind": 0,
                       "Value": 10,
-                      "FractionDigits": 0
+                      "FractionDigits": 0,
+                      "Negative": false
                     }
                   }
                 ]
@@ -554,14 +556,14 @@ func TestParseAndMarshal(t *testing.T) {
             "Range": [
               {
                 "Min": {
-                  "Kind": 2,
-                  "Value": 0,
-                  "FractionDigits": 0
+                  "Value": 9223372036854775808,
+                  "FractionDigits": 8,
+                  "Negative": true
                 },
                 "Max": {
-                  "Kind": 3,
-                  "Value": 0,
-                  "FractionDigits": 0
+                  "Value": 9223372036854775807,
+                  "FractionDigits": 8,
+                  "Negative": false
                 }
               }
             ]
@@ -661,7 +663,19 @@ func TestParseAndMarshal(t *testing.T) {
     {
       "Name": "DERIVED"
     }
-  ]
+  ],
+  "extra-unstable": {
+    "namespace": [
+      {
+        "Name": "urn:t",
+        "Source": {
+          "Keyword": "namespace",
+          "HasArgument": true,
+          "Argument": "urn:t"
+        }
+      }
+    ]
+  }
 }`,
 		},
 	}, {
@@ -728,6 +742,18 @@ func TestParseAndMarshal(t *testing.T) {
         }
       ]
     }
+  },
+  "extra-unstable": {
+    "namespace": [
+      {
+        "Name": "urn:t",
+        "Source": {
+          "Keyword": "namespace",
+          "HasArgument": true,
+          "Argument": "urn:t"
+        }
+      }
+    ]
   }
 }`,
 			"ext": `{
@@ -741,6 +767,26 @@ func TestParseAndMarshal(t *testing.T) {
       "HasArgument": true,
       "Argument": "e"
     }
+  },
+  "extra-unstable": {
+    "extension": [
+      {
+        "Name": "foobar",
+        "Argument": {
+          "Name": "baz"
+        }
+      }
+    ],
+    "namespace": [
+      {
+        "Name": "urn:e",
+        "Source": {
+          "Keyword": "namespace",
+          "HasArgument": true,
+          "Argument": "urn:e"
+        }
+      }
+    ]
   }
 }`,
 		},
