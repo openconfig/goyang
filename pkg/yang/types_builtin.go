@@ -572,8 +572,8 @@ type EnumType struct {
 	min      int64            // minimum value allowed
 	max      int64            // maximum value allowed
 	unique   bool             // numeric values must be unique (enums)
-	ToString map[int64]string `json:",omitempty"`
-	ToInt    map[string]int64
+	ToString map[int64]string `json:",omitempty"` // map of enum entries by value (integer)
+	ToInt    map[string]int64 `json:",omitempty"` // map of enum entries by name (string)
 }
 
 // NewEnumType returns an initialized EnumType.
