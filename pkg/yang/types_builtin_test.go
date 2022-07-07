@@ -15,6 +15,7 @@
 package yang
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -811,6 +812,55 @@ func TestNumberString(t *testing.T) {
 		t.Run(tt.desc, func(t *testing.T) {
 			if got := tt.in.String(); got != tt.want {
 				t.Fatalf("did not get expected number, got: %s, want: %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEnumToJson(t *testing.T) {
+	tests := []struct {
+		desc    string
+		in      *EnumType
+		want    string
+		wantErr bool
+	}{{
+		"empty enum to JSON",
+		&EnumType{
+			last:     -1, // +1 will start at 0
+			min:      0,
+			max:      MaxBitfieldSize - 1,
+			ToString: map[int64]string{},
+			ToInt:    map[string]int64{},
+		},
+		`{}`,
+		false,
+	}, {
+		"2 value enum to JSON",
+		&EnumType{
+			last: 2,
+			min:  0,
+			max:  MaxBitfieldSize - 1,
+			ToString: map[int64]string{
+				1: "value1",
+				2: "value2",
+			},
+			ToInt: map[string]int64{
+				"value1": 1,
+				"value2": 2,
+			},
+		},
+		`{"ToString":{"1":"value1","2":"value2"},"ToInt":{"value1":1,"value2":2}}`,
+		false,
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			got, err := json.Marshal(tt.in)
+			if string(got) != tt.want {
+				t.Errorf("got: %v, want: %v", string(got), tt.want)
+			}
+			if (err != nil) != tt.wantErr {
+				t.Errorf("gotErr: %v, wantErr: %v", err, tt.wantErr)
 			}
 		})
 	}

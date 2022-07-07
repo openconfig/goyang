@@ -568,12 +568,12 @@ func pow10(e uint8) uint64 {
 // A EnumType represents a mapping of strings to integers.  It is used both
 // for enumerations as well as bitfields.
 type EnumType struct {
-	last     int64 // maximum value assigned thus far
-	min      int64 // minimum value allowed
-	max      int64 // maximum value allowed
-	unique   bool  // numeric values must be unique (enums)
-	toString map[int64]string
-	toInt    map[string]int64
+	last     int64            // maximum value assigned thus far
+	min      int64            // minimum value allowed
+	max      int64            // maximum value allowed
+	unique   bool             // numeric values must be unique (enums)
+	ToString map[int64]string `json:",omitempty"` // map of enum entries by value (integer)
+	ToInt    map[string]int64 `json:",omitempty"` // map of enum entries by name (string)
 }
 
 // NewEnumType returns an initialized EnumType.
@@ -583,8 +583,8 @@ func NewEnumType() *EnumType {
 		min:      MinEnum,
 		max:      MaxEnum,
 		unique:   true,
-		toString: map[int64]string{},
-		toInt:    map[string]int64{},
+		ToString: map[int64]string{},
+		ToInt:    map[string]int64{},
 	}
 }
 
@@ -596,8 +596,8 @@ func NewBitfield() *EnumType {
 		last:     -1, // +1 will start at 0
 		min:      0,
 		max:      MaxBitfieldSize - 1,
-		toString: map[int64]string{},
-		toInt:    map[string]int64{},
+		ToString: map[int64]string{},
+		ToInt:    map[string]int64{},
 	}
 }
 
@@ -607,10 +607,10 @@ func NewBitfield() *EnumType {
 // assigned to the same value, the conversion from value to name will result in
 // the most recently assigned name.
 func (e *EnumType) Set(name string, value int64) error {
-	if _, ok := e.toInt[name]; ok {
+	if _, ok := e.ToInt[name]; ok {
 		return fmt.Errorf("field %s already assigned", name)
 	}
-	if oname, ok := e.toString[value]; e.unique && ok {
+	if oname, ok := e.ToString[value]; e.unique && ok {
 		return fmt.Errorf("fields %s and %s conflict on value %d", name, oname, value)
 	}
 	if value < e.min {
@@ -619,8 +619,8 @@ func (e *EnumType) Set(name string, value int64) error {
 	if value > e.max {
 		return fmt.Errorf("value %d for %s too large (maximum is %d)", value, name, e.max)
 	}
-	e.toString[value] = name
-	e.toInt[name] = value
+	e.ToString[value] = name
+	e.ToInt[name] = value
 	if value >= e.last {
 		e.last = value
 	}
@@ -638,24 +638,24 @@ func (e *EnumType) SetNext(name string) error {
 
 // Name returns the name in e associated with value.  The empty string is
 // returned if no name has been assigned to value.
-func (e *EnumType) Name(value int64) string { return e.toString[value] }
+func (e *EnumType) Name(value int64) string { return e.ToString[value] }
 
 // Value returns the value associated with name in e associated.  0 is returned
 // if name is not in e, or if it is the first value in an unnumbered enum. Use
 // IsDefined to definitively confirm name is in e.
-func (e *EnumType) Value(name string) int64 { return e.toInt[name] }
+func (e *EnumType) Value(name string) int64 { return e.ToInt[name] }
 
 // IsDefined returns true if name is defined in e, else false.
 func (e *EnumType) IsDefined(name string) bool {
-	_, defined := e.toInt[name]
+	_, defined := e.ToInt[name]
 	return defined
 }
 
 // Names returns the sorted list of enum string names.
 func (e *EnumType) Names() []string {
-	names := make([]string, len(e.toInt))
+	names := make([]string, len(e.ToInt))
 	i := 0
-	for name := range e.toInt {
+	for name := range e.ToInt {
 		names[i] = name
 		i++
 	}
@@ -671,9 +671,9 @@ func (p int64Slice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 // Values returns the sorted list of enum values.
 func (e *EnumType) Values() []int64 {
-	values := make([]int64, len(e.toInt))
+	values := make([]int64, len(e.ToInt))
 	i := 0
-	for _, value := range e.toInt {
+	for _, value := range e.ToInt {
 		values[i] = value
 		i++
 	}
@@ -683,8 +683,8 @@ func (e *EnumType) Values() []int64 {
 
 // NameMap returns a map of names to values.
 func (e *EnumType) NameMap() map[string]int64 {
-	m := make(map[string]int64, len(e.toInt))
-	for name, value := range e.toInt {
+	m := make(map[string]int64, len(e.ToInt))
+	for name, value := range e.ToInt {
 		m[name] = value
 	}
 	return m
@@ -692,8 +692,8 @@ func (e *EnumType) NameMap() map[string]int64 {
 
 // ValueMap returns a map of values to names.
 func (e *EnumType) ValueMap() map[int64]string {
-	m := make(map[int64]string, len(e.toString))
-	for name, value := range e.toString {
+	m := make(map[int64]string, len(e.ToString))
+	for name, value := range e.ToString {
 		m[name] = value
 	}
 	return m

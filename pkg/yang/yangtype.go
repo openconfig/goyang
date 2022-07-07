@@ -277,7 +277,7 @@ func (y *YangType) Equal(t *YangType) bool {
 		!y.Range.Equal(t.Range),
 		!tsEqual(y.Type, t.Type),
 		!cmp.Equal(y.Enum, t.Enum, cmp.Comparer(func(t, u EnumType) bool {
-			return cmp.Equal(t.unique, u.unique) && cmp.Equal(t.toInt, u.toInt) && cmp.Equal(t.toString, u.toString)
+			return cmp.Equal(t.unique, u.unique) && cmp.Equal(t.ToInt, u.ToInt) && cmp.Equal(t.ToString, u.ToString)
 		})):
 
 		return false
