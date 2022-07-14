@@ -16,6 +16,7 @@ package yang
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 )
 
@@ -169,6 +170,9 @@ func (ms *Modules) resolveIdentities() []error {
 
 				// Build up a list of direct children of this identity.
 				base.Identity.Values = append(base.Identity.Values, i.Identity)
+				sort.Slice(base.Identity.Values, func(j, k int) bool {
+					return base.Identity.Values[j].Name < base.Identity.Values[k].Name
+				})
 			}
 		}
 	}
