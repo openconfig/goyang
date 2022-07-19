@@ -388,12 +388,12 @@ var treeTestCases = []identityTestCase{
 				module: "base",
 				name:   "GREATGRANDFATHER",
 				values: []string{
-					"BROTHER", // Order is by hierarchy first then alphabetically
+					"BROTHER", // Order is alphabetical
 					"FATHER",
-					"SON",
 					"GRANDFATHER",
-					"UNCLE",
 					"GREATUNCLE",
+					"SON",
+					"UNCLE",
 				},
 			},
 			{

@@ -170,9 +170,6 @@ func (ms *Modules) resolveIdentities() []error {
 
 				// Build up a list of direct children of this identity.
 				base.Identity.Values = append(base.Identity.Values, i.Identity)
-				sort.Slice(base.Identity.Values, func(j, k int) bool {
-					return base.Identity.Values[j].Name < base.Identity.Values[k].Name
-				})
 			}
 		}
 	}
@@ -183,6 +180,9 @@ func (ms *Modules) resolveIdentities() []error {
 		for _, j := range i.Identity.Values {
 			newValues = addChildren(j, newValues)
 		}
+		sort.SliceStable(newValues, func(j, k int) bool {
+			return newValues[j].Name < newValues[k].Name
+		})
 		i.Identity.Values = newValues
 	}
 
