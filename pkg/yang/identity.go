@@ -16,6 +16,7 @@ package yang
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 )
 
@@ -179,6 +180,9 @@ func (ms *Modules) resolveIdentities() []error {
 		for _, j := range i.Identity.Values {
 			newValues = addChildren(j, newValues)
 		}
+		sort.SliceStable(newValues, func(j, k int) bool {
+			return newValues[j].Name < newValues[k].Name
+		})
 		i.Identity.Values = newValues
 	}
 

@@ -388,19 +388,19 @@ var treeTestCases = []identityTestCase{
 				module: "base",
 				name:   "GREATGRANDFATHER",
 				values: []string{
+					"BROTHER", // Order is alphabetical
+					"FATHER",
 					"GRANDFATHER",
 					"GREATUNCLE",
-					"FATHER",
-					"UNCLE",
 					"SON",
-					"BROTHER",
+					"UNCLE",
 				},
 			},
 			{
 				module:    "base",
 				name:      "GRANDFATHER",
 				baseNames: []string{"GREATGRANDFATHER"},
-				values:    []string{"FATHER", "UNCLE", "SON", "BROTHER"},
+				values:    []string{"BROTHER", "FATHER", "SON", "UNCLE"},
 			},
 			{
 				module:    "base",
@@ -411,7 +411,7 @@ var treeTestCases = []identityTestCase{
 				module:    "base",
 				name:      "FATHER",
 				baseNames: []string{"GRANDFATHER"},
-				values:    []string{"SON", "BROTHER"},
+				values:    []string{"BROTHER", "SON"},
 			},
 			{
 				module:    "base",
@@ -426,6 +426,7 @@ var treeTestCases = []identityTestCase{
 		},
 	},
 	{
+		name: "tree-test-case-3",
 		in: []inputModule{
 			{
 				name: "base.yang",
@@ -468,6 +469,7 @@ var treeTestCases = []identityTestCase{
 		},
 	},
 	{
+		name: "tree-test-case-4",
 		in: []inputModule{
 			{
 				name: "base.yang",
@@ -514,6 +516,7 @@ var treeTestCases = []identityTestCase{
 		},
 	},
 	{
+		name: "tree-test-case-5",
 		in: []inputModule{
 			{
 				name: "base.yang",
@@ -717,13 +720,17 @@ func TestIdentityTree(t *testing.T) {
 
 				valueMap := make(map[string]bool)
 
-				for _, val := range chkID.values {
+				for i, val := range chkID.values {
 					valueMap[val] = false
 					// Check that IsDefined returns the right result
 					if !foundID.IsDefined(val) {
 						t.Errorf("Couldn't find defined value %s  for %s", val, chkID.name)
 					}
 
+					// Check that the values are sorted in a consistent order
+					if foundID.Values[i].Name != val {
+						t.Errorf("Invalid order for value #%d. Expecting %s Got %s", i, foundID.Values[i].Name, val)
+					}
 					// Check that GetValue returns the right Identity
 					idval := foundID.GetValue(val)
 					if idval == nil {
