@@ -16,8 +16,8 @@
 //
 // A generic yang statements takes one of the forms:
 //
-//    keyword [argument] ;
-//    keyword [argument] { [statement [...]] }
+//	keyword [argument] ;
+//	keyword [argument] { [statement [...]] }
 //
 // At the lowest level, package yang returns a simple tree of statements via the
 // Parse function.  The Parse function makes no attempt to determine the
@@ -39,7 +39,6 @@
 //	}
 //
 //	// e is the Entry tree for "module-name"
-//
 //
 // More complicated uses cases should use NewModules and then some combination
 // of Modules.GetModule, Modules.Read, Modules.Parse, and Modules.GetErrors.
