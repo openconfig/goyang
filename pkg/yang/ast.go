@@ -233,7 +233,7 @@ func build(stmt *Statement, parent reflect.Value, types *typeDictionary) (v refl
 //
 // The functions have the form:
 //
-//	 func fn(ss *Statement, v, p reflect.Value, types *typeDictionary) error
+//	func fn(ss *Statement, v, p reflect.Value, types *typeDictionary) error
 //
 // Given stmt as a Statement of type at, ss is a substatement of stmt (in a few
 // exceptional cases, ss is the Statement itself).  v must have the same type
@@ -281,11 +281,11 @@ func build(stmt *Statement, parent reflect.Value, types *typeDictionary) (v refl
 // The Field can have attributes delimited by a ','.  The only
 // supported attributes are:
 //
-//    nomerge:       Do not merge this field
-//    required:      This field must be populated
-//    required=KIND: This field must be populated if the keyword is KIND
-//                   otherwise this field must not be present.
-//                   (This is to support merging Module and SubModule).
+//	nomerge:       Do not merge this field
+//	required:      This field must be populated
+//	required=KIND: This field must be populated if the keyword is KIND
+//	               otherwise this field must not be present.
+//	               (This is to support merging Module and SubModule).
 //
 // If at contains substructures, initTypes recurses on the substructures.
 func initTypes(at reflect.Type) {
