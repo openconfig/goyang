@@ -27,4 +27,33 @@ type Options struct {
 	// generated within the schema to store the logical grouping from which it
 	// is derived.
 	StoreUses bool
+	// DeviateOptions contains options for how deviations are handled.
+	DeviateOptions DeviateOptions
+}
+
+// DeviateOptions contains options for how deviations are handled.
+type DeviateOptions struct {
+	// IgnoreDeviateNotSupported indicates to the parser to retain nodes
+	// that are marked with "deviate not-supported". An example use case is
+	// where the user wants to interact with different targets that have
+	// different support for a leaf without having to use a second instance
+	// of an AST.
+	IgnoreDeviateNotSupported bool
+}
+
+// IsDeviateOpt ensures that DeviateOptions satisfies the DeviateOpt interface.
+func (DeviateOptions) IsDeviateOpt() {}
+
+// DeviateOpt is an interface that can be used in function arguments.
+type DeviateOpt interface {
+	IsDeviateOpt()
+}
+
+func hasIgnoreDeviateNotSupported(opts []DeviateOpt) bool {
+	for _, o := range opts {
+		if opt, ok := o.(DeviateOptions); ok {
+			return opt.IgnoreDeviateNotSupported
+		}
+	}
+	return false
 }
