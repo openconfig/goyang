@@ -2957,6 +2957,7 @@ func TestDeviation(t *testing.T) {
 	tests := []struct {
 		desc                    string
 		inFiles                 map[string]string
+		inParseOptions          Options
 		wants                   map[string][]deviationTest
 		wantParseErrSubstring   string
 		wantProcessErrSubstring string
@@ -3156,6 +3157,32 @@ func TestDeviation(t *testing.T) {
 				path: "/a-leaf",
 			}, {
 				path: "/a-leaflist",
+			}, {
+				path:  "survivor",
+				entry: &Entry{Name: "survivor"},
+			}},
+		},
+	}, {
+		desc:    "deviation - not supported but ignored by option",
+		inFiles: map[string]string{"deviate": mustReadFile(filepath.Join("testdata", "deviate-notsupported.yang"))},
+		inParseOptions: Options{
+			DeviateOptions: DeviateOptions{
+				IgnoreDeviateNotSupported: true,
+			},
+		},
+		wants: map[string][]deviationTest{
+			"deviate": {{
+				path:  "/target",
+				entry: &Entry{Name: "target"},
+			}, {
+				path:  "/target-list",
+				entry: &Entry{Name: "target-list"},
+			}, {
+				path:  "/a-leaf",
+				entry: &Entry{Name: "a-leaf"},
+			}, {
+				path:  "/a-leaflist",
+				entry: &Entry{Name: "a-leaflist"},
 			}, {
 				path:  "survivor",
 				entry: &Entry{Name: "survivor"},
@@ -3527,6 +3554,7 @@ func TestDeviation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
 			ms := NewModules()
+			ms.ParseOptions = tt.inParseOptions
 
 			for name, mod := range tt.inFiles {
 				if err := ms.Parse(mod, name); err != nil {

@@ -1098,7 +1098,7 @@ func (e *Entry) Augment(addErrors bool) (processed, skipped int) {
 
 // ApplyDeviate walks the deviations within the supplied entry, and applies them to the
 // schema.
-func (e *Entry) ApplyDeviate() []error {
+func (e *Entry) ApplyDeviate(deviateOpts ...DeviateOpt) []error {
 	var errs []error
 	appendErr := func(err error) { errs = append(errs, err) }
 	for _, d := range e.Deviations {
@@ -1168,7 +1168,9 @@ func (e *Entry) ApplyDeviate() []error {
 						appendErr(fmt.Errorf("%s: node %s does not have a valid parent, but deviate not-supported references one", Source(e.Node), e.Name))
 						continue
 					}
-					dp.delete(deviatedNode.Name)
+					if !hasIgnoreDeviateNotSupported(deviateOpts) {
+						dp.delete(deviatedNode.Name)
+					}
 				case DeviationDelete:
 					if devSpec.Config != TSUnset {
 						deviatedNode.Config = TSUnset

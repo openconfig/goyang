@@ -395,7 +395,7 @@ func (ms *Modules) Process() []error {
 		for _, m := range devmods {
 			e := ToEntry(m)
 			if !dvP[e.Name] {
-				errs = append(errs, e.ApplyDeviate()...)
+				errs = append(errs, e.ApplyDeviate(ms.ParseOptions.DeviateOptions)...)
 				dvP[e.Name] = true
 			}
 		}
