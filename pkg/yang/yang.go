@@ -1046,6 +1046,7 @@ func (s *Length) Statement() *Statement { return s.Source }
 func (s *Length) Exts() []*Statement    { return s.Extensions }
 
 // A Pattern is defined in: http://tools.ietf.org/html/rfc6020#section-9.4.6
+//and http://tools.ietf.org/html/rfc7950#section-9.4.5.1 ("modifier" sub-statement)
 type Pattern struct {
 	Name       string       `yang:"Name,nomerge"`
 	Source     *Statement   `yang:"Statement,nomerge"`
