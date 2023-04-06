@@ -1056,6 +1056,7 @@ type Pattern struct {
 	ErrorAppTag  *Value `yang:"error-app-tag"`
 	ErrorMessage *Value `yang:"error-message"`
 	Reference    *Value `yang:"reference"`
+	Modifier     *Value `yang:"modifier"`
 }
 
 func (Pattern) Kind() string             { return "pattern" }
