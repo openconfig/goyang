@@ -4060,6 +4060,25 @@ func TestMisc(t *testing.T) {
 				}
 			},
 		}},
+	}, {
+		name: "ordered-by client: invalid argument",
+		inModules: map[string]string{
+			"test.yang": `
+			module test {
+				prefix "t";
+				namespace "urn:t";
+
+				list ordered-list {
+					key "name";
+					ordered-by client;
+					leaf name {
+						type string;
+					}
+				}
+			}
+			`,
+		},
+		wantErrSubstr: "ordered-by has invalid argument",
 	}}
 
 	for _, tt := range tests {
