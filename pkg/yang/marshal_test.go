@@ -342,7 +342,8 @@ func TestMarshalJSON(t *testing.T) {
       "ListAttr": {
         "MinElements": 0,
         "MaxElements": 18446744073709551615,
-        "OrderedBy": null
+        "OrderedBy": null,
+        "OrderedByUser": false
       }
     }
   },
@@ -356,7 +357,8 @@ func TestMarshalJSON(t *testing.T) {
   "ListAttr": {
     "MinElements": 48,
     "MaxElements": 42,
-    "OrderedBy": null
+    "OrderedBy": null,
+    "OrderedByUser": false
   },
   "Identities": [
     {
@@ -534,7 +536,8 @@ func TestParseAndMarshal(t *testing.T) {
           "ListAttr": {
             "MinElements": 10,
             "MaxElements": 18446744073709551615,
-            "OrderedBy": null
+            "OrderedBy": null,
+            "OrderedByUser": false
           }
         },
         "d": {
@@ -623,7 +626,8 @@ func TestParseAndMarshal(t *testing.T) {
           "ListAttr": {
             "MinElements": 0,
             "MaxElements": 18446744073709551615,
-            "OrderedBy": null
+            "OrderedBy": null,
+            "OrderedByUser": false
           }
         },
         "zip2": {
@@ -645,7 +649,8 @@ func TestParseAndMarshal(t *testing.T) {
           "ListAttr": {
             "MinElements": 0,
             "MaxElements": 1000,
-            "OrderedBy": null
+            "OrderedBy": null,
+            "OrderedByUser": false
           }
         }
       }

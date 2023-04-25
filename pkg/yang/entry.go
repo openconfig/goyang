@@ -148,7 +148,31 @@ type RPCEntry struct {
 type ListAttr struct {
 	MinElements uint64 // leaf-list or list MUST have at least min-elements
 	MaxElements uint64 // leaf-list or list has at most max-elements
-	OrderedBy   *Value // order of entries determined by "system" or "user"
+	// OrderedBy is deprecated. Use OrderedByUser instead.
+	OrderedBy *Value
+	// OrderedByUser indicates whether the entries are "ordered-by user".
+	// Otherwise the order is determined by the system.
+	OrderedByUser bool
+}
+
+// parseOrderedBy parses the ordered-by value and classifies the list/leaf-list
+// by whether the `ordered-by user` modifier is active.
+//
+// For more information see
+// https://datatracker.ietf.org/doc/html/rfc7950#section-7.7.7
+func (l *ListAttr) parseOrderedBy(s *Value) error {
+	if s == nil {
+		return nil
+	}
+	l.OrderedBy = s
+	switch s.Name {
+	case "user":
+		l.OrderedByUser = true
+	case "system":
+	default:
+		return fmt.Errorf("%s: ordered-by has invalid argument: %q", Source(s), s.Name)
+	}
+	return nil
 }
 
 // NewDefaultListAttr returns a new ListAttr object with min/max elements being
@@ -610,7 +634,9 @@ func ToEntry(n Node) (e *Entry) {
 
 		e = ToEntry(leaf)
 		e.ListAttr = NewDefaultListAttr()
-		e.ListAttr.OrderedBy = s.OrderedBy
+		if err := e.ListAttr.parseOrderedBy(s.OrderedBy); err != nil {
+			e.addError(err)
+		}
 		var err error
 		if e.ListAttr.MaxElements, err = semCheckMaxElements(s.MaxElements); err != nil {
 			e.addError(err)
@@ -647,7 +673,9 @@ func ToEntry(n Node) (e *Entry) {
 	switch s := n.(type) {
 	case *List:
 		e.ListAttr = NewDefaultListAttr()
-		e.ListAttr.OrderedBy = s.OrderedBy
+		if err := e.ListAttr.parseOrderedBy(s.OrderedBy); err != nil {
+			e.addError(err)
+		}
 		var err error
 		if e.ListAttr.MaxElements, err = semCheckMaxElements(s.MaxElements); err != nil {
 			e.addError(err)
