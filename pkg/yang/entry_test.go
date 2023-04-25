@@ -3964,7 +3964,7 @@ type customTestCases struct {
 	wantEntryCustomTest func(t *testing.T, e *Entry)
 }
 
-func TestMisc(t *testing.T) {
+func TestOrderedBy(t *testing.T) {
 	tests := []struct {
 		name          string
 		inModules     map[string]string
