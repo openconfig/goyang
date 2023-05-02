@@ -1485,6 +1485,13 @@ func (e *Entry) merge(prefix *Value, namespace *Value, oe *Entry) {
 		} else {
 			v.Parent = e
 			v.Exts = append(v.Exts, oe.Exts...)
+			for lk, lv := range oe.Extra {
+				if v.Extra[lk] == nil {
+					v.Extra[lk] = lv
+					continue
+				}
+				v.Extra[lk] = append(v.Extra[lk], oe.Extra[lk]...)
+			}
 			e.Dir[k] = v
 		}
 	}
