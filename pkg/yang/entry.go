@@ -1461,6 +1461,12 @@ func (e *Entry) dup() *Entry {
 			ne.Dir[k] = de
 		}
 	}
+
+	ne.Extra = make(map[string][]interface{})
+	for k, v := range e.Extra {
+		ne.Extra[k] = v
+	}
+
 	return &ne
 }
 
@@ -1485,6 +1491,9 @@ func (e *Entry) merge(prefix *Value, namespace *Value, oe *Entry) {
 		} else {
 			v.Parent = e
 			v.Exts = append(v.Exts, oe.Exts...)
+			for lk := range oe.Extra {
+				v.Extra[lk] = append(v.Extra[lk], oe.Extra[lk]...)
+			}
 			e.Dir[k] = v
 		}
 	}

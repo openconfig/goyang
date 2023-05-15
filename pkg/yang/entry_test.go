@@ -2058,6 +2058,7 @@ var testIfFeatureModules = []struct {
   feature ft-identity;
   feature ft-uses;
   feature ft-refine;
+  feature ft-augment-uses;
 
   container cont {
     if-feature ft-container;
@@ -2118,6 +2119,9 @@ var testIfFeatureModules = []struct {
 
   augment "/cont" {
     if-feature ft-augment;
+	uses g {
+		if-feature ft-augment-uses;
+	}
   }
 
   identity id {
@@ -2130,7 +2134,10 @@ var testIfFeatureModules = []struct {
       if-feature ft-refine;
     }
   }
-  grouping g {}
+
+  grouping g {
+	container gc {}
+  }
 }
 `,
 	},
@@ -2268,6 +2275,18 @@ func TestIfFeature(t *testing.T) {
 			name:           "uses",
 			inIfFeatures:   ms.Modules["if-feature"].Uses[0].IfFeature,
 			wantIfFeatures: []string{"ft-uses"},
+		},
+		{
+			// Verify that if-feature field defined in "uses" is correctly propagated to container
+			name:           "uses",
+			inIfFeatures:   entryIfFeatures(mod.Dir["gc"]),
+			wantIfFeatures: []string{"ft-uses"},
+		},
+		{
+			// Verify that if-feature field defined in "augment" and in "augment > uses" is correctly propagated to container
+			name:           "augment-uses",
+			inIfFeatures:   entryIfFeatures(mod.Dir["cont"].Dir["gc"]),
+			wantIfFeatures: []string{"ft-augment-uses", "ft-augment"},
 		},
 	}
 
