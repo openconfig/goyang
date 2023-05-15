@@ -2277,10 +2277,13 @@ func TestIfFeature(t *testing.T) {
 			wantIfFeatures: []string{"ft-uses"},
 		},
 		{
+			// Verify that if-feature field defined in "uses" is correctly propagated to container
 			name:           "uses",
 			inIfFeatures:   entryIfFeatures(mod.Dir["gc"]),
 			wantIfFeatures: []string{"ft-uses"},
-		}, {
+		},
+		{
+			// Verify that if-feature field defined in "augment" and in "augment > uses" is correctly propagated to container
 			name:           "augment-uses",
 			inIfFeatures:   entryIfFeatures(mod.Dir["cont"].Dir["gc"]),
 			wantIfFeatures: []string{"ft-augment-uses", "ft-augment"},
