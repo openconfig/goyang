@@ -36,6 +36,9 @@ func Parse(yangfiles, path []string) (map[string]*yang.Entry, []error) {
 
 	var processErr []error
 	for _, name := range yangfiles {
+		if name == "" {
+			continue
+		}
 		if err := ms.Read(name); err != nil {
 			processErr = append(processErr, err)
 		}
