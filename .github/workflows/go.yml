@@ -8,4 +8,5 @@ on:
     - cron: "0 0 * * *"
 
 jobs:
-  openconfig/common-ci/.github/workflows/basic_go.yaml@0dea8d1
+  go:
+    uses: openconfig/common-ci/.github/workflows/basic_go.yaml@0dea8d1
