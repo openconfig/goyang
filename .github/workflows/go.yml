@@ -8,33 +8,5 @@ on:
     - cron: "0 0 * * *"
 
 jobs:
-  go:
-    uses: openconfig/common-ci/.github/workflows/basic_go.yml@basic_go_workflow
-
-  static_analysis:
-    name: Static Analysis
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Install Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: '1.x'
-        id: go
-
-      - name: Install required static analysis tools
-        run: |
-          go install honnef.co/go/tools/cmd/staticcheck@latest
-
-      - name: Check out ygot code
-        uses: actions/checkout@v2
-
-      - name: Go vet
-        run: go vet ./...
-
-      - name: Check gofmt
-        run: diff -u <(echo -n) <(gofmt -d -s .)
-
-      - name: Staticcheck
-        run: |
-          staticcheck ./...
+  Go:
+    uses: openconfig/common-ci/.github/workflows/basic_go.yaml@0ef57c0b791d1097550176ae6bdf6829bf805643
