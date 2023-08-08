@@ -9,4 +9,4 @@ on:
 
 jobs:
   common:
-    uses: openconfig/common-ci/.github/workflows/basic_go.yml@142ef47ca12d6a5da8e77cc0ef4dff9ffcd0a781
+    uses: openconfig/common-ci/.github/workflows/basic_go.yml@97d0e02bb9b9449f8a4df5ce3997840216ff9f5f
