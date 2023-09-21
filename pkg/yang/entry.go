@@ -1344,8 +1344,22 @@ func (e *Entry) Find(name string) *Entry {
 			_, part = getPrefix(part)
 			switch part {
 			case "input":
+				if e.RPC.Input == nil {
+					e.RPC.Input = &Entry{
+						Name: "input",
+						Kind: InputEntry,
+						Dir:  make(map[string]*Entry),
+					}
+				}
 				e = e.RPC.Input
 			case "output":
+				if e.RPC.Output == nil {
+					e.RPC.Output = &Entry{
+						Name: "output",
+						Kind: OutputEntry,
+						Dir:  make(map[string]*Entry),
+					}
+				}
 				e = e.RPC.Output
 			}
 		default:
