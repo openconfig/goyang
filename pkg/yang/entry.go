@@ -1347,6 +1347,7 @@ func (e *Entry) Find(name string) *Entry {
 				if e.RPC.Input == nil {
 					e.RPC.Input = &Entry{
 						Name: "input",
+						Kind: InputEntry,
 						Dir:  make(map[string]*Entry),
 					}
 				}
@@ -1355,6 +1356,7 @@ func (e *Entry) Find(name string) *Entry {
 				if e.RPC.Output == nil {
 					e.RPC.Output = &Entry{
 						Name: "output",
+						Kind: OutputEntry,
 						Dir:  make(map[string]*Entry),
 					}
 				}
