@@ -9,7 +9,7 @@ on:
 
 jobs:
   go:
-    uses: openconfig/common-ci/.github/workflows/go.yml@c2294c3c86c90e75e58c24a40d6f7f3364bbae9d
+    uses: openconfig/common-ci/.github/workflows/go.yml@8f3db83e5548415f4f3999e42dd5f9bf7a203837
 
   linter:
-    uses: openconfig/common-ci/.github/workflows/linter.yml@c2294c3c86c90e75e58c24a40d6f7f3364bbae9d
+    uses: openconfig/common-ci/.github/workflows/linter.yml@8f3db83e5548415f4f3999e42dd5f9bf7a203837
