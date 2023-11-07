@@ -442,3 +442,9 @@ func (ms *Modules) include(m *Module) error {
 	}
 	return nil
 }
+
+// ClearEntryCache clears the entryCache containing previously converted nodes
+// used by the ToEntry function.
+func (ms *Modules) ClearEntryCache() {
+	ms.entryCache = map[Node]*Entry{}
+}
