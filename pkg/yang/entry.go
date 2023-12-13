@@ -559,11 +559,18 @@ func ToEntry(n Node) (e *Entry) {
 		}
 	}
 	ms := RootNode(n).Modules
-	if e := ms.entryCache[n]; e != nil {
+
+	// Protect the entryCache map from concurrent access.
+	ms.entryCacheMu.RLock()
+	e = ms.entryCache[n]
+	ms.entryCacheMu.RUnlock()
+	if e != nil {
 		return e
 	}
 	defer func() {
+		ms.entryCacheMu.Lock()
 		ms.entryCache[n] = e
+		ms.entryCacheMu.Unlock()
 	}()
 
 	// Copy in the extensions from our Node, if any.
