@@ -559,11 +559,11 @@ func ToEntry(n Node) (e *Entry) {
 		}
 	}
 	ms := RootNode(n).Modules
-	if e := ms.entryCache[n]; e != nil {
+	if e := ms.getEntryCache(n); e != nil {
 		return e
 	}
 	defer func() {
-		ms.entryCache[n] = e
+		ms.setEntryCache(n, e)
 	}()
 
 	// Copy in the extensions from our Node, if any.

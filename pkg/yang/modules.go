@@ -26,14 +26,16 @@ import (
 // Modules contains information about all the top level modules and
 // submodules that are read into it via its Read method.
 type Modules struct {
-	Modules    map[string]*Module // All "module" nodes
-	SubModules map[string]*Module // All "submodule" nodes
-	includes   map[*Module]bool   // Modules we have already done include on
-	nsMu       sync.Mutex         // nsMu protects the byNS map.
-	byNS       map[string]*Module // Cache of namespace lookup
-	typeDict   *typeDictionary    // Cache for type definitions.
+	Modules      map[string]*Module // All "module" nodes
+	SubModules   map[string]*Module // All "submodule" nodes
+	includes     map[*Module]bool   // Modules we have already done include on
+	nsMu         sync.Mutex         // nsMu protects the byNS map.
+	byNS         map[string]*Module // Cache of namespace lookup
+	typeDict     *typeDictionary    // Cache for type definitions.
+	entryCacheMu sync.RWMutex       // entryCacheMu protects the entryCache map.
 	// entryCache is used to prevent unnecessary recursion into previously
-	// converted nodes.
+	// converted nodes. To access the map, use the get/set/ClearEntryCache()
+	// thread-safe functions.
 	entryCache map[Node]*Entry
 	// mergedSubmodule is used to prevent re-parsing a submodule that has already
 	// been merged into a particular entity when circular dependencies are being
@@ -323,7 +325,7 @@ func (ms *Modules) Process() []error {
 	// Reset globals that may remain stale if multiple Process() calls are
 	// made by the same caller.
 	ms.mergedSubmodule = map[string]bool{}
-	ms.entryCache = map[Node]*Entry{}
+	ms.ClearEntryCache()
 
 	errs := ms.process()
 	if len(errs) > 0 {
@@ -443,8 +445,22 @@ func (ms *Modules) include(m *Module) error {
 	return nil
 }
 
+func (ms *Modules) getEntryCache(n Node) *Entry {
+	ms.entryCacheMu.RLock()
+	defer ms.entryCacheMu.RUnlock()
+	return ms.entryCache[n]
+}
+
+func (ms *Modules) setEntryCache(n Node, e *Entry) {
+	ms.entryCacheMu.Lock()
+	defer ms.entryCacheMu.Unlock()
+	ms.entryCache[n] = e
+}
+
 // ClearEntryCache clears the entryCache containing previously converted nodes
 // used by the ToEntry function.
 func (ms *Modules) ClearEntryCache() {
+	ms.entryCacheMu.Lock()
+	defer ms.entryCacheMu.Unlock()
 	ms.entryCache = map[Node]*Entry{}
 }
