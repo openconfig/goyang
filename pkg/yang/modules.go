@@ -34,7 +34,8 @@ type Modules struct {
 	typeDict     *typeDictionary    // Cache for type definitions.
 	entryCacheMu sync.RWMutex       // entryCacheMu protects the entryCache map.
 	// entryCache is used to prevent unnecessary recursion into previously
-	// converted nodes.
+	// converted nodes. To access the map, use the get/set/ClearEntryCache()
+	// thread-safe functions.
 	entryCache map[Node]*Entry
 	// mergedSubmodule is used to prevent re-parsing a submodule that has already
 	// been merged into a particular entity when circular dependencies are being
@@ -442,6 +443,18 @@ func (ms *Modules) include(m *Module) error {
 		i.Module = im
 	}
 	return nil
+}
+
+func (ms *Modules) getEntryCache(n Node) *Entry {
+	ms.entryCacheMu.RLock()
+	defer ms.entryCacheMu.RUnlock()
+	return ms.entryCache[n]
+}
+
+func (ms *Modules) setEntryCache(n Node, e *Entry) {
+	ms.entryCacheMu.Lock()
+	defer ms.entryCacheMu.Unlock()
+	ms.entryCache[n] = e
 }
 
 // ClearEntryCache clears the entryCache containing previously converted nodes
