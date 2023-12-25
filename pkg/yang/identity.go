@@ -151,10 +151,11 @@ func (ms *Modules) resolveIdentities() []error {
 		}
 	}
 
-	// Determine which identities have a base statement, and link this to a
-	// fully resolved identity statement. The intention here is to make sure
-	// that the Children slice is fully populated with pointers to all identities
-	// that have a base, so that we can do inheritance of these later.
+	// Now, we want to create for all identities a view of all of their children.
+	// A child identity here means an inherited identity.
+	//
+	// We start by finding the direct children of all identities using the
+	// 'base' statement.
 	for _, i := range ms.typeDict.identities.dict {
 		if i.Identity.Base != nil {
 			// This identity inherits from one or more other identities.
@@ -174,7 +175,8 @@ func (ms *Modules) resolveIdentities() []error {
 		}
 	}
 
-	// Do a final sweep through the identities to build up their children.
+	// Now, we can find all transitive identities by recursively populating
+	// the children of each identity.
 	for _, i := range ms.typeDict.identities.dict {
 		newValues := []*Identity{}
 		for _, j := range i.Identity.Values {
