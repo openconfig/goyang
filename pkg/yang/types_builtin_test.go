@@ -55,6 +55,54 @@ func Rf(a, b int64, fracDig uint8) YRange {
 	return YRange{n1, n2}
 }
 
+func TestFromFloat(t *testing.T) {
+	tests := []struct {
+		desc string
+		in   float64
+		want Number
+	}{{
+		desc: "positive - no decimals",
+		in:   10.0,
+		want: Number{
+			Negative:       false,
+			Value:          10,
+			FractionDigits: 0,
+		},
+	}, {
+		desc: "positive - decimals",
+		in:   10.15,
+		want: Number{
+			Negative:       false,
+			Value:          1015,
+			FractionDigits: 2,
+		},
+	}, {
+		desc: "negative - no decimals",
+		in: -10.0,
+		want: Number{
+			Negative: true,
+			Value: 10,
+			FractionDigits: 0,
+		},
+	}, {
+		desc: "negative - decimals",
+		in: -10.15,
+		want: Number{
+			Negative: true,
+			Value: 1015,
+			FractionDigits: 2,
+		},
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			if got := FromFloat(tt.in); !cmp.Equal(got, tt.want) {
+				t.Fatalf("FromFloat(%v): did not get expected value, got: %+v, want: %+v", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNumberInt(t *testing.T) {
 	tests := []struct {
 		desc    string
