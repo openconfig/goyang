@@ -328,6 +328,7 @@ func FromFloat(f float64) Number {
 		}
 	}
 
+	// Per RFC7950/6020, fraction-digits must be at least 1.
 	fracDig := uint8(1)
 	f *= 10.0
 	for ; Frac(f) != 0.0 && fracDig <= MaxFractionDigits; fracDig++ {
