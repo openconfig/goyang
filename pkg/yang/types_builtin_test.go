@@ -78,18 +78,18 @@ func TestFromFloat(t *testing.T) {
 		},
 	}, {
 		desc: "negative - no decimals",
-		in: -10.0,
+		in:   -10.0,
 		want: Number{
-			Negative: true,
-			Value: 10,
+			Negative:       true,
+			Value:          10,
 			FractionDigits: 0,
 		},
 	}, {
 		desc: "negative - decimals",
-		in: -10.15,
+		in:   -10.15,
 		want: Number{
-			Negative: true,
-			Value: 1015,
+			Negative:       true,
+			Value:          1015,
 			FractionDigits: 2,
 		},
 	}}
