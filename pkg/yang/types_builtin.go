@@ -334,12 +334,12 @@ func FromFloat(f float64) Number {
 	for ; Frac(f) != 0.0 && fracDig <= MaxFractionDigits; fracDig++ {
 		f *= 10.0
 	}
-	v := uint64(f)
 	negative := false
 	if f < 0 {
 		negative = true
-		v = -v
+		f = -f
 	}
+	v := uint64(f)
 
 	return Number{Negative: negative, Value: v, FractionDigits: fracDig}
 }
