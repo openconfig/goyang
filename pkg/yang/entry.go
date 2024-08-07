@@ -660,6 +660,16 @@ func ToEntry(n Node) (e *Entry) {
 		// when the group is used in multiple locations and the
 		// grouping has a leafref that references outside the group.
 		e = ToEntry(g).dup()
+
+		// process augments
+		if s.Augment != nil {
+			a := ToEntry(s.Augment)
+			a.Parent = e
+			a.Augments = append(a.Augments, e)
+
+			e.Find(a.Name).merge(nil, a.Namespace(), a)
+		}
+
 		addExtraKeywordsToLeafEntry(n, e)
 		return e
 	}
