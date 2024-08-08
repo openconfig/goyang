@@ -3871,6 +3871,260 @@ func TestLeafEntry(t *testing.T) {
 	}
 }
 
+func TestAugmentUses(t *testing.T) {
+
+	tests := []struct {
+		name       string
+		inModules  map[string]string
+		WantErrors []string
+		pathExist  [][]string
+	}{
+		{
+			name:       "Yang 1.0 fail multiple augment in use",
+			WantErrors: []string{"multiple augments not allowed in yang version 1.0: grouping-a"},
+			inModules: map[string]string{
+				"a.yang": `
+				module mod-a {
+				yang-version 1.1;
+				namespace "urn:mod-a";
+				prefix moda;
+
+				include submod-a-one;
+				include submod-a-two;
+				}
+				`,
+				"b.yang": `
+				submodule submod-a-one {
+				belongs-to mod-a {
+					prefix moda;
+				}
+				yang-version 1.0;
+				include submod-a-two;
+
+				grouping grouping-a {
+					list range {
+					must 'end >= start' {
+						error-message
+						"'end' must be greater than or equal to 'start'.";
+					}
+					leaf start {
+						type uint16 {
+						range "1..10";
+						}
+					}
+					leaf end {
+						type uint16 {
+						range "1..10";
+						}
+					}
+					key "start end";
+					}
+					container z {
+
+					}
+				}
+
+				augment "/moda:container-a" {
+					container augment-a {
+					uses grouping-a {
+						augment "range" {
+						choice timeout-type {
+							mandatory true;
+							case period {
+							leaf period {
+								type uint16 {
+								range "2..100";
+								}
+								units second;
+							}
+							}
+							case boolean {
+							container boolean {
+								leaf enabled {
+								type boolean;
+								}
+							}
+							}
+						}
+						}
+						augment "z" {
+							leaf enableZ {
+							type boolean;
+							}
+						}
+					}
+					}
+				}
+				}
+				`,
+				"c.yang": `
+				submodule submod-a-two {
+				belongs-to mod-a {
+					prefix moda;
+				}
+				yang-version 1.1;
+
+				container container-a {
+
+					container a {
+					}
+
+					container b {
+					}
+				}
+				}
+				`,
+			},
+		},
+		{
+			name: "Yang 1.1 pass multiple augment in use",
+			pathExist: [][]string{
+				{"container-a", "a"},
+				{"container-a", "b"},
+				{"container-a", "augment-a", "range", "start"},
+				{"container-a", "augment-a", "z", "enableZ"},
+			},
+			inModules: map[string]string{
+				"a.yang": `
+				module mod-a {
+				yang-version 1.1;
+				namespace "urn:mod-a";
+				prefix moda;
+
+				include submod-a-one;
+				include submod-a-two;
+				}
+				`,
+				"b.yang": `
+				submodule submod-a-one {
+				belongs-to mod-a {
+					prefix moda;
+				}
+				yang-version 1.1;
+				include submod-a-two;
+
+				grouping grouping-a {
+					list range {
+					must 'end >= start' {
+						error-message
+						"'end' must be greater than or equal to 'start'.";
+					}
+					leaf start {
+						type uint16 {
+						range "1..10";
+						}
+					}
+					leaf end {
+						type uint16 {
+						range "1..10";
+						}
+					}
+					key "start end";
+					}
+					container z {
+
+					}
+				}
+
+				augment "/moda:container-a" {
+					container augment-a {
+					uses grouping-a {
+						augment "range" {
+						choice timeout-type {
+							mandatory true;
+							case period {
+							leaf period {
+								type uint16 {
+								range "2..100";
+								}
+								units second;
+							}
+							}
+							case boolean {
+							container boolean {
+								leaf enabled {
+								type boolean;
+								}
+							}
+							}
+						}
+						}
+						augment "z" {
+							leaf enableZ {
+							type boolean;
+							}
+						}
+					}
+					}
+				}
+				}
+				`,
+				"c.yang": `
+				submodule submod-a-two {
+				belongs-to mod-a {
+					prefix moda;
+				}
+				yang-version 1.1;
+
+				container container-a {
+
+					container a {
+					}
+
+					container b {
+					}
+				}
+				}
+				`,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ms := NewModules()
+			var errs []error
+
+			for n, m := range tt.inModules {
+				if err := ms.Parse(m, n); err != nil {
+					errs = append(errs, err)
+
+				}
+			}
+
+			if len(errs) > 0 {
+				t.Fatalf("ms.Parse(), got unexpected error parsing input modules: %v", errs)
+			}
+
+			errs = append(errs, ms.Process()...)
+
+			var errsStr = strings.Builder{}
+			for _, e := range errs {
+				errsStr.WriteString(e.Error())
+			}
+
+			for _, errStr := range tt.WantErrors {
+				strings.Contains(errsStr.String(), errStr)
+			}
+
+			var m *Entry
+			m, errs = ms.GetModule("mod-a")
+			x := m
+			for _, p := range tt.pathExist {
+				for _, pe := range p {
+					y, ok := x.Dir[pe]
+					if !ok {
+						t.Fatalf("expected module %s to contain path %s", m.Name, strings.Join(p, "/"))
+					}
+					x = y
+				}
+				x = m
+			}
+
+		})
+	}
+}
+
 func TestLess(t *testing.T) {
 	sErrors := sortedErrors{
 		{"testfile0", errors.New("test error0")},
