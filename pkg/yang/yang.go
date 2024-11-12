@@ -704,6 +704,7 @@ type Input struct {
 	Leaf      []*Leaf      `yang:"leaf"`
 	LeafList  []*LeafList  `yang:"leaf-list"`
 	List      []*List      `yang:"list"`
+	Must      []*Must      `yang:"must"`
 	Typedef   []*Typedef   `yang:"typedef"`
 	Uses      []*Uses      `yang:"uses"`
 }
