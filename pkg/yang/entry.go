@@ -1278,7 +1278,7 @@ func (e *Entry) ApplyDeviate(deviateOpts ...DeviateOpt) []error {
 								devNodeMust[idx] = devNodeMust[len(devNodeMust)-1]            // Swap with last element
 								deviatedNode.Extra["must"] = devNodeMust[:len(devNodeMust)-1] // Trim last element
 							} else {
-								appendErr(fmt.Errorf("must statement marked for deletion not found [%s]", existingMust.Name))
+								appendErr(fmt.Errorf("must statement marked for deletion not found [%s]", mustDelete.Name))
 							}
 						}
 					}
