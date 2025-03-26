@@ -1190,6 +1190,10 @@ func (e *Entry) ApplyDeviate(deviateOpts ...DeviateOpt) []error {
 						deviatedNode.Type = devSpec.Type
 					}
 
+					if musts, exists := devSpec.Extra["must"]; exists {
+						deviatedNode.Extra["must"] = append(deviatedNode.Extra["must"], musts...)
+					}
+
 				case DeviationNotSupported:
 					dp := deviatedNode.Parent
 					if dp == nil {
@@ -1246,6 +1250,37 @@ func (e *Entry) ApplyDeviate(deviateOpts ...DeviateOpt) []error {
 							appendErr(fmt.Errorf("max-element value %d differs from deviation's max-element value %d for entry %v", devSpec.ListAttr.MaxElements, deviatedNode.ListAttr.MaxElements, d.DeviatedPath))
 						}
 						deviatedNode.ListAttr.MaxElements = math.MaxUint64
+					}
+
+					if musts, exists := devSpec.Extra["must"]; exists {
+						// range through the deviations to apply them
+						for _, mustDeleteInterf := range musts {
+
+							mustDelete := mustDeleteInterf.(*Must)
+
+							found := false
+							var idx int
+							var existingMustInterf interface{}
+							var existingMust *Must
+							for idx, existingMustInterf = range deviatedNode.Extra["must"] {
+								if existingMustInterf.(*Must).Name == mustDelete.Name {
+									existingMust = existingMustInterf.(*Must)
+									if (existingMust.ErrorMessage == nil && mustDelete.ErrorMessage == nil) ||
+										(existingMust.ErrorMessage != nil && mustDelete.ErrorMessage != nil &&
+											existingMust.ErrorMessage.Name == mustDelete.ErrorMessage.Name) {
+										found = true
+										break
+									}
+								}
+							}
+							if found {
+								devNodeMust := deviatedNode.Extra["must"]
+								devNodeMust[idx] = devNodeMust[len(devNodeMust)-1]            // Swap with last element
+								deviatedNode.Extra["must"] = devNodeMust[:len(devNodeMust)-1] // Trim last element
+							} else {
+								appendErr(fmt.Errorf("must statement marked for deletion not found [%s]", mustDelete.Name))
+							}
+						}
 					}
 
 				default:
