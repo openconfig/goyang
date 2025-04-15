@@ -660,6 +660,83 @@ func ToEntry(n Node) (e *Entry) {
 		// when the group is used in multiple locations and the
 		// grouping has a leafref that references outside the group.
 		e = ToEntry(g).dup()
+
+		for _, refine := range s.Refine {
+			refineTarget := e.Find(refine.Name)
+			if refineTarget == nil {
+				return newError(s, "target node to refine %s not found in path: %s", refine.Name, e.Path())
+			}
+			// apply refinement according to https://datatracker.ietf.org/doc/html/rfc7950#section-7.13.2
+			// as best as we can
+
+			//   o  A leaf or choice node may get a default value, or a new default
+			//      value if it already had one.
+			//
+			//   o  A leaf-list node may get a set of default values, or a new set of
+			//      default values if it already had defaults; i.e., the set of
+			//      refined default values replaces the defaults already given.
+			if refine.Default != nil {
+				// TODO: do it
+				_ = refine.Default
+			}
+
+			//
+			//   o  Any node may get a specialized "description" string.
+			if refine.Description != nil {
+				refineTarget.Description = refine.Description.asString()
+			}
+
+			//
+			//   o  Any node may get a different "config" statement.
+			if refine.Reference != nil {
+				refineTarget.Config, err = tristateValue(refine.Reference)
+				if err != nil {
+					return newError(n, "error determining TriState value of Config: %s", err)
+				}
+			}
+
+			//   o  A leaf, anydata, anyxml, or choice node may get a different
+			//      "mandatory" statement.
+			if refine.Mandatory != nil {
+				refineTarget.Mandatory, err = tristateValue(refine.Mandatory)
+				if err != nil {
+					return newError(n, "error determining TriState value of Mandatory: %s", err)
+				}
+			}
+
+			//   o  A container node may get a "presence" statement.
+			// TODO(): presence statement
+
+			//   o  A leaf-list or list node may get a different "min-elements" or
+			//      "max-elements" statement.
+			if refine.MinElements != nil {
+				refineTarget.ListAttr.MinElements, err = semCheckMinElements(refine.MinElements)
+				if err != nil {
+					return newError(n, "error with refined MinElements: %s", err)
+				}
+			}
+			if refine.MaxElements != nil {
+				refineTarget.ListAttr.MaxElements, err = semCheckMaxElements(refine.MaxElements)
+				if err != nil {
+					return newError(n, "error with refined MaxElements: %s", err)
+				}
+			}
+
+			//   o  Any node may get a specialized "reference" string.
+			//   o  A leaf, leaf-list, list, container, choice, case, anydata, or
+			//      anyxml node may get additional "if-feature" expressions.
+			//   o  A leaf, leaf-list, list, container, anydata, or anyxml node may
+			//      get additional "must" expressions.
+			addExtraKeywordsToLeafEntry(refine, refineTarget)
+
+			//  o  Any node can get refined extensions, if the extension allows
+			//      refinement.  See Section 7.19 for details.
+			// TODO: should this replace or append??
+			if len(refine.Extensions) > 0 {
+				refineTarget.Exts = refine.Exts()
+			}
+		}
+
 		addExtraKeywordsToLeafEntry(n, e)
 		return e
 	}
@@ -755,6 +832,38 @@ func ToEntry(n Node) (e *Entry) {
 			}
 		case "choice":
 			for _, a := range fv.Interface().([]*Choice) {
+				cases := a.Case
+				if cases == nil || len(cases) == 0 {
+					cases = make([]*Case, 0)
+				}
+
+				for _, container := range a.Container {
+					parent := container.Parent
+					caseType := &Case{
+						Name:      container.Name,
+						Source:    nil,
+						Parent:    parent,
+						Container: []*Container{container},
+					}
+					caseType.Container[0].Parent = caseType
+					cases = append(cases, caseType)
+				}
+				a.Container = nil
+
+				for _, leaf := range a.Leaf {
+					parent := leaf.Parent
+					caseType := &Case{
+						Name:   leaf.Name,
+						Source: nil,
+						Parent: parent,
+						Leaf:   []*Leaf{leaf},
+					}
+					caseType.Leaf[0].Parent = caseType
+					cases = append(cases, caseType)
+				}
+				a.Leaf = nil
+
+				a.Case = cases
 				e.add(a.Name, ToEntry(a))
 			}
 		case "container":
