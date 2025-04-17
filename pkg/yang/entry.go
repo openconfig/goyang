@@ -544,6 +544,19 @@ func semCheckMinElements(v *Value) (uint64, error) {
 	return val, nil
 }
 
+func convertToCase[T Node](nodeSlicePtr *[]T, toCase func(T) *Case) []*Case {
+	orig := *nodeSlicePtr
+	out := make([]*Case, 0, len(orig))
+
+	for _, t := range orig {
+		out = append(out, toCase(t))
+	}
+
+	*nodeSlicePtr = nil
+
+	return out
+}
+
 // ToEntry expands node n into a directory Entry.  Expansion is based on the
 // YANG tags in the structure behind n.  ToEntry must only be used
 // with nodes that are directories, such as top level modules and sub-modules.
@@ -832,38 +845,90 @@ func ToEntry(n Node) (e *Entry) {
 			}
 		case "choice":
 			for _, a := range fv.Interface().([]*Choice) {
-				cases := a.Case
-				if cases == nil || len(cases) == 0 {
-					cases = make([]*Case, 0)
-				}
+				//   https://datatracker.ietf.org/doc/html/rfc7950#section-7.9.2
+				//   As a shorthand, the "case" statement can be omitted if the branch
+				//   contains a single "anydata", "anyxml", "choice", "container", "leaf",
+				//   "list", or "leaf-list" statement.  In this case, the case node still
+				//   exists in the schema tree, and its identifier is the same as the
+				//   identifier of the child node.
 
-				for _, container := range a.Container {
-					parent := container.Parent
-					caseType := &Case{
-						Name:      container.Name,
-						Source:    nil,
-						Parent:    parent,
-						Container: []*Container{container},
+				// anydata
+				a.Case = append(a.Case, convertToCase(&a.Anydata, func(c *AnyData) *Case {
+					cs := &Case{
+						Name:    c.Name,
+						Parent:  c.Parent,
+						Anydata: []*AnyData{c},
 					}
-					caseType.Container[0].Parent = caseType
-					cases = append(cases, caseType)
-				}
-				a.Container = nil
+					cs.Anydata[0].Parent = cs
+					return cs
+				})...)
 
-				for _, leaf := range a.Leaf {
-					parent := leaf.Parent
-					caseType := &Case{
-						Name:   leaf.Name,
-						Source: nil,
-						Parent: parent,
-						Leaf:   []*Leaf{leaf},
+				// anyxml
+				a.Case = append(a.Case, convertToCase(&a.Anyxml, func(c *AnyXML) *Case {
+					cs := &Case{
+						Name:   c.Name,
+						Parent: c.Parent,
+						Anyxml: []*AnyXML{c},
 					}
-					caseType.Leaf[0].Parent = caseType
-					cases = append(cases, caseType)
-				}
-				a.Leaf = nil
+					cs.Anyxml[0].Parent = cs
+					return cs
+				})...)
 
-				a.Case = cases
+				// choice
+				a.Case = append(a.Case, convertToCase(&a.Choice, func(c *Choice) *Case {
+					cs := &Case{
+						Name:   c.Name,
+						Parent: c.Parent,
+						Choice: []*Choice{c},
+					}
+					cs.Choice[0].Parent = cs
+					return cs
+				})...)
+
+				// container
+				a.Case = append(a.Case, convertToCase(&a.Container, func(c *Container) *Case {
+					cs := &Case{
+						Name:      c.Name,
+						Parent:    c.Parent,
+						Container: []*Container{c},
+					}
+					cs.Container[0].Parent = cs
+					return cs
+				})...)
+
+				// leaf
+				a.Case = append(a.Case, convertToCase(&a.Leaf, func(c *Leaf) *Case {
+					cs := &Case{
+						Name:   c.Name,
+						Parent: c.Parent,
+						Leaf:   []*Leaf{c},
+					}
+					cs.Leaf[0].Parent = cs
+					return cs
+				})...)
+
+				// list
+				a.Case = append(a.Case, convertToCase(&a.List, func(c *List) *Case {
+					cs := &Case{
+						Name:   c.Name,
+						Parent: c.Parent,
+						List:   []*List{c},
+					}
+					cs.List[0].Parent = cs
+					return cs
+				})...)
+
+				// leaf-list
+				a.Case = append(a.Case, convertToCase(&a.LeafList, func(c *LeafList) *Case {
+					cs := &Case{
+						Name:     c.Name,
+						Parent:   c.Parent,
+						LeafList: []*LeafList{c},
+					}
+					cs.LeafList[0].Parent = cs
+					return cs
+				})...)
+
 				e.add(a.Name, ToEntry(a))
 			}
 		case "container":
