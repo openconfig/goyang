@@ -660,6 +660,22 @@ func ToEntry(n Node) (e *Entry) {
 		// when the group is used in multiple locations and the
 		// grouping has a leafref that references outside the group.
 		e = ToEntry(g).dup()
+
+		switch determineYangVersion(g) {
+		case YANGVersion10:
+			if len(s.Augment) > 1 {
+				return newError(s, "multiple augments not allowed in yang version 1.0: %s", s.Name)
+			}
+		}
+
+		// process augments
+		for _, x := range s.Augment {
+			a := ToEntry(x)
+			a.Parent = e
+			a.Augments = append(a.Augments, e)
+			e.Find(a.Name).merge(nil, a.Namespace(), a)
+		}
+
 		addExtraKeywordsToLeafEntry(n, e)
 		return e
 	}
@@ -1043,6 +1059,33 @@ func ToEntry(n Node) (e *Entry) {
 	}
 
 	return e
+}
+
+// YANGVersion is the enum that represents the YANG Version.
+type YANGVersion string
+
+const (
+	YANGVersion10 YANGVersion = "1.0"
+	YANGVersion11 YANGVersion = "1.1"
+)
+
+func determineYangVersion(n Node) YANGVersion {
+	p := n.ParentNode()
+	if p != nil {
+		return determineYangVersion(p)
+	}
+	var m *Module
+	var ok bool
+	if m, ok = n.(*Module); ok {
+		switch m.YangVersion.asString() {
+		case string(YANGVersion10):
+			return YANGVersion10
+		case string(YANGVersion11):
+			return YANGVersion11
+		}
+	}
+	// default to 1.0
+	return YANGVersion10
 }
 
 // addExtraKeywordsToLeafEntry stores the values for unimplemented keywords in leaf entries.
