@@ -4088,7 +4088,6 @@ func TestAugmentUses(t *testing.T) {
 			for n, m := range tt.inModules {
 				if err := ms.Parse(m, n); err != nil {
 					errs = append(errs, err)
-
 				}
 			}
 
@@ -4107,20 +4106,23 @@ func TestAugmentUses(t *testing.T) {
 				strings.Contains(errsStr.String(), errStr)
 			}
 
-			var m *Entry
-			m, errs = ms.GetModule("mod-a")
-			x := m
+			var curElem *Entry
+			curElem, errs = ms.GetModule("mod-a")
+			if len(errs) > 0 {
+				t.Fatalf("GetModule returned errors: %v", errs)
+			}
+
+			x := curElem
 			for _, p := range tt.pathExist {
 				for _, pe := range p {
 					y, ok := x.Dir[pe]
 					if !ok {
-						t.Fatalf("expected module %s to contain path %s", m.Name, strings.Join(p, "/"))
+						t.Fatalf("expected module %s to contain path %s, could not find element %s in parent, got children: %v", curElem.Name, strings.Join(p, "/"), pe, x.Dir)
 					}
 					x = y
 				}
-				x = m
+				x = curElem
 			}
-
 		})
 	}
 }

@@ -662,7 +662,7 @@ func ToEntry(n Node) (e *Entry) {
 		e = ToEntry(g).dup()
 
 		switch determineYangVersion(g) {
-		case YangVersion10:
+		case YANGVersion10:
 			if len(s.Augment) > 1 {
 				return newError(s, "multiple augments not allowed in yang version 1.0: %s", s.Name)
 			}
@@ -1061,14 +1061,15 @@ func ToEntry(n Node) (e *Entry) {
 	return e
 }
 
-type YangVersion string
+// YANGVersion is the enum that represents the YANG Version.
+type YANGVersion string
 
 const (
-	YangVersion10 YangVersion = "1.0"
-	YangVersion11 YangVersion = "1.1"
+	YANGVersion10 YANGVersion = "1.0"
+	YANGVersion11 YANGVersion = "1.1"
 )
 
-func determineYangVersion(n Node) YangVersion {
+func determineYangVersion(n Node) YANGVersion {
 	p := n.ParentNode()
 	if p != nil {
 		return determineYangVersion(p)
@@ -1077,14 +1078,14 @@ func determineYangVersion(n Node) YangVersion {
 	var ok bool
 	if m, ok = n.(*Module); ok {
 		switch m.YangVersion.asString() {
-		case string(YangVersion10):
-			return YangVersion10
-		case string(YangVersion11):
-			return YangVersion11
+		case string(YANGVersion10):
+			return YANGVersion10
+		case string(YANGVersion11):
+			return YANGVersion11
 		}
 	}
 	// default to 1.0
-	return YangVersion10
+	return YANGVersion10
 }
 
 // addExtraKeywordsToLeafEntry stores the values for unimplemented keywords in leaf entries.
