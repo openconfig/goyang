@@ -1255,31 +1255,24 @@ func (e *Entry) ApplyDeviate(deviateOpts ...DeviateOpt) []error {
 					if musts, exists := devSpec.Extra["must"]; exists {
 						// range through the deviations to apply them
 						for _, mustDeleteInterf := range musts {
-
+							var (
+								found              bool
+								idx                int
+								existingMustInterf interface{}
+							)
 							mustDelete := mustDeleteInterf.(*Must)
-
-							found := false
-							var idx int
-							var existingMustInterf interface{}
-							var existingMust *Must
 							for idx, existingMustInterf = range deviatedNode.Extra["must"] {
 								if existingMustInterf.(*Must).Name == mustDelete.Name {
-									existingMust = existingMustInterf.(*Must)
-									if (existingMust.ErrorMessage == nil && mustDelete.ErrorMessage == nil) ||
-										(existingMust.ErrorMessage != nil && mustDelete.ErrorMessage != nil &&
-											existingMust.ErrorMessage.Name == mustDelete.ErrorMessage.Name) {
-										found = true
-										break
-									}
+									found = true
+									break
 								}
 							}
-							if found {
-								devNodeMust := deviatedNode.Extra["must"]
-								devNodeMust[idx] = devNodeMust[len(devNodeMust)-1]            // Swap with last element
-								deviatedNode.Extra["must"] = devNodeMust[:len(devNodeMust)-1] // Trim last element
-							} else {
+							if !found {
 								appendErr(fmt.Errorf("must statement marked for deletion not found [%s]", mustDelete.Name))
 							}
+							devNodeMust := deviatedNode.Extra["must"]
+							devNodeMust[idx] = devNodeMust[len(devNodeMust)-1]            // Swap with last element
+							deviatedNode.Extra["must"] = devNodeMust[:len(devNodeMust)-1] // Trim last element
 						}
 					}
 
