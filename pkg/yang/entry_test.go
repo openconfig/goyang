@@ -3568,6 +3568,96 @@ func TestDeviation(t *testing.T) {
 				},
 			}},
 		},
+	}, {
+		desc: "deviate must - delete",
+		inFiles: map[string]string{
+			"module": `
+			module test-base {
+				prefix "a";
+				namespace "urn:a";
+
+				container config {
+					leaf mode {
+						type string;
+						must ". = 'on'" {
+							error-message "Mode must be 'on'.";
+						}
+						must ". = 'other'" {
+							error-message "Mode must be 'on'.";
+						}
+					}
+				}
+				deviation /config/mode {
+					deviate delete {
+						must ". = 'on'";
+					}
+				}
+			}`,
+		},
+		wants: map[string][]deviationTest{
+			"test-base": {
+				{
+					path: "/a:config/a:mode",
+					entry: &Entry{
+						Name: "mode",
+						Extra: map[string][]interface{}{
+							"must": MustSliceToInterface([]*Must{
+								{
+									Name: ". = 'other'",
+								},
+							},
+							),
+						},
+					},
+				},
+			},
+		},
+	}, {
+		desc: "deviate must - add",
+		inFiles: map[string]string{
+			"module": `
+			module test-base {
+				prefix "a";
+				namespace "urn:a";
+
+				container config {
+					leaf mode {
+						type string;
+						must ". = 'other'" {
+							error-message "Mode must be 'on'.";
+						}
+					}
+				}
+				deviation /config/mode {
+					deviate add {
+						must ". = 'on'" {
+							error-message "Mode must be 'on'.";
+						}
+					}
+				}
+			}`,
+		},
+		wants: map[string][]deviationTest{
+			"test-base": {
+				{
+					path: "/a:config/a:mode",
+					entry: &Entry{
+						Name: "mode",
+						Extra: map[string][]interface{}{
+							"must": MustSliceToInterface([]*Must{
+								{
+									Name: ". = 'other'",
+								},
+								{
+									Name: ". = 'on'",
+								},
+							},
+							),
+						},
+					},
+				},
+			},
+		},
 	}}
 
 	for _, tt := range tests {
@@ -3665,10 +3755,32 @@ func TestDeviation(t *testing.T) {
 					if got.Units != want.entry.Units {
 						t.Errorf("%d (%s): did not get expected units statement, got: %s, want: %s", idx, want.path, got.Units, want.entry.Units)
 					}
+
+					gotMust := make([]string, 0, len(got.Extra["Must"]))
+					wantMust := make([]string, 0, len(want.entry.Extra["Must"]))
+					for _, m := range got.Extra["must"] {
+						gotMust = append(gotMust, m.(*Must).Name)
+					}
+					for _, m := range want.entry.Extra["must"] {
+						wantMust = append(wantMust, m.(*Must).Name)
+					}
+
+					MustDiff := cmp.Diff(wantMust, gotMust)
+					if MustDiff != "" {
+						t.Errorf("Must deviation mismatch (-want +got):\n%s", MustDiff)
+					}
 				}
 			}
 		})
 	}
+}
+
+func MustSliceToInterface(m []*Must) []interface{} {
+	result := make([]interface{}, 0, len(m))
+	for _, x := range m {
+		result = append(result, x)
+	}
+	return result
 }
 
 func TestLeafEntry(t *testing.T) {
