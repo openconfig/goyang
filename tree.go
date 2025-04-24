@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 
 	"github.com/openconfig/goyang/pkg/indent"
 	"github.com/openconfig/goyang/pkg/yang"
@@ -69,6 +70,9 @@ func Write(w io.Writer, e *yang.Entry) {
 	if e.Prefix != nil {
 		name = e.Prefix.Name + ":" + name
 	}
+	if e.Default != nil {
+		name = name + " default: " + strings.Join(e.Default, ",")
+	}
 	switch {
 	case e.Dir == nil && e.ListAttr != nil:
 		fmt.Fprintf(w, "[]%s\n", name)
@@ -96,6 +100,17 @@ func Write(w io.Writer, e *yang.Entry) {
 	sort.Strings(names)
 	for _, k := range names {
 		Write(indent.NewWriter(w, "  "), e.Dir[k])
+	}
+	if e.Extra != nil {
+		val, ok := e.Extra["presence"]
+		if ok {
+			switch v := val[0].(type) {
+			case *yang.Value:
+				fmt.Fprintf(w, "presence: %s\n", v.Name)
+			default:
+				fmt.Fprintf(w, "presence: %s\n", val)
+			}
+		}
 	}
 	// { to match the brace below to keep brace matching working
 	fmt.Fprintln(w, "}")
