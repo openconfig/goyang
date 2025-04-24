@@ -1,0 +1,48 @@
+submodule refine-tests {
+  belongs-to base { prefix "sbase"; }
+  grouping refine-sub-group {
+    leaf refine-sub-group-leaf {
+        type string;
+        default "initial-default";
+        }
+  }
+
+  // sample refine description
+  container refine-description {
+    uses refine-sub-group {
+      refine "refine-sub-group-leaf" {
+        description "new refined description";
+      }
+    }
+  }
+
+  // sample refine leaf default
+  container refine-default {
+    uses refine-sub-group {
+      refine refine-sub-group-leaf {
+        default "refined-default-string";
+      }
+    }
+  }
+
+  grouping fruit-bowl {
+    description
+      "A bowl with a few pieces of fruit by default.";
+    leaf-list fruit {
+      type string;
+      default "apple";
+      default "banana";
+    }
+  }
+
+  // sample refine leaf-list defaults
+  container exotic-bowl {
+    uses fruit-bowl {
+      refine fruit {
+        default "mango";
+        default "papaya";
+      }
+    }
+  }
+
+}

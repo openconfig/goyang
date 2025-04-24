@@ -681,18 +681,32 @@ func ToEntry(n Node) (e *Entry) {
 			}
 			// apply refinement according to https://datatracker.ietf.org/doc/html/rfc7950#section-7.13.2
 			// as best as we can
-
-			//   o  A leaf or choice node may get a default value, or a new default
-			//      value if it already had one.
 			//
 			//   o  A leaf-list node may get a set of default values, or a new set of
 			//      default values if it already had defaults; i.e., the set of
 			//      refined default values replaces the defaults already given.
-			if refine.Default != nil {
-				// TODO: do it
-				_ = refine.Default
-			}
+			//
+			//   o  A leaf or choice node may get a default value, or a new default
+			//      value if it already had one.
+			if len(refine.Defaults) != 0 {
+				switch refineTarget.Node.(type) {
+				case *Leaf, *LeafList, *Choice:
+					if refineTarget.ListAttr != nil {
+						refineTarget.Default = []string{}
+						for _, def := range refine.Defaults {
+							refineTarget.Default = append(refineTarget.Default, def.Name)
+						}
+					} else {
+						if len(refine.Defaults) > 1 {
+							return newError(refine, "only single default value allowed on leaf")
+						}
+						refineTarget.Default = []string{refine.Defaults[0].Name}
+					}
+				default:
+					return newError(refine, "refine default value only allowed on leaf, choice-node or leaf-list")
+				}
 
+			}
 			//
 			//   o  Any node may get a specialized "description" string.
 			if refine.Description != nil {
@@ -724,7 +738,13 @@ func ToEntry(n Node) (e *Entry) {
 			}
 
 			//   o  A container node may get a "presence" statement.
-			// TODO(): presence statement
+			if refine.Presence != nil {
+				if _, ok := refineTarget.Node.(*Container); !ok {
+					return newError(refine, "presence statement only allowed on container")
+				}
+				// We overwrite the current presence value and do not append
+				refineTarget.Extra["presence"] = []interface{}{&Value{Name: refine.Presence.Name}}
+			}
 
 			//   o  A leaf-list or list node may get a different "min-elements" or
 			//      "max-elements" statement.

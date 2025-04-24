@@ -1,0 +1,22 @@
+submodule presence-tests {
+  belongs-to base { prefix "sbase"; }
+
+  // sample presence
+  container presence-example-container {
+    presence "the presence of this container means something";
+  }
+
+  grouping grouping-no-presence {
+    container container-no-presence {}
+  }
+
+  container container-with-presence {
+    uses grouping-no-presence {
+        refine container-no-presence {
+            presence "this presence was added with a refine";
+        }
+    }
+  }
+
+
+}
