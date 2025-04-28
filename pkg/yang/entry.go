@@ -121,6 +121,7 @@ type Entry struct {
 	// Entry have been given deviation values.
 	deviatePresence deviationPresence
 	Uses            []*UsesStmt `json:",omitempty"` // Uses merged into this entry.
+	Presence        *string     `json:",omitempty"`
 
 	// Extra maps all the unsupported fields to their values
 	Extra map[string][]interface{} `json:"extra-unstable,omitempty"`
@@ -743,7 +744,7 @@ func ToEntry(n Node) (e *Entry) {
 					return newError(refine, "presence statement only allowed on container")
 				}
 				// We overwrite the current presence value and do not append
-				refineTarget.Extra["presence"] = []interface{}{&Value{Name: refine.Presence.Name}}
+				refineTarget.Presence = &refine.Presence.Name
 			}
 
 			//   o  A leaf-list or list node may get a different "min-elements" or
@@ -966,6 +967,10 @@ func ToEntry(n Node) (e *Entry) {
 		case "container":
 			for _, a := range fv.Interface().([]*Container) {
 				e.add(a.Name, ToEntry(a))
+			}
+		case "presence":
+			if v, ok := fv.Interface().(*Value); ok && v != nil {
+				e.Presence = &v.Name
 			}
 		case "grouping":
 			for _, a := range fv.Interface().([]*Grouping) {
@@ -1217,7 +1222,6 @@ func ToEntry(n Node) (e *Entry) {
 			"namespace",
 			"ordered-by",
 			"organization",
-			"presence",
 			"reference",
 			"revision",
 			"status",

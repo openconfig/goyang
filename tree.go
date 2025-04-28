@@ -101,16 +101,8 @@ func Write(w io.Writer, e *yang.Entry) {
 	for _, k := range names {
 		Write(indent.NewWriter(w, "  "), e.Dir[k])
 	}
-	if e.Extra != nil {
-		val, ok := e.Extra["presence"]
-		if ok {
-			switch v := val[0].(type) {
-			case *yang.Value:
-				fmt.Fprintf(w, "presence: %s\n", v.Name)
-			default:
-				fmt.Fprintf(w, "presence: %s\n", val)
-			}
-		}
+	if e.Presence != nil {
+		fmt.Fprintf(indent.NewWriter(w, "  "), "presence: %s\n", *e.Presence)
 	}
 	// { to match the brace below to keep brace matching working
 	fmt.Fprintln(w, "}")
