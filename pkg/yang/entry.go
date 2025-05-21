@@ -710,10 +710,16 @@ func ToEntry(n Node) (e *Entry) {
 
 			//   o  A leaf, anydata, anyxml, or choice node may get a different
 			//      "mandatory" statement.
+
 			if refine.Mandatory != nil {
-				refineTarget.Mandatory, err = tristateValue(refine.Mandatory)
-				if err != nil {
-					return newError(n, "error determining TriState value of Mandatory: %s", err)
+				switch refineTarget.Node.(type) {
+				case *Leaf, *AnyData, *AnyXML, *Choice:
+					refineTarget.Mandatory, err = tristateValue(refine.Mandatory)
+					if err != nil {
+						return newError(n, "error determining TriState value of Mandatory: %s", err)
+					}
+				default:
+					return newError(n, "target to refine is not a leaf, anydata, anyxml, or choice: %s", refineTarget.Name)
 				}
 			}
 
@@ -723,12 +729,18 @@ func ToEntry(n Node) (e *Entry) {
 			//   o  A leaf-list or list node may get a different "min-elements" or
 			//      "max-elements" statement.
 			if refine.MinElements != nil {
+				if refineTarget.ListAttr == nil {
+					return newError(n, "target to refine is not a leaf-list or list: %s", refineTarget.Name)
+				}
 				refineTarget.ListAttr.MinElements, err = semCheckMinElements(refine.MinElements)
 				if err != nil {
 					return newError(n, "error with refined MinElements: %s", err)
 				}
 			}
 			if refine.MaxElements != nil {
+				if refineTarget.ListAttr == nil {
+					return newError(n, "target to refine is not a leaf-list or list: %s", refineTarget.Name)
+				}
 				refineTarget.ListAttr.MaxElements, err = semCheckMaxElements(refine.MaxElements)
 				if err != nil {
 					return newError(n, "error with refined MaxElements: %s", err)
