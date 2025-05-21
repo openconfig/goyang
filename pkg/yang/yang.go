@@ -478,6 +478,7 @@ func (s *List) Groupings() []*Grouping { return s.Grouping }
 func (s *List) Typedefs() []*Typedef   { return s.Typedef }
 
 // A Choice is defined in: http://tools.ietf.org/html/rfc6020#section-7.9
+// for yang 1.1: https://datatracker.ietf.org/doc/html/rfc7950#section-7.9
 type Choice struct {
 	Name       string       `yang:"Name,nomerge"`
 	Source     *Statement   `yang:"Statement,nomerge"`
@@ -487,6 +488,7 @@ type Choice struct {
 	Anydata     []*AnyData   `yang:"anydata"`
 	Anyxml      []*AnyXML    `yang:"anyxml"`
 	Case        []*Case      `yang:"case"`
+	Choice      []*Choice    `yang:"choice"`
 	Config      *Value       `yang:"config"`
 	Container   []*Container `yang:"container"`
 	Default     *Value       `yang:"default"`
