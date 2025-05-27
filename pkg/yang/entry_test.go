@@ -4102,8 +4102,13 @@ func TestAugmentUses(t *testing.T) {
 				errsStr.WriteString(e.Error())
 			}
 
-			for _, errStr := range tt.WantErrors {
-				strings.Contains(errsStr.String(), errStr)
+			if len(tt.WantErrors) > 0 {
+				for _, errStr := range tt.WantErrors {
+					if !strings.Contains(errsStr.String(), errStr) {
+						t.Errorf("expected error %s", errStr)
+					}
+				}
+				return
 			}
 
 			var curElem *Entry
