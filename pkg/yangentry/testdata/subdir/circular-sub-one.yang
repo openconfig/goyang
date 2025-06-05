@@ -1,0 +1,9 @@
+submodule circular-sub-one {
+    yang-version "1.1";
+
+    belongs-to circular-main { prefix "main"; }
+
+    include circular-sub-two;
+
+    revision "2025-02-15";
+}

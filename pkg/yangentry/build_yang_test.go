@@ -14,7 +14,11 @@
 
 package yangentry
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/openconfig/goyang/pkg/yang"
+)
 
 // TestParse tests the Parse function - which takes an input
 // set of modules and processes them using the goyang compiler into a set of
@@ -56,19 +60,70 @@ func TestParse(t *testing.T) {
 		inFiles:  []string{"testdata/04-valid-module-one.yang", "testdata/04-valid-module-two.yang"},
 		inPath:   []string{},
 		wantMods: []string{"module-one", "module-two"},
+	}, {
+		name:    "circular submodule dependency",
+		inFiles: []string{"testdata/05-circular-main.yang"},
+		inPath:  []string{"testdata/subdir"},
+		wantErr: true,
 	}}
 
 	for _, tt := range tests {
-		entries, errs := Parse(tt.inFiles, tt.inPath)
-		if len(errs) != 0 && !tt.wantErr {
-			t.Errorf("%s: unexpected error processing modules: %v", tt.name, errs)
-			continue
-		}
-
-		for _, m := range tt.wantMods {
-			if _, ok := entries[m]; !ok {
-				t.Errorf("%s: could not find module %s", tt.name, m)
+		t.Run(tt.name, func(t *testing.T) {
+			entries, errs := Parse(tt.inFiles, tt.inPath)
+			if len(errs) != 0 && !tt.wantErr {
+				t.Fatalf("%s: unexpected error processing modules: %v", tt.name, errs)
 			}
-		}
+
+			for _, m := range tt.wantMods {
+				if _, ok := entries[m]; !ok {
+					t.Fatalf("%s: could not find module %s", tt.name, m)
+				}
+			}
+		})
+	}
+}
+
+// TestParseWithOptions tests the ParseWithOptions function - which takes an input
+// set of modules along with a set of parse options, and processes them using the goyang
+// compiler into a set of yang.Entry pointers.
+func TestParseWithOptions(t *testing.T) {
+	tests := []struct {
+		name         string
+		inFiles      []string
+		inPath       []string
+		parseOptions yang.Options
+		wantErr      bool
+		wantMods     []string
+	}{
+		{
+			name:         "circular submodule dependency with default options",
+			inFiles:      []string{"testdata/05-circular-main.yang"},
+			inPath:       []string{"testdata/subdir"},
+			parseOptions: yang.Options{},
+			wantErr:      true,
+		},
+		{
+			name:         "circular submodule dependency with IgnoreSubmoduleCircularDependencies",
+			inFiles:      []string{"testdata/05-circular-main.yang"},
+			inPath:       []string{"testdata/subdir"},
+			parseOptions: yang.Options{IgnoreSubmoduleCircularDependencies: true},
+			wantMods:     []string{"circular-main"},
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			entries, errs := ParseWithOptions(tt.inFiles, tt.inPath, tt.parseOptions)
+			if len(errs) != 0 && !tt.wantErr {
+				t.Fatalf("%s: unexpected error processing modules: %v", tt.name, errs)
+			}
+
+			for _, m := range tt.wantMods {
+				if _, ok := entries[m]; !ok {
+					t.Fatalf("%s: could not find module %s", tt.name, m)
+				}
+			}
+		})
 	}
 }

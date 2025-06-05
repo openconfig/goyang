@@ -28,8 +28,24 @@ import (
 // parsed top level modules. It also returns a list of errors encountered while
 // parsing, if any.
 func Parse(yangfiles, path []string) (map[string]*yang.Entry, []error) {
-	ms := yang.NewModules()
+	return parse(yangfiles, path, yang.NewModules())
+}
 
+// ParseWithOptions takes a list of either module/submodule names or .yang file
+// paths, a list of include paths, and a set of parse options. It configures the
+// yang parser with the specified parse options and runs it on the YANG
+// files by searching for them in the include paths or in the current
+// directory, returning a slice of yang.Entry pointers which represent the
+// parsed top level modules. It also returns a list of errors encountered while
+// parsing, if any.
+func ParseWithOptions(yangfiles, path []string, parseOptions yang.Options) (map[string]*yang.Entry, []error) {
+	ms := yang.NewModules()
+	ms.ParseOptions = parseOptions
+
+	return parse(yangfiles, path, ms)
+}
+
+func parse(yangfiles, path []string, ms *yang.Modules) (map[string]*yang.Entry, []error) {
 	for _, p := range path {
 		ms.AddPath(fmt.Sprintf("%s/...", p))
 	}
