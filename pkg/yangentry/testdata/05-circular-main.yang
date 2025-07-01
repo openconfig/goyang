@@ -1,0 +1,12 @@
+module circular-main {
+    yang-version "1.1";
+
+    namespace "urn:test:circular:main";
+
+    prefix "main";
+
+    include circular-sub-one;
+    include circular-sub-two;
+
+    revision "2025-02-15";
+}
