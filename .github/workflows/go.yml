@@ -7,9 +7,11 @@ on:
   schedule:
     - cron: "0 0 * * *"
 
+permissions: {}
+
 jobs:
   go:
-    uses: openconfig/common-ci/.github/workflows/go.yml@125b6b58286d116b216e45c33cb859f547965d61
+    uses: openconfig/common-ci/.github/workflows/go.yml@004dd5fc3a3b8b996513160dbb5f1477fd5805f3
 
   linter:
-    uses: openconfig/common-ci/.github/workflows/linter.yml@125b6b58286d116b216e45c33cb859f547965d61
+    uses: openconfig/common-ci/.github/workflows/linter.yml@004dd5fc3a3b8b996513160dbb5f1477fd5805f3
