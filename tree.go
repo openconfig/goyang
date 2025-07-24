@@ -11,6 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+// Copyright 2025 Swisscom (Schweiz) AG
 
 package main
 
@@ -18,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 
 	"github.com/openconfig/goyang/pkg/indent"
 	"github.com/openconfig/goyang/pkg/yang"
@@ -69,6 +72,9 @@ func Write(w io.Writer, e *yang.Entry) {
 	if e.Prefix != nil {
 		name = e.Prefix.Name + ":" + name
 	}
+	if e.Default != nil {
+		name = name + " default: " + strings.Join(e.Default, ",")
+	}
 	switch {
 	case e.Dir == nil && e.ListAttr != nil:
 		fmt.Fprintf(w, "[]%s\n", name)
@@ -96,6 +102,9 @@ func Write(w io.Writer, e *yang.Entry) {
 	sort.Strings(names)
 	for _, k := range names {
 		Write(indent.NewWriter(w, "  "), e.Dir[k])
+	}
+	if e.Presence != nil {
+		fmt.Fprintf(indent.NewWriter(w, "  "), "presence: %s\n", *e.Presence)
 	}
 	// { to match the brace below to keep brace matching working
 	fmt.Fprintln(w, "}")
