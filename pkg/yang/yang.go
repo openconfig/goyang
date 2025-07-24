@@ -689,7 +689,7 @@ func (s *RPC) Exts() []*Statement     { return s.Extensions }
 func (s *RPC) Groupings() []*Grouping { return s.Grouping }
 func (s *RPC) Typedefs() []*Typedef   { return s.Typedef }
 
-// An Input is defined in: http://tools.ietf.org/html/rfc6020#section-7.13.2
+// An Input is defined in: http://tools.ietf.org/html/rfc7950#section-7.14.2
 type Input struct {
 	Name       string       `yang:"Name,nomerge"`
 	Source     *Statement   `yang:"Statement,nomerge"`
@@ -704,6 +704,7 @@ type Input struct {
 	Leaf      []*Leaf      `yang:"leaf"`
 	LeafList  []*LeafList  `yang:"leaf-list"`
 	List      []*List      `yang:"list"`
+	Must      []*Must      `yang:"must"`
 	Typedef   []*Typedef   `yang:"typedef"`
 	Uses      []*Uses      `yang:"uses"`
 }
@@ -716,7 +717,7 @@ func (s *Input) Exts() []*Statement     { return s.Extensions }
 func (s *Input) Groupings() []*Grouping { return s.Grouping }
 func (s *Input) Typedefs() []*Typedef   { return s.Typedef }
 
-// An Output is defined in: http://tools.ietf.org/html/rfc6020#section-7.13.3
+// An Output is defined in: http://tools.ietf.org/html/rfc7950#section-7.14.3
 type Output struct {
 	Name       string       `yang:"Name,nomerge"`
 	Source     *Statement   `yang:"Statement,nomerge"`
@@ -731,6 +732,7 @@ type Output struct {
 	Leaf      []*Leaf      `yang:"leaf"`
 	LeafList  []*LeafList  `yang:"leaf-list"`
 	List      []*List      `yang:"list"`
+	Must      []*Must      `yang:"must"`
 	Typedef   []*Typedef   `yang:"typedef"`
 	Uses      []*Uses      `yang:"uses"`
 }
