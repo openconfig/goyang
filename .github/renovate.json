@@ -13,7 +13,9 @@
     {
       "customType": "regex",
       "description": "Synchronize Go Version: MODULE.bazel go_sdk",
-      "managerFilePatterns": ["MODULE.bazel"],
+      "fileMatch": [
+        "MODULE.bazel"
+      ],
       "matchStrings": [
         "go_sdk.download(versions*=s*\"(?<currentValue>[d.]+)\")"
       ],
