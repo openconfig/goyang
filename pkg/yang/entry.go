@@ -11,6 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+// Copyright 2025 Swisscom (Schweiz) AG
 
 package yang
 
@@ -121,6 +123,7 @@ type Entry struct {
 	// Entry have been given deviation values.
 	deviatePresence deviationPresence
 	Uses            []*UsesStmt `json:",omitempty"` // Uses merged into this entry.
+	Presence        *string     `json:",omitempty"`
 
 	// Extra maps all the unsupported fields to their values
 	Extra map[string][]interface{} `json:"extra-unstable,omitempty"`
@@ -544,6 +547,19 @@ func semCheckMinElements(v *Value) (uint64, error) {
 	return val, nil
 }
 
+func convertToCase[T Node](nodeSlicePtr *[]T, toCase func(T) *Case) []*Case {
+	orig := *nodeSlicePtr
+	out := make([]*Case, 0, len(orig))
+
+	for _, t := range orig {
+		out = append(out, toCase(t))
+	}
+
+	*nodeSlicePtr = nil
+
+	return out
+}
+
 // ToEntry expands node n into a directory Entry.  Expansion is based on the
 // YANG tags in the structure behind n.  ToEntry must only be used
 // with nodes that are directories, such as top level modules and sub-modules.
@@ -660,6 +676,115 @@ func ToEntry(n Node) (e *Entry) {
 		// when the group is used in multiple locations and the
 		// grouping has a leafref that references outside the group.
 		e = ToEntry(g).dup()
+
+		for _, refine := range s.Refine {
+			refineTarget := e.Find(refine.Name)
+			if refineTarget == nil {
+				return newError(s, "target node to refine %s not found in path: %s", refine.Name, e.Path())
+			}
+			// apply refinement according to https://datatracker.ietf.org/doc/html/rfc7950#section-7.13.2
+			// as best as we can
+			//
+			//   o  A leaf-list node may get a set of default values, or a new set of
+			//      default values if it already had defaults; i.e., the set of
+			//      refined default values replaces the defaults already given.
+			//
+			//   o  A leaf or choice node may get a default value, or a new default
+			//      value if it already had one.
+			if len(refine.Defaults) != 0 {
+				switch refineTarget.Node.(type) {
+				case *Leaf, *LeafList, *Choice:
+					if refineTarget.ListAttr != nil {
+						refineTarget.Default = []string{}
+						for _, def := range refine.Defaults {
+							refineTarget.Default = append(refineTarget.Default, def.Name)
+						}
+					} else {
+						if len(refine.Defaults) > 1 {
+							return newError(refine, "only single default value allowed on leaf")
+						}
+						refineTarget.Default = []string{refine.Defaults[0].Name}
+					}
+				default:
+					return newError(refine, "refine default value only allowed on leaf, choice-node or leaf-list")
+				}
+
+			}
+			//
+			//   o  Any node may get a specialized "description" string.
+			if refine.Description != nil {
+				refineTarget.Description = refine.Description.asString()
+			}
+
+			//
+			//   o  Any node may get a different "config" statement.
+			if refine.Reference != nil {
+				refineTarget.Config, err = tristateValue(refine.Reference)
+				if err != nil {
+					return newError(n, "error determining TriState value of Config: %s", err)
+				}
+			}
+
+			//   o  A leaf, anydata, anyxml, or choice node may get a different
+			//      "mandatory" statement.
+
+			if refine.Mandatory != nil {
+				switch refineTarget.Node.(type) {
+				case *Leaf, *AnyData, *AnyXML, *Choice:
+					refineTarget.Mandatory, err = tristateValue(refine.Mandatory)
+					if err != nil {
+						return newError(n, "error determining TriState value of Mandatory: %s", err)
+					}
+				default:
+					return newError(n, "target to refine is not a leaf, anydata, anyxml, or choice: %s", refineTarget.Name)
+				}
+			}
+
+			//   o  A container node may get a "presence" statement.
+			if refine.Presence != nil {
+				if _, ok := refineTarget.Node.(*Container); !ok {
+					return newError(refine, "presence statement only allowed on container")
+				}
+				// We overwrite the current presence value and do not append
+				refineTarget.Presence = &refine.Presence.Name
+			}
+
+			//   o  A leaf-list or list node may get a different "min-elements" or
+			//      "max-elements" statement.
+			if refine.MinElements != nil {
+				if refineTarget.ListAttr == nil {
+					return newError(n, "target to refine is not a leaf-list or list: %s", refineTarget.Name)
+				}
+				refineTarget.ListAttr.MinElements, err = semCheckMinElements(refine.MinElements)
+				if err != nil {
+					return newError(n, "error with refined MinElements: %s", err)
+				}
+			}
+			if refine.MaxElements != nil {
+				if refineTarget.ListAttr == nil {
+					return newError(n, "target to refine is not a leaf-list or list: %s", refineTarget.Name)
+				}
+				refineTarget.ListAttr.MaxElements, err = semCheckMaxElements(refine.MaxElements)
+				if err != nil {
+					return newError(n, "error with refined MaxElements: %s", err)
+				}
+			}
+
+			//   o  Any node may get a specialized "reference" string.
+			//   o  A leaf, leaf-list, list, container, choice, case, anydata, or
+			//      anyxml node may get additional "if-feature" expressions.
+			//   o  A leaf, leaf-list, list, container, anydata, or anyxml node may
+			//      get additional "must" expressions.
+			addExtraKeywordsToLeafEntry(refine, refineTarget)
+
+			//  o  Any node can get refined extensions, if the extension allows
+			//      refinement.  See Section 7.19 for details.
+			// TODO: should this replace or append??
+			if len(refine.Extensions) > 0 {
+				refineTarget.Exts = refine.Exts()
+			}
+		}
+
 		addExtraKeywordsToLeafEntry(n, e)
 		return e
 	}
@@ -755,11 +880,99 @@ func ToEntry(n Node) (e *Entry) {
 			}
 		case "choice":
 			for _, a := range fv.Interface().([]*Choice) {
+				//   https://datatracker.ietf.org/doc/html/rfc7950#section-7.9.2
+				//   As a shorthand, the "case" statement can be omitted if the branch
+				//   contains a single "anydata", "anyxml", "choice", "container", "leaf",
+				//   "list", or "leaf-list" statement.  In this case, the case node still
+				//   exists in the schema tree, and its identifier is the same as the
+				//   identifier of the child node.
+
+				// anydata
+				a.Case = append(a.Case, convertToCase(&a.Anydata, func(c *AnyData) *Case {
+					cs := &Case{
+						Name:    c.Name,
+						Parent:  c.Parent,
+						Anydata: []*AnyData{c},
+					}
+					cs.Anydata[0].Parent = cs
+					return cs
+				})...)
+
+				// anyxml
+				a.Case = append(a.Case, convertToCase(&a.Anyxml, func(c *AnyXML) *Case {
+					cs := &Case{
+						Name:   c.Name,
+						Parent: c.Parent,
+						Anyxml: []*AnyXML{c},
+					}
+					cs.Anyxml[0].Parent = cs
+					return cs
+				})...)
+
+				// choice
+				a.Case = append(a.Case, convertToCase(&a.Choice, func(c *Choice) *Case {
+					cs := &Case{
+						Name:   c.Name,
+						Parent: c.Parent,
+						Choice: []*Choice{c},
+					}
+					cs.Choice[0].Parent = cs
+					return cs
+				})...)
+
+				// container
+				a.Case = append(a.Case, convertToCase(&a.Container, func(c *Container) *Case {
+					cs := &Case{
+						Name:      c.Name,
+						Parent:    c.Parent,
+						Container: []*Container{c},
+					}
+					cs.Container[0].Parent = cs
+					return cs
+				})...)
+
+				// leaf
+				a.Case = append(a.Case, convertToCase(&a.Leaf, func(c *Leaf) *Case {
+					cs := &Case{
+						Name:   c.Name,
+						Parent: c.Parent,
+						Leaf:   []*Leaf{c},
+					}
+					cs.Leaf[0].Parent = cs
+					return cs
+				})...)
+
+				// list
+				a.Case = append(a.Case, convertToCase(&a.List, func(c *List) *Case {
+					cs := &Case{
+						Name:   c.Name,
+						Parent: c.Parent,
+						List:   []*List{c},
+					}
+					cs.List[0].Parent = cs
+					return cs
+				})...)
+
+				// leaf-list
+				a.Case = append(a.Case, convertToCase(&a.LeafList, func(c *LeafList) *Case {
+					cs := &Case{
+						Name:     c.Name,
+						Parent:   c.Parent,
+						LeafList: []*LeafList{c},
+					}
+					cs.LeafList[0].Parent = cs
+					return cs
+				})...)
+
 				e.add(a.Name, ToEntry(a))
 			}
 		case "container":
 			for _, a := range fv.Interface().([]*Container) {
 				e.add(a.Name, ToEntry(a))
+			}
+		case "presence":
+			if v, ok := fv.Interface().(*Value); ok && v != nil {
+				e.Presence = &v.Name
 			}
 		case "grouping":
 			for _, a := range fv.Interface().([]*Grouping) {
@@ -1011,7 +1224,6 @@ func ToEntry(n Node) (e *Entry) {
 			"namespace",
 			"ordered-by",
 			"organization",
-			"presence",
 			"reference",
 			"revision",
 			"status",
