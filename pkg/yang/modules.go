@@ -371,6 +371,18 @@ func (ms *Modules) Process() []error {
 		}
 	}
 
+	// rerun the error checks, after augmentation happened
+	for _, m := range ms.Modules {
+		errs = append(errs, ToEntry(m).GetErrors()...)
+	}
+	for _, m := range ms.SubModules {
+		errs = append(errs, ToEntry(m).GetErrors()...)
+	}
+
+	if len(errs) > 0 {
+		return errorSort(errs)
+	}
+
 	// Now fix up all the choice statements to add in the missing case
 	// statements.
 	for _, m := range ms.Modules {
