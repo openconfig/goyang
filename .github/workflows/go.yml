@@ -19,7 +19,7 @@ jobs:
       statuses: write
 
   linter:
-    uses: openconfig/common-ci/.github/workflows/linter.yml@88a41b190576ebf6d51b5204c1056af2bda19036
+    uses: openconfig/common-ci/.github/workflows/linter.yml@49fc521890a243722b1fd43d70d170e46602a787
     permissions:
       contents: read
       packages: read
