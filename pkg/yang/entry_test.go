@@ -3658,6 +3658,43 @@ func TestDeviation(t *testing.T) {
 				},
 			},
 		},
+	}, {
+		desc: "deviate add extension",
+		inFiles: map[string]string{
+			"module": `
+			module test-deviate-add-extension {
+				prefix "a";
+				namespace "urn:a";
+
+				container foo {
+					leaf bar {
+						type string;
+						ext:extension1 "extension 1";
+					}
+				}
+				deviation /foo/bar {
+					deviate add {
+						ext:extension2;
+						ext:extension3 "extension 3";
+					}
+				}
+			}`,
+		},
+		wants: map[string][]deviationTest{
+			"test-deviate-add-extension": {
+				{
+					path: "/a:foo/a:bar",
+					entry: &Entry{
+						Name: "mode",
+						Exts: []*Statement{
+							{Keyword: "ext:extension1", HasArgument: true, Argument: "extension 1"},
+							{Keyword: "ext:extension2"},
+							{Keyword: "ext:extension3", HasArgument: true, Argument: "extension 3"},
+						},
+					},
+				},
+			},
+		},
 	}}
 
 	for _, tt := range tests {
@@ -3768,6 +3805,11 @@ func TestDeviation(t *testing.T) {
 					MustDiff := cmp.Diff(wantMust, gotMust)
 					if MustDiff != "" {
 						t.Errorf("Must deviation mismatch (-want +got):\n%s", MustDiff)
+					}
+
+					if extsDiff := cmp.Diff(want.entry.Exts, got.Exts,
+						cmpopts.IgnoreUnexported(Statement{})); extsDiff != "" {
+						t.Errorf("Exts mismatch (-want +got):\n%s", extsDiff)
 					}
 				}
 			}

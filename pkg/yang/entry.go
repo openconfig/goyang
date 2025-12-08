@@ -1194,6 +1194,10 @@ func (e *Entry) ApplyDeviate(deviateOpts ...DeviateOpt) []error {
 						deviatedNode.Extra["must"] = append(deviatedNode.Extra["must"], musts...)
 					}
 
+					if len(devSpec.Exts) > 0 {
+						deviatedNode.Exts = append(deviatedNode.Exts, devSpec.Exts...)
+					}
+
 				case DeviationNotSupported:
 					dp := deviatedNode.Parent
 					if dp == nil {
