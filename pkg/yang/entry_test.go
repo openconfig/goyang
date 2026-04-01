@@ -3658,6 +3658,50 @@ func TestDeviation(t *testing.T) {
 				},
 			},
 		},
+	}, {
+		desc: "not-supported and replace targeting the same node",
+		inFiles: map[string]string{
+			"source": `
+				module source {
+					prefix "s";
+					namespace "urn:s";
+
+					leaf a { type string; }
+					leaf b { type string; }
+				}`,
+			"dev-notsup": `
+				module dev-notsup {
+					prefix "dn";
+					namespace "urn:dn";
+
+					import source { prefix s; }
+
+					deviation /s:a {
+						deviate not-supported;
+					}
+				}`,
+			"dev-replace": `
+				module dev-replace {
+					prefix "dr";
+					namespace "urn:dr";
+
+					import source { prefix s; }
+
+					deviation /s:a {
+						deviate replace {
+							type uint16;
+						}
+					}
+				}`,
+		},
+		wants: map[string][]deviationTest{
+			"source": {{
+				path: "/a",
+			}, {
+				path:  "/b",
+				entry: &Entry{},
+			}},
+		},
 	}}
 
 	for _, tt := range tests {
