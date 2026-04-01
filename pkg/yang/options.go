@@ -39,6 +39,9 @@ type DeviateOptions struct {
 	// different support for a leaf without having to use a second instance
 	// of an AST.
 	IgnoreDeviateNotSupported bool
+
+	// pass controls what deviations are applied.
+	pass deviationPass
 }
 
 // IsDeviateOpt ensures that DeviateOptions satisfies the DeviateOpt interface.
@@ -47,6 +50,23 @@ func (DeviateOptions) IsDeviateOpt() {}
 // DeviateOpt is an interface that can be used in function arguments.
 type DeviateOpt interface {
 	IsDeviateOpt()
+}
+
+type deviationPass int
+
+const (
+	deviateAll              deviationPass = iota // Apply all deviations.
+	deviateSkipNotSupported                      // Skip not-supported deviations.
+	deviateOnlyNotSupported                      // Apply only not-supported deviations.
+)
+
+func getDeviationPass(opts []DeviateOpt) deviationPass {
+	for _, o := range opts {
+		if opt, ok := o.(DeviateOptions); ok && opt.pass != deviateAll {
+			return opt.pass
+		}
+	}
+	return deviateAll
 }
 
 func hasIgnoreDeviateNotSupported(opts []DeviateOpt) bool {

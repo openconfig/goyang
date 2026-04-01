@@ -392,18 +392,33 @@ func (ms *Modules) Process() []error {
 	// rather we can just walk all modules and submodules *after* entries
 	// are resolved. This means we do not need to concern ourselves that
 	// an entry does not exist.
+	// Deviations are applied in two passes so that not-supported deviations
+	// do not delete nodes before add/replace/delete deviations are applied.
+	// Without this, non-deterministic errors depend on map iteration order.
+	// Pass 1: Apply add/replace/delete deviations, skip not-supported.
+	errs = append(errs, ms.applyDeviations(
+		DeviateOptions{pass: deviateSkipNotSupported})...)
+	// Pass 2: Apply not-supported deviations only.
+	errs = append(errs, ms.applyDeviations(
+		DeviateOptions{pass: deviateOnlyNotSupported})...)
+
+	return errorSort(errs)
+}
+
+func (ms *Modules) applyDeviations(opts ...DeviateOpt) []error {
+	opts = append([]DeviateOpt{ms.ParseOptions.DeviateOptions}, opts...)
+	var errs []error
 	dvP := map[string]bool{} // cache the modules we've handled since we have both modname and modname@revision-date
 	for _, devmods := range []map[string]*Module{ms.Modules, ms.SubModules} {
 		for _, m := range devmods {
 			e := ToEntry(m)
 			if !dvP[e.Name] {
-				errs = append(errs, e.ApplyDeviate(ms.ParseOptions.DeviateOptions)...)
+				errs = append(errs, e.ApplyDeviate(opts...)...)
 				dvP[e.Name] = true
 			}
 		}
 	}
-
-	return errorSort(errs)
+	return errs
 }
 
 // include resolves all the include and import statements for m.  It returns

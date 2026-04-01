@@ -1129,7 +1129,19 @@ func (e *Entry) Augment(addErrors bool) (processed, skipped int) {
 func (e *Entry) ApplyDeviate(deviateOpts ...DeviateOpt) []error {
 	var errs []error
 	appendErr := func(err error) { errs = append(errs, err) }
+
+	pass := getDeviationPass(deviateOpts)
+
 	for _, d := range e.Deviations {
+		_, hasNotSupported := d.Deviate[DeviationNotSupported]
+		onlyHasNotSupported := hasNotSupported && len(d.Deviate) == 1
+		if pass == deviateSkipNotSupported && onlyHasNotSupported {
+			continue
+		}
+		if pass == deviateOnlyNotSupported && !hasNotSupported {
+			continue
+		}
+
 		deviatedNode := e.Find(d.DeviatedPath)
 		if deviatedNode == nil {
 			appendErr(fmt.Errorf("cannot find target node to deviate, %s", d.DeviatedPath))
@@ -1137,6 +1149,13 @@ func (e *Entry) ApplyDeviate(deviateOpts ...DeviateOpt) []error {
 		}
 
 		for dt, dv := range d.Deviate {
+			if pass == deviateSkipNotSupported && dt == DeviationNotSupported {
+				continue
+			}
+			if pass == deviateOnlyNotSupported && dt != DeviationNotSupported {
+				continue
+			}
+
 			for _, devSpec := range dv {
 				switch dt {
 				case DeviationAdd, DeviationReplace:
