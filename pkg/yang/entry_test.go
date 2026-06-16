@@ -1989,6 +1989,28 @@ func TestActionRPC(t *testing.T) {
   }
 }`,
 		},
+		{
+			name:          "input-output rpc with must",
+			wantNodeKind:  "rpc",
+			operationPath: []string{"operation"},
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  rpc operation {
+    description "rpc";
+    input {
+      must "false" {
+        error-message "imposible";
+      }
+    }
+    output {
+      must "false" {
+        error-message "imposible";
+      }
+    }
+  }
+}`,
+		},
 	}
 	for _, tt := range tests {
 		ms := NewModules()
