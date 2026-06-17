@@ -1804,13 +1804,15 @@ func getEntry(root *Entry, path []string) *Entry {
 
 func TestActionRPC(t *testing.T) {
 	tests := []struct {
-		name          string
-		inModule      string
-		operationPath []string
-		wantNodeKind  string
-		wantError     string
-		noInput       bool
-		noOutput      bool
+		name           string
+		inModule       string
+		operationPath  []string
+		wantNodeKind   string
+		wantError      string
+		noInput        bool
+		noOutput       bool
+		wantInputMust  []string
+		wantOutputMust []string
 	}{
 		{
 			name:          "test action in container",
@@ -1989,6 +1991,29 @@ func TestActionRPC(t *testing.T) {
   }
 }`,
 		},
+		{
+			name:           "input-output rpc with must",
+			wantNodeKind:   "rpc",
+			operationPath:  []string{"operation"},
+			wantInputMust:  []string{"false()"},
+			wantOutputMust: []string{"true()", "b"},
+			inModule: `module test {
+  namespace "urn:test";
+  prefix "test";
+  rpc operation {
+    description "rpc";
+    input {
+      must "false()" {
+        error-message "imposible";
+      }
+    }
+    output {
+      must "true()";
+	  must "b";
+    }
+  }
+}`,
+		},
 	}
 	for _, tt := range tests {
 		ms := NewModules()
@@ -2026,7 +2051,33 @@ func TestActionRPC(t *testing.T) {
 		} else if !tt.noOutput && e.RPC.Output == nil {
 			t.Errorf("%s: RPCEntry has nil Output, want: non-nil. Entry: %#v", tt.name, e.RPC)
 		}
+		if e.RPC != nil {
+			if got := mustExprs(t, tt.name, e.RPC.Input); !reflect.DeepEqual(got, tt.wantInputMust) {
+				t.Errorf("%s: input must expressions: got %v, want %v", tt.name, got, tt.wantInputMust)
+			}
+			if got := mustExprs(t, tt.name, e.RPC.Output); !reflect.DeepEqual(got, tt.wantOutputMust) {
+				t.Errorf("%s: output must expressions: got %v, want %v", tt.name, got, tt.wantOutputMust)
+			}
+		}
+
 	}
+}
+
+func mustExprs(t *testing.T, name string, e *Entry) []string {
+	t.Helper()
+	if e == nil {
+		return nil
+	}
+	var exprs []string
+	for _, x := range e.Extra["must"] {
+		m, ok := x.(*Must)
+		if !ok {
+			t.Errorf("%s: Extra[\"must\"] contains %T, want *Must", name, x)
+			continue
+		}
+		exprs = append(exprs, m.Name)
+	}
+	return exprs
 }
 
 var testIfFeatureModules = []struct {
