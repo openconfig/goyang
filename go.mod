@@ -9,4 +9,5 @@ require (
 	github.com/kylelemons/godebug v1.1.0
 	github.com/openconfig/gnmi v0.14.1
 	github.com/pborman/getopt v1.1.0
+	github.com/pborman/getopt/v2 v2.2.0
 )
