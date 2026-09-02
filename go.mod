@@ -2,7 +2,7 @@ module github.com/openconfig/goyang
 
 go 1.22.0
 
-toolchain go1.25.4
+toolchain go1.27.1
 
 require (
 	github.com/google/go-cmp v0.7.0
