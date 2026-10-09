@@ -619,11 +619,14 @@ func (e *EnumType) Set(name string, value int64) error {
 	if value > e.max {
 		return fmt.Errorf("value %d for %s too large (maximum is %d)", value, name, e.max)
 	}
-	e.ToString[value] = name
-	e.ToInt[name] = value
-	if value >= e.last {
+	// RFC 7950 section 9.6.4.2: an implicit value is one greater than the
+	// highest value assigned so far, whether that value is negative or not.
+	// The initial last of -1 only makes the first implicit value zero.
+	if len(e.ToInt) == 0 || value > e.last {
 		e.last = value
 	}
+	e.ToString[value] = name
+	e.ToInt[name] = value
 	return nil
 }
 

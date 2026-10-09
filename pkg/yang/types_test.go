@@ -271,6 +271,63 @@ func TestTypeResolve(t *testing.T) {
 			},
 		},
 	}, {
+		desc: "enum with implicit value after a negative explicit value",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-5"}},
+				{Name: "VENUS"},
+				{Name: "EARTH", Value: &Value{Name: "0"}},
+			},
+		},
+		out: &YangType{
+			Name: "enumeration",
+			Kind: Yenum,
+			Enum: &EnumType{
+				last:   0,
+				min:    MinEnum,
+				max:    MaxEnum,
+				unique: true,
+				ToString: map[int64]string{
+					-5: "MERCURY",
+					-4: "VENUS",
+					0:  "EARTH",
+				},
+				ToInt: map[string]int64{
+					"MERCURY": -5,
+					"VENUS":   -4,
+					"EARTH":   0,
+				},
+			},
+		},
+	}, {
+		desc: "enum with only negative values",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-10"}},
+				{Name: "VENUS"},
+			},
+		},
+		out: &YangType{
+			Name: "enumeration",
+			Kind: Yenum,
+			Enum: &EnumType{
+				last:   -9,
+				min:    MinEnum,
+				max:    MaxEnum,
+				unique: true,
+				ToString: map[int64]string{
+					-10: "MERCURY",
+					-9:  "VENUS",
+				},
+				ToInt: map[string]int64{
+					"MERCURY": -10,
+					"VENUS":   -9,
+				},
+			},
+		},
+	}, {
 		desc: "enum with repeated specified values",
 		in: &Type{
 			Name: "enumeration",
