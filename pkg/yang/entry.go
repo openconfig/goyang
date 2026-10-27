@@ -1379,19 +1379,25 @@ func (e *Entry) Find(name string) *Entry {
 			switch part {
 			case "input":
 				if e.RPC.Input == nil {
+					// An input created for an augment is a child of its
+					// operation like a declared one (RFC 7950 Section 6.4.1).
 					e.RPC.Input = &Entry{
-						Name: "input",
-						Kind: InputEntry,
-						Dir:  make(map[string]*Entry),
+						Name:   "input",
+						Kind:   InputEntry,
+						Dir:    make(map[string]*Entry),
+						Parent: e,
 					}
 				}
 				e = e.RPC.Input
 			case "output":
 				if e.RPC.Output == nil {
+					// An output created for an augment is a child of its
+					// operation like a declared one (RFC 7950 Section 6.4.1).
 					e.RPC.Output = &Entry{
-						Name: "output",
-						Kind: OutputEntry,
-						Dir:  make(map[string]*Entry),
+						Name:   "output",
+						Kind:   OutputEntry,
+						Dir:    make(map[string]*Entry),
+						Parent: e,
 					}
 				}
 				e = e.RPC.Output
@@ -1508,6 +1514,26 @@ func (e *Entry) dup() *Entry {
 			de.Parent = &ne
 			ne.Dir[k] = de
 		}
+	}
+
+	// RPC is a pointer, so the copy above would share one input and one output
+	// between every copy of an rpc or action, such as each use of a grouping
+	// that defines an action. An augment or a deviation aimed at the input or
+	// output of one use would then reach every use, against RFC 7950 Section
+	// 7.17: the augment's target node "is augmented with the nodes defined in
+	// the substatements that follow the "augment" statement". Copy the input
+	// and output too, parented to this copy.
+	if e.RPC != nil {
+		rpc := *e.RPC
+		if e.RPC.Input != nil {
+			rpc.Input = e.RPC.Input.dup()
+			rpc.Input.Parent = &ne
+		}
+		if e.RPC.Output != nil {
+			rpc.Output = e.RPC.Output.dup()
+			rpc.Output.Parent = &ne
+		}
+		ne.RPC = &rpc
 	}
 
 	ne.Extra = make(map[string][]interface{})
