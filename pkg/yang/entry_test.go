@@ -2029,6 +2029,140 @@ func TestActionRPC(t *testing.T) {
 	}
 }
 
+func TestActionGroupingUsesHaveOwnInputOutput(t *testing.T) {
+	tests := []struct {
+		name     string
+		inModule string
+		// wantBox1 and wantBox2 are the leaves expected in the input of
+		// act in box1 and box2.
+		wantBox1 []string
+		wantBox2 []string
+	}{{
+		name: "augment of one use",
+		inModule: `module test {
+  yang-version 1.1;
+  namespace "urn:test";
+  prefix "test";
+  grouping g {
+    action act {
+      input { leaf x { type string; } }
+      output { leaf y { type string; } }
+    }
+  }
+  container box1 { uses g; }
+  container box2 { uses g; }
+  augment "/test:box1/test:act/test:input" {
+    leaf z { type string; }
+  }
+}`,
+		wantBox1: []string{"x", "z"},
+		wantBox2: []string{"x"},
+	}, {
+		name: "deviation of one use",
+		inModule: `module test {
+  yang-version 1.1;
+  namespace "urn:test";
+  prefix "test";
+  grouping g {
+    action act {
+      input { leaf x { type string; } }
+      output { leaf y { type string; } }
+    }
+  }
+  container box1 { uses g; }
+  container box2 { uses g; }
+  deviation "/test:box1/test:act/test:input/test:x" {
+    deviate not-supported;
+  }
+}`,
+		wantBox1: []string{},
+		wantBox2: []string{"x"},
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ms := NewModules()
+			if err := ms.Parse(tt.inModule, "test"); err != nil {
+				t.Fatalf("cannot parse module: %v", err)
+			}
+			if errs := ms.Process(); len(errs) > 0 {
+				t.Fatalf("cannot process module: %v", errs)
+			}
+			root := ToEntry(ms.Modules["test"])
+
+			for _, box := range []struct {
+				name string
+				want []string
+			}{{"box1", tt.wantBox1}, {"box2", tt.wantBox2}} {
+				act := getEntry(root, []string{box.name, "act"})
+				if act == nil || act.RPC == nil || act.RPC.Input == nil || act.RPC.Output == nil {
+					t.Fatalf("%s/act: want an action with input and output, got: %v", box.name, act)
+				}
+				var got []string
+				for name := range act.RPC.Input.Dir {
+					got = append(got, name)
+				}
+				if diff := cmp.Diff(box.want, got, cmpopts.SortSlices(func(a, b string) bool { return a < b }), cmpopts.EquateEmpty()); diff != "" {
+					t.Errorf("%s/act/input leaves (-want, +got):\n%s", box.name, diff)
+				}
+				if act.RPC.Input.Parent != act {
+					t.Errorf("%s/act/input: parent is not %s/act", box.name, box.name)
+				}
+				if act.RPC.Output.Parent != act {
+					t.Errorf("%s/act/output: parent is not %s/act", box.name, box.name)
+				}
+			}
+		})
+	}
+}
+
+func TestAugmentCreatedInputOutputHasParent(t *testing.T) {
+	ms := NewModules()
+	if err := ms.Parse(`module test {
+  yang-version 1.1;
+  namespace "urn:test";
+  prefix "test";
+  container box {
+    action in-only { input { leaf x { type string; } } }
+    action out-only { output { leaf y { type string; } } }
+  }
+  augment "/test:box/test:in-only/test:output" {
+    leaf r { type string; }
+  }
+  augment "/test:box/test:out-only/test:input" {
+    leaf r { type string; }
+  }
+}`, "test"); err != nil {
+		t.Fatalf("cannot parse module: %v", err)
+	}
+	if errs := ms.Process(); len(errs) > 0 {
+		t.Fatalf("cannot process module: %v", errs)
+	}
+	root := ToEntry(ms.Modules["test"])
+
+	inOnly := getEntry(root, []string{"box", "in-only"})
+	if inOnly == nil || inOnly.RPC == nil || inOnly.RPC.Output == nil {
+		t.Fatalf("box/in-only: want an output created by the augment, got: %v", inOnly)
+	}
+	if inOnly.RPC.Output.Parent != inOnly {
+		t.Errorf("box/in-only/output: parent is not box/in-only")
+	}
+	if got, want := inOnly.RPC.Output.Dir["r"].Path(), "/test/box/in-only/output/r"; got != want {
+		t.Errorf("box/in-only/output/r: got path %q, want %q", got, want)
+	}
+
+	outOnly := getEntry(root, []string{"box", "out-only"})
+	if outOnly == nil || outOnly.RPC == nil || outOnly.RPC.Input == nil {
+		t.Fatalf("box/out-only: want an input created by the augment, got: %v", outOnly)
+	}
+	if outOnly.RPC.Input.Parent != outOnly {
+		t.Errorf("box/out-only/input: parent is not box/out-only")
+	}
+	if got, want := outOnly.RPC.Input.Dir["r"].Path(), "/test/box/out-only/input/r"; got != want {
+		t.Errorf("box/out-only/input/r: got path %q, want %q", got, want)
+	}
+}
+
 var testIfFeatureModules = []struct {
 	name string
 	in   string
