@@ -328,6 +328,72 @@ func TestTypeResolve(t *testing.T) {
 			},
 		},
 	}, {
+		desc: "enum with several implicit values after a negative explicit value",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "HELLO", Value: &Value{Name: "-42"}},
+				{Name: "WORLD"},
+				{Name: "HALLO"},
+				{Name: "WELT"},
+			},
+		},
+		out: &YangType{
+			Name: "enumeration",
+			Kind: Yenum,
+			Enum: &EnumType{
+				last:   -39,
+				min:    MinEnum,
+				max:    MaxEnum,
+				unique: true,
+				ToString: map[int64]string{
+					-42: "HELLO",
+					-41: "WORLD",
+					-40: "HALLO",
+					-39: "WELT",
+				},
+				ToInt: map[string]int64{
+					"HELLO": -42,
+					"WORLD": -41,
+					"HALLO": -40,
+					"WELT":  -39,
+				},
+			},
+		},
+	}, {
+		desc: "enum with implicit values after a negative and a positive explicit value",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "HELLO", Value: &Value{Name: "-42"}},
+				{Name: "WORLD"},
+				{Name: "BONJOUR", Value: &Value{Name: "42"}},
+				{Name: "LE_MONDE"},
+			},
+		},
+		out: &YangType{
+			Name: "enumeration",
+			Kind: Yenum,
+			Enum: &EnumType{
+				last:   43,
+				min:    MinEnum,
+				max:    MaxEnum,
+				unique: true,
+				ToString: map[int64]string{
+					-42: "HELLO",
+					-41: "WORLD",
+					42:  "BONJOUR",
+					43:  "LE_MONDE",
+				},
+				ToInt: map[string]int64{
+					"HELLO":    -42,
+					"WORLD":    -41,
+					"BONJOUR":  42,
+					"LE_MONDE": 43,
+				},
+			},
+		},
+	}, {
 		desc: "enum with repeated specified values",
 		in: &Type{
 			Name: "enumeration",
