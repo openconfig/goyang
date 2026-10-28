@@ -271,6 +271,129 @@ func TestTypeResolve(t *testing.T) {
 			},
 		},
 	}, {
+		desc: "enum with implicit value after a negative explicit value",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-5"}},
+				{Name: "VENUS"},
+				{Name: "EARTH", Value: &Value{Name: "0"}},
+			},
+		},
+		out: &YangType{
+			Name: "enumeration",
+			Kind: Yenum,
+			Enum: &EnumType{
+				last:   0,
+				min:    MinEnum,
+				max:    MaxEnum,
+				unique: true,
+				ToString: map[int64]string{
+					-5: "MERCURY",
+					-4: "VENUS",
+					0:  "EARTH",
+				},
+				ToInt: map[string]int64{
+					"MERCURY": -5,
+					"VENUS":   -4,
+					"EARTH":   0,
+				},
+			},
+		},
+	}, {
+		desc: "enum with only negative values",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "MERCURY", Value: &Value{Name: "-10"}},
+				{Name: "VENUS"},
+			},
+		},
+		out: &YangType{
+			Name: "enumeration",
+			Kind: Yenum,
+			Enum: &EnumType{
+				last:   -9,
+				min:    MinEnum,
+				max:    MaxEnum,
+				unique: true,
+				ToString: map[int64]string{
+					-10: "MERCURY",
+					-9:  "VENUS",
+				},
+				ToInt: map[string]int64{
+					"MERCURY": -10,
+					"VENUS":   -9,
+				},
+			},
+		},
+	}, {
+		desc: "enum with several implicit values after a negative explicit value",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "HELLO", Value: &Value{Name: "-42"}},
+				{Name: "WORLD"},
+				{Name: "HALLO"},
+				{Name: "WELT"},
+			},
+		},
+		out: &YangType{
+			Name: "enumeration",
+			Kind: Yenum,
+			Enum: &EnumType{
+				last:   -39,
+				min:    MinEnum,
+				max:    MaxEnum,
+				unique: true,
+				ToString: map[int64]string{
+					-42: "HELLO",
+					-41: "WORLD",
+					-40: "HALLO",
+					-39: "WELT",
+				},
+				ToInt: map[string]int64{
+					"HELLO": -42,
+					"WORLD": -41,
+					"HALLO": -40,
+					"WELT":  -39,
+				},
+			},
+		},
+	}, {
+		desc: "enum with implicit values after a negative and a positive explicit value",
+		in: &Type{
+			Name: "enumeration",
+			Enum: []*Enum{
+				{Name: "HELLO", Value: &Value{Name: "-42"}},
+				{Name: "WORLD"},
+				{Name: "BONJOUR", Value: &Value{Name: "42"}},
+				{Name: "LE_MONDE"},
+			},
+		},
+		out: &YangType{
+			Name: "enumeration",
+			Kind: Yenum,
+			Enum: &EnumType{
+				last:   43,
+				min:    MinEnum,
+				max:    MaxEnum,
+				unique: true,
+				ToString: map[int64]string{
+					-42: "HELLO",
+					-41: "WORLD",
+					42:  "BONJOUR",
+					43:  "LE_MONDE",
+				},
+				ToInt: map[string]int64{
+					"HELLO":    -42,
+					"WORLD":    -41,
+					"BONJOUR":  42,
+					"LE_MONDE": 43,
+				},
+			},
+		},
+	}, {
 		desc: "enum with repeated specified values",
 		in: &Type{
 			Name: "enumeration",
